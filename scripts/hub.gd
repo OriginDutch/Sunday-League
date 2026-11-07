@@ -28,9 +28,6 @@ var last_seated := 0
 var wipe_armed := false
 var _ticker_i := 0
 
-# post-match summary (restyled in the next step; still the v0.1 panel)
-var summary_panel: PanelContainer
-var summary_label: Label
 
 
 func build(m: Main) -> void:
@@ -872,62 +869,169 @@ static func _money(v: int) -> String:
 	return ("-" if v < 0 else "") + s + out
 
 
-# ================================================================== post-match summary (v0.1 panel, restyle next)
+# ================================================================== post-match summary
+
+var summary_root: Control         # own scaled layer over everything
+
 
 func _build_summary() -> void:
-	summary_panel = PanelContainer.new()
-	summary_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	summary_panel.offset_left = -300
-	summary_panel.offset_right = 300
-	summary_panel.offset_top = -330
-	summary_panel.offset_bottom = 330
-	summary_panel.visible = false
-	add_child(summary_panel)
-	var sv := VBoxContainer.new()
-	sv.add_theme_constant_override("separation", 14)
-	summary_panel.add_child(sv)
-	summary_label = Label.new()
-	summary_label.label_settings = _font(20)
-	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	summary_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	sv.add_child(summary_label)
-	var cont := Button.new()
-	cont.text = "Continue"
-	cont.add_theme_font_size_override("font_size", 22)
-	cont.pressed.connect(func() -> void: main.back_to_hub())
-	sv.add_child(cont)
+	summary_root = Control.new()
+	summary_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	summary_root.visible = false
+	add_child(summary_root)
+	get_viewport().size_changed.connect(_fit_summary)
+	_fit_summary()
+
+
+func _fit_summary() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var sc := minf(vp.x / Kit.DESIGN.x, vp.y / Kit.DESIGN.y)
+	summary_root.scale = Vector2(sc, sc)
+	summary_root.size = vp / sc
 
 
 func show_summary(s: Dictionary, opponent: String) -> void:
 	last_seated = s["seated"]
 	_ticker_i += 1
-	var res := {"W": "WIN", "D": "DRAW", "L": "LOSS"}
+	for ch in summary_root.get_children():
+		ch.queue_free()
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.35)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	summary_root.add_child(dim)
+	var home: bool = s.get("home", true)
+	var gf: int = s["goals_for"]
+	var ga: int = s["goals_against"]
+	var us := ClubState.CLUB_NAME
+
+	var card := Kit.sheet("card", 1120, 0.4, Vector4(36, 30, 36, 30), 22)
+	var b: VBoxContainer = card["body"]
+	var res := {"W": "Full time — a win!", "D": "Full time — a draw", "L": "Full time — a loss"}
+	var tag := "League · now %s" % _ordinal(int(s["position"])) if s.has("position") else "Friendly"
+	if s.get("season_over", false):
+		tag += " · season over"
+	b.add_child(_spread(Kit.heading(res[s["result"]], 44), Kit.caps(tag)))
+	# score line: home team on the left
+	var line := _hbox(28)
+	line.alignment = BoxContainer.ALIGNMENT_CENTER
+	var l_name := us if home else opponent
+	var r_name := opponent if home else us
+	var lh := _hbox(16)
+	lh.alignment = BoxContainer.ALIGNMENT_END
+	lh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var ln := Kit.label(l_name, false, 24, 700, Kit.c("ink"))
+	ln.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	lh.add_child(ln)
+	lh.add_child(Kit.icon("crest_home" if home else "crest_away", 60, Kit.c("pen") if home else Kit.c("ink")))
+	line.add_child(lh)
+	line.add_child(Kit.label("%d – %d" % [gf if home else ga, ga if home else gf], false, 64, 700, Kit.c("ink")))
+	var rh := _hbox(16)
+	rh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rh.add_child(Kit.icon("crest_away" if home else "crest_home", 60, Kit.c("ink") if home else Kit.c("pen")))
+	var rn := Kit.label(r_name, false, 24, 700, Kit.c("ink"))
+	rn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	rh.add_child(rn)
+	line.add_child(rh)
+	b.add_child(line)
+	b.add_child(Kit.rule())
+
+	var cols := _hbox(40)
+	# attendance
+	var att := _sum_col("Attendance", "fans")
+	if home:
+		att.add_child(_sum_row("Seated (paying)", str(s["seated"])))
+		att.add_child(_sum_row("Standing (free)", str(s["standing"])))
+		att.add_child(_sum_row("Total", str(s["attendance"]), null, true))
+		var pct: float = 100.0 * s["seated"] / maxf(1.0, s["attendance"])
+		att.add_child(Kit.progress(pct, false))
+		att.add_child(Kit.label("Every seat was taken." if s["standing"] > 0 and s["seated"] > 0 else
+			("Nobody had a seat." if s["seated"] == 0 else "Room to spare."), false, 14, 500, Kit.c("muted")))
+	else:
+		att.add_child(_sum_row("Our travelling fans", str(int(round(club.fans * Main.AWAY_TRAVEL_SHARE)))))
+		att.add_child(Kit.label("Away match: their ground, their turnstiles.", false, 14, 500, Kit.c("muted"), true))
+	cols.add_child(att)
+	# money
+	var mon := _sum_col("Money", "cash")
+	mon.add_child(_sum_row("Ticket income (%d × £%d)" % [s["seated"], ClubState.TICKET_PRICE], "+£%s" % _money(s["revenue"]), Kit.c("ok")))
+	mon.add_child(_sum_row("Cash before", "£%s" % _money(club.money - int(s["revenue"]))))
+	mon.add_child(_sum_row("Cash now", "£%s" % _money(club.money), null, true))
+	cols.add_child(mon)
+	# fans & approval
+	var fa := _sum_col("Fans", "approval")
+	var dfans: int = s["fans_after"] - s["fans_before"]
+	fa.add_child(_sum_row("Fans", "%d → %d  (%+d)" % [s["fans_before"], s["fans_after"], dfans], Kit.c("ok") if dfans >= 0 else Kit.c("danger")))
+	var a0 := int(round(s["approval_before"]))
+	var a1 := int(round(s["approval_after"]))
+	fa.add_child(_sum_row("Fan approval", "%d%% → %d%%  (%+d)" % [a0, a1, a1 - a0], Kit.c("ok") if a1 >= a0 else Kit.c("danger"), true))
 	var parts: Dictionary = s["approval_parts"]
-	summary_label.text = "%s   %d - %d   vs %s\n\nAttendance: %d\n   %d seated (paid £%d each)\n   %d standing (free)\nTicket income: £%d\n\nFans: %d → %d\nApproval: %d%% → %d%%\n   result %+.1f · entertainment %+.1f · seating %+.1f" % [
-		res[s["result"]], s["goals_for"], s["goals_against"], opponent,
-		s["attendance"], s["seated"], ClubState.TICKET_PRICE, s["standing"], s["revenue"],
-		s["fans_before"], s["fans_after"], int(round(s["approval_before"])), int(round(s["approval_after"])),
-		parts["result"], parts["entertainment"], parts["seating"]]
-	if s.has("position"):
-		var where := "home" if s.get("home", true) else "away"
-		summary_label.text += "\n\nLeague (%s match): now %s" % [where, _ordinal(s["position"])]
-		if s.get("season_over", false):
-			summary_label.text += "  —  SEASON OVER"
-		var others: Array = s.get("round_results", [])
-		if not others.is_empty():
-			summary_label.text += "\nOther results:\n" + "\n".join(others.slice(0, 10))
+	var rname: String = {"W": "win", "D": "draw", "L": "loss"}[s["result"]]
+	for p in [["· Result (%s)" % rname, parts["result"]], ["· Entertainment", parts["entertainment"]], ["· Seating", parts["seating"]]]:
+		var v: float = snappedf(p[1], 0.1)
+		if is_zero_approx(v):
+			v = 0.0
+		if p[0] == "· Seating" and not home:
+			continue
+		fa.add_child(_sum_row(p[0], "%+.1f" % v, Kit.c("ok") if v >= 0.0 else Kit.c("danger")))
+	cols.add_child(fa)
+	b.add_child(cols)
 	if s["seated"] >= GOAL_SUPPORTERS:
-		summary_label.text += "\n\n★ v0.1 GOAL REACHED: %d paying supporters! ★" % s["seated"]
-	summary_panel.visible = true
+		b.add_child(Kit.label("★ Goal reached: %d paying supporters! ★" % s["seated"], true, 26, 700, Kit.c("pen")))
+	var back := Kit.primary("Back to the club", "club")
+	back.size_flags_horizontal = Control.SIZE_SHRINK_END
+	back.custom_minimum_size = Vector2(280, 56)
+	back.pressed.connect(func() -> void: main.back_to_hub())
+	b.add_child(back)
+	Kit.pin(card["root"], 224)
+	Kit.pin(card["root"], 896)
+	summary_root.add_child(card["root"])
+	card["root"].anchor_left = 0.5
+	card["root"].anchor_right = 0.5
+	card["root"].offset_left = -560
+	card["root"].offset_right = 560
+	card["root"].offset_top = 132
+
+	# elsewhere in the league (sticky note)
+	var others: Array = s.get("round_results", [])
+	if not others.is_empty():
+		var n := Kit.sheet("note", 320, -2.5, Vector4(20, 24, 20, 20), 2)
+		var nb: VBoxContainer = n["body"]
+		nb.add_child(Kit.caps("Elsewhere today", Kit.c("note_muted")))
+		for r in others:
+			if str(r).contains(us):
+				continue
+			nb.add_child(Kit.label(r, true, 16, 400, Kit.c("note_ink"), true))
+		Kit.tape(n["root"], Vector2(132, -14), 4)
+		summary_root.add_child(n["root"])
+		n["root"].position = Vector2(26, 150)
+	summary_root.visible = true
+
+
+func _sum_col(head: String, ic: String) -> VBoxContainer:
+	var v := _vbox(6)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var h := _hbox(8)
+	h.add_child(Kit.icon(ic, 20, Kit.c("pen")))
+	var cl := Kit.caps(head)
+	cl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(cl)
+	v.add_child(h)
+	return v
+
+
+func _sum_row(lab: String, val: String, col = null, bold := false) -> Control:
+	var p := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0)
+	sb.border_width_bottom = 1
+	sb.border_color = Kit.c("tag_border")
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	p.add_theme_stylebox_override("panel", sb)
+	p.add_child(_spread(Kit.label(lab, false, 16, 500, Kit.c("muted")),
+		Kit.label(val, false, 20 if bold else 17, 700 if bold else 600, Kit.c("ink") if col == null else col)))
+	return p
 
 
 func hide_summary() -> void:
-	summary_panel.visible = false
-
-
-func _font(size: int) -> LabelSettings:
-	var ls := LabelSettings.new()
-	ls.font_size = size
-	ls.outline_size = maxi(3, size / 7)
-	ls.outline_color = Color(0, 0, 0, 0.8)
-	return ls
+	if summary_root != null:
+		summary_root.visible = false

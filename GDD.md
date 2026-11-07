@@ -2,6 +2,7 @@
 
 > Living document. Only contains what Marcel has decided. Anything not decided is listed under **Open questions**.
 > Rule for this project: Claude decides nothing unless Marcel explicitly says Claude may decide.
+> Working agreement (2026-11-07): **everything we do, discuss, plan or decide is recorded in this document**, so nothing gets lost.
 
 Last updated: 2026-11-07 (design session 1: economy, stadium, v0.1 scope)
 
@@ -148,7 +149,27 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Demolishing / replacing:** you get money back **pro rata**. Upgrades **depreciate from 75% to 10% over ~3 seasons**.
 - **Build time:** depends on the size of the upgrade (TBD). **Instant for now**; build phases come in a later round.
 - **Settings (for now):** volume (separate for music / effects / crowd), match length, camera speed.
-- **Navigation:** three mockups made (bottom dock, left sidebar, top tabs) — choice open.
+- **Navigation:** three mockups made (bottom dock, left sidebar, top tabs) — superseded by the ChatGPT design direction below.
+
+### Design process (2026-11-07)
+- **ChatGPT designs the UI; Claude builds it in Godot.** Claude wrote the designer brief: [UI Style Guide & Design Brief](https://claude.ai/artifact/QfV7Z8GDX2vMwBspqv6bkm) (what's decided, screen contents, Godot constraints, deliverables).
+- Approach: **find a style first, then expand to more screens.**
+- Round 1 (ChatGPT): good structure, but too premium (gold on charcoal, oak crest), photo/3D icon art, ground hidden. Feedback sent.
+- Round 2: ground visible, one icon style, consistent numbers; still premium colours. Feedback sent: three colour variants on a frozen layout.
+- Round 3: three themes delivered with tokens (`design/ui-handoff/sunday_league_ui_tokens.json` + `README_FOR_CLAUDE.md`): Clubhouse Canteen, Chalkboard, Club Colours (red & white).
+
+### Chosen UI style (Marcel, 2026-11-07)
+- **Chalkboard style in Clubhouse Canteen colours:** panel #20372A (93% opacity), border #526D57, text #F5F0DF, muted #C0C9B9, accent #E8D9A8, success #79C68B, warning #E5AE54, danger #D66B61. Full values in the tokens JSON.
+- **Fonts:** Barlow Semi Condensed (400–700) for all functional UI; **Caveat** (500–600) for the ticker, taglines **and headings** (club name, "Our Goal", "Next Match") — for now. Stats, buttons and instructions stay in Barlow.
+- **Layout:** top stats bar; "Our Goal" card left; "Next Match" card right with **both crests** (so you see home vs away); **slim floating bottom strip** (ticker + navigation on one line, a little above the bottom edge so you still glimpse the ground); centre of the ground kept clear.
+- Chalk underlines under headings, chalky progress-bar fill, homemade single-colour crests (SVG, recolourable later) — in `design/ui-handoff/`.
+- Mock-up of this style: "Hub · Canteen colours, chalkboard style" on the [Hub mockups canvas](https://claude.ai/artifact/89eq9cBSogTe6xLhRZL9EZ) (has a texture switch).
+
+### Panel texture — still open
+- ChatGPT's 512 px texture: even fine grain, reads as felt/noise. **Rejected.**
+- Claude's procedural textures (subtle / medium / bold; eraser wipes, haze, ghost strokes; `design/textures/`): **rejected** ("buiten smaak").
+- Next: a new ChatGPT round with three directions — A) real photographed chalkboard, B) illustrated/stylised, C) flat panels with chalk details only (outlines, corner marks, doodles). Prompt is ready; waiting for Marcel's ChatGPT limit to reset.
+
 
 ## 10b. Economy
 
@@ -327,6 +348,9 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
 | 2026-11-07 | v0.1 scope and done-criterion (§11b); random friendlies, ticket sales only, fans pay only for a seat |
 | 2026-11-07 | v0.1 build: chair + bench, pick a slot, growth from winning + facilities, fixed ticket price, recruit to 11 (free, can't play short), approval from results/entertainment/seating, autosave after match |
+| 2026-11-07 | Working agreement: everything discussed/planned/decided goes into the GDD |
+| 2026-11-07 | UI: ChatGPT designs, Claude builds; chosen style = Chalkboard style in Clubhouse Canteen colours, Barlow + Caveat (Caveat also for headings for now), slim floating bottom strip, both crests in Next Match |
+| 2026-11-07 | Panel texture: ChatGPT grain and Claude's procedural versions rejected; new ChatGPT round with 3 directions pending |
 | 2026-11-07 | Menus/UI: style, English with i18n in mind, live build preview, rotatable camera, 9×5×9×5 sections, pro-rata demolish refund (75%→10% over ~3 seasons), instant build for now, settings list |
 | 2026-11-07 | Playtest round 3: layered defensive block, step-out, attacking runs (in behind / come short / hold) |
 | 2026-11-07 | Playtest round 2: Q nearest+cycle, 4 auto-switch rules, receiver comes to the ball, active defending, real dead balls, stackable chairs, save after purchases, sound, minimap + edge arrows, chants |
@@ -361,6 +385,10 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 
 **Later (Marcel, 2026-11-07)**
 - Stamina / sprint bar.
+
+**3D assets (raised 2026-11-07)**
+- Marcel will pay for a month of ChatGPT only if Claude or ChatGPT can build a good set of 3D models (stadium parts, shops, other assets). Under discussion: what Claude needs to build a first test asset.
+- Art style for 3D is still undecided (see Tech).
 
 **Not discussed yet** (here so they don't get lost)
 - Economy: safety net (see §10b), exact expense list, performance bonuses.

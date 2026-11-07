@@ -1,0 +1,417 @@
+{
+  "meta": {
+    "project": "Sunday League",
+    "purpose": "Godot 4 UI design tokens and visual style specification",
+    "version": "1.0",
+    "design_resolution": [
+      1920,
+      1080
+    ],
+    "target_resolution_min": [
+      1280,
+      720
+    ],
+    "source_of_truth": "This JSON defines shared UI metrics and the three selectable visual themes. Do not infer values from the reference mock-up image.",
+    "units": "All dimensions are pixels at 1920x1080 unless otherwise stated."
+  },
+  "shared": {
+    "fonts": {
+      "ui": {
+        "family": "Barlow Semi Condensed",
+        "source": "Google Fonts",
+        "weights": [
+          400,
+          500,
+          600,
+          700
+        ],
+        "usage": "All functional UI: labels, stats, buttons, headings, navigation."
+      },
+      "personality": {
+        "family": "Caveat",
+        "source": "Google Fonts",
+        "weights": [
+          500,
+          600
+        ],
+        "usage": "Taglines, flavour text and the news ticker only. Never use for controls, stats, or essential instructions."
+      }
+    },
+    "type_scale": {
+      "title": {
+        "font": "ui",
+        "weight": 700,
+        "size": 30,
+        "line_height": 36
+      },
+      "heading": {
+        "font": "ui",
+        "weight": 700,
+        "size": 22,
+        "line_height": 28
+      },
+      "body": {
+        "font": "ui",
+        "weight": 500,
+        "size": 16,
+        "line_height": 22
+      },
+      "caption": {
+        "font": "ui",
+        "weight": 400,
+        "size": 14,
+        "line_height": 18
+      },
+      "ticker": {
+        "font": "personality",
+        "weight": 600,
+        "size": 20,
+        "line_height": 24
+      }
+    },
+    "icons": {
+      "style": "flat_single_colour_outline",
+      "format": "SVG",
+      "grid": [
+        24,
+        24
+      ],
+      "stroke_width": 2,
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round",
+      "default_colour": "text",
+      "selected_colour": "accent",
+      "no_photorealistic_or_3d_icons": true,
+      "no_mixed_icon_families": true
+    },
+    "layout": {
+      "structure": [
+        "top_stats_bar",
+        "club_goal_card_left",
+        "next_match_card_right",
+        "clear_central_ground_view",
+        "integrated_ticker_and_bottom_navigation"
+      ],
+      "ground_visibility": "Keep the centre of the screen clear. Panels frame the pitch and must not dominate it.",
+      "top_right_actions": [
+        "settings_icon",
+        "quit_icon"
+      ],
+      "bottom_navigation_items": [
+        "Stadium",
+        "Recruitment",
+        "Squad",
+        "Finances"
+      ],
+      "bottom_navigation_height": 72,
+      "ticker": {
+        "placement": "Integrated into the bottom navigation strip, occupying the left portion",
+        "text": "Rumour has it the chairman is eyeing a second-hand scoreboard. Fancy.",
+        "font": "personality",
+        "must_preserve_exact_copy": true
+      },
+      "remove_empty_right_navigation_slot": true,
+      "club_goal_card": {
+        "title": "Our Goal",
+        "description": "Reach 100 paying supporters",
+        "progress_value": 24,
+        "progress_max": 100,
+        "progress_label": "24 / 100",
+        "do_not_repeat_club_name_or_crest": true
+      },
+      "next_match_card": {
+        "title": "Next Match",
+        "opponent": "Riverside United",
+        "primary_action": "Play Match",
+        "availability": "All 11 players available.",
+        "omit_date": true,
+        "omit_venue": true,
+        "omit_league_or_division": true
+      },
+      "top_stats": [
+        {
+          "key": "fans",
+          "value": "30",
+          "label": "Fans"
+        },
+        {
+          "key": "fan_approval",
+          "value": "58%",
+          "label": "Fan Approval"
+        },
+        {
+          "key": "cash",
+          "value": "£34",
+          "label": "Cash"
+        },
+        {
+          "key": "seats",
+          "value": "24",
+          "label": "Seats"
+        },
+        {
+          "key": "squad",
+          "value": "11 / 11",
+          "label": "Squad"
+        },
+        {
+          "key": "record",
+          "value": "W4 D1 L3",
+          "label": "Friendlies Only"
+        }
+      ],
+      "crest_direction": "Simple homemade amateur-club badge. Prefer a basic shield or roundel with a small football/leaf motif. Avoid ornate heraldry and luxury oak-tree crests.",
+      "tagline": "The changing rooms are technically a shed.",
+      "tagline_font": "personality"
+    },
+    "components": {
+      "panel": {
+        "radius": 9,
+        "border_width": 1,
+        "shadow_offset": [
+          0,
+          3
+        ],
+        "shadow_blur": 10
+      },
+      "button": {
+        "radius": 7,
+        "border_width": 1,
+        "shadow_offset": [
+          0,
+          2
+        ],
+        "shadow_blur": 5,
+        "minimum_click_target": 44
+      },
+      "navigation_item": {
+        "minimum_click_target": 44,
+        "selected_indicator": "accent underline or accent-tinted background",
+        "icon_size": 24
+      },
+      "panel_opacity_default": 0.93
+    },
+    "interaction_states": {
+      "button_states_required": [
+        "default",
+        "hover",
+        "pressed",
+        "disabled"
+      ],
+      "other_interactive_states_required": [
+        "default",
+        "hover",
+        "pressed",
+        "selected",
+        "disabled"
+      ],
+      "disabled_play_rule": "Play Match is enabled when squad count is 11 or more. If fewer than 11, disable it and show a concise reason below the button.",
+      "current_mock_data_rule": "With squad 11 / 11, Play Match must be enabled and the availability line must say All 11 players available. Do not show a warning."
+    },
+    "godot_implementation": {
+      "engine": "Godot 4",
+      "recommended_output": "Godot Theme resource(s) generated from these tokens, with shared component styles and theme overrides.",
+      "avoid": [
+        "CSS as the runtime styling mechanism",
+        "frosted glass or backdrop blur",
+        "rasterised text",
+        "text baked into icons",
+        "photographs or realistic player imagery in UI",
+        "3D-rendered coin or trophy icons",
+        "fixed-width text containers that cannot accommodate longer translations"
+      ],
+      "panel_fill": "Use a flat semi-transparent StyleBoxFlat fill. No blur.",
+      "scaling": "Use anchors/containers and responsive sizing. Preserve minimum 44px click targets at the 1920x1080 design scale and scale proportionally for lower resolutions.",
+      "translation_headroom": "Allow approximately 40% additional text width for longer translations such as German and Dutch.",
+      "font_imports": "Import the specified Google Fonts as TTF/OTF assets and assign the requested weights."
+    }
+  },
+  "themes": {
+    "clubhouse_canteen": {
+      "display_name": "Clubhouse Canteen",
+      "description": "Warm, homely club green and cream. A local clubhouse with a canteen, not a premium management sim.",
+      "panel_opacity": 0.93,
+      "colours": {
+        "background": "#263B2E",
+        "panel": "#20372A",
+        "panel_border": "#526D57",
+        "text": "#F5F0DF",
+        "muted_text": "#C0C9B9",
+        "accent": "#E8D9A8",
+        "success": "#79C68B",
+        "warning": "#E5AE54",
+        "danger": "#D66B61"
+      },
+      "component_effects": {
+        "panel": {
+          "radius": 9,
+          "border_width": 1,
+          "shadow_offset": [
+            0,
+            3
+          ],
+          "shadow_blur": 10,
+          "shadow_opacity": 0.22
+        },
+        "button": {
+          "radius": 7,
+          "border_width": 1,
+          "shadow_offset": [
+            0,
+            2
+          ],
+          "shadow_blur": 5,
+          "shadow_opacity": 0.18
+        }
+      },
+      "button_states": {
+        "default": {
+          "background": "#E8D9A8",
+          "text": "#263B2E",
+          "border": "#E8D9A8"
+        },
+        "hover": {
+          "background": "#F4E8C2",
+          "text": "#263B2E",
+          "border": "#F4E8C2"
+        },
+        "pressed": {
+          "background": "#D1BE86",
+          "text": "#263B2E",
+          "border": "#D1BE86"
+        },
+        "disabled": {
+          "background": "#526357",
+          "text": "#AEB8AB",
+          "border": "#526357"
+        }
+      }
+    },
+    "chalkboard": {
+      "display_name": "Chalkboard",
+      "description": "Dark green slate, chalk-white text and one bright lime accent. Scruffy, practical and distinctive.",
+      "panel_opacity": 0.94,
+      "colours": {
+        "background": "#172922",
+        "panel": "#20342C",
+        "panel_border": "#52685B",
+        "text": "#F0F0E7",
+        "muted_text": "#B7C4B9",
+        "accent": "#C9E66B",
+        "success": "#82C991",
+        "warning": "#E6B65A",
+        "danger": "#DB7770"
+      },
+      "component_effects": {
+        "panel": {
+          "radius": 7,
+          "border_width": 1,
+          "shadow_offset": [
+            0,
+            3
+          ],
+          "shadow_blur": 8,
+          "shadow_opacity": 0.25
+        },
+        "button": {
+          "radius": 6,
+          "border_width": 1,
+          "shadow_offset": [
+            0,
+            2
+          ],
+          "shadow_blur": 4,
+          "shadow_opacity": 0.18
+        }
+      },
+      "button_states": {
+        "default": {
+          "background": "#C9E66B",
+          "text": "#172922",
+          "border": "#C9E66B"
+        },
+        "hover": {
+          "background": "#DDF49A",
+          "text": "#172922",
+          "border": "#DDF49A"
+        },
+        "pressed": {
+          "background": "#A9C74F",
+          "text": "#172922",
+          "border": "#A9C74F"
+        },
+        "disabled": {
+          "background": "#46564C",
+          "text": "#AAB5AA",
+          "border": "#46564C"
+        }
+      }
+    },
+    "club_colours_red_white": {
+      "display_name": "Club Colours — Red & White",
+      "description": "Neutral charcoal foundation with the club's chosen red driving accents, selected states and primary actions.",
+      "panel_opacity": 0.93,
+      "colours": {
+        "background": "#22282C",
+        "panel": "#292F34",
+        "panel_border": "#596168",
+        "text": "#F6F3EF",
+        "muted_text": "#C0C4C7",
+        "accent": "#E34B50",
+        "success": "#75C68A",
+        "warning": "#E5B35C",
+        "danger": "#A9363D"
+      },
+      "component_effects": {
+        "panel": {
+          "radius": 9,
+          "border_width": 1,
+          "shadow_offset": [
+            0,
+            3
+          ],
+          "shadow_blur": 10,
+          "shadow_opacity": 0.24
+        },
+        "button": {
+          "radius": 7,
+          "border_width": 1,
+          "shadow_offset": [
+            0,
+            2
+          ],
+          "shadow_blur": 5,
+          "shadow_opacity": 0.18
+        }
+      },
+      "button_states": {
+        "default": {
+          "background": "#E34B50",
+          "text": "#FFFFFF",
+          "border": "#E34B50"
+        },
+        "hover": {
+          "background": "#F36A6E",
+          "text": "#FFFFFF",
+          "border": "#F36A6E"
+        },
+        "pressed": {
+          "background": "#BD373D",
+          "text": "#FFFFFF",
+          "border": "#BD373D"
+        },
+        "disabled": {
+          "background": "#554346",
+          "text": "#B9AFB0",
+          "border": "#554346"
+        }
+      },
+      "club_colour_mapping": {
+        "primary_club_colour": "accent",
+        "secondary_club_colour": "optional secondary accent for crest details only",
+        "neutral_surfaces": "remain unchanged",
+        "semantic_success_warning_danger": "must not be replaced by club colours"
+      }
+    }
+  }
+}

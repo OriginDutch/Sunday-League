@@ -198,7 +198,7 @@ func _ready() -> void:
 		add_child(shed)
 	if "--bigstand" in args:
 		# dev: big two-tier stand POC (GDD §10i) along the north touchline, 6 m behind it
-		var bs := BigStand.new()
+		var bs = load("res://scripts/big_stand.gd").new()  # by path: works before the editor rescans class names
 		bs.position = Vector3(0, 0, -(HALF_W + 6.0))
 		add_child(bs)
 		for arg in args:

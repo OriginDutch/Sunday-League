@@ -196,6 +196,16 @@ func _ready() -> void:
 		var shed: Node3D = load("res://assets/models/the_shed.glb").instantiate()
 		shed.position = Vector3(0, 0, -(HALF_W + 3.0))
 		add_child(shed)
+	if "--bigstand" in args:
+		# dev: big two-tier stand POC (GDD §10i) along the north touchline, 6 m behind it
+		var bs := BigStand.new()
+		bs.position = Vector3(0, 0, -(HALF_W + 6.0))
+		add_child(bs)
+		for arg in args:
+			if arg.begins_with("--club-colours="):
+				# dev: --club-colours=primaryhex,secondaryhex  (demo of the club colours upgrade)
+				var cc: PackedStringArray = arg.trim_prefix("--club-colours=").split(",")
+				bs.set_club_colours(Color(cc[0]), Color(cc[1]))
 	if "--quick-friendly" in args:
 		# dev: play a 2x3s friendly with nobody at the controls, then show the summary
 		start_friendly()

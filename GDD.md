@@ -245,7 +245,27 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - People: **~30% full, mostly in club colours** (low-poly figures).
 - Seats: **club name spelled out in the seats** (second colour).
 - Back: **simple facade** (cladding + stair cores) for now, to be revisited later.
-- Still to ask: which text in the seats for the POC; go-ahead to build.
+- Seat text for the POC: **"SUNDAY LEAGUE"** (Marcel). Go-ahead given 2026-11-07.
+
+**What Claude built** (numbers are Claude's picks, tunable):
+- 103.5 m wide, ~35 m deep, roof front edge ~26 m high, cantilevered ~36 m from the rear columns (no columns in front of the view); white warren trusses at every section boundary, rear columns + back-stay ties, corrugated roof with a 4 m translucent strip at the front, club-colour fascia.
+- Lower tier: 20 rows (0.80 m tread, 0.36 m rise) on a raised walkway behind a pitch-side wall with a club-colour band; 8 aisles with half-steps, yellow nosings and handrails; 3 vomitories (tunnel mouths) in sections 2, 5, 8.
+- Skybox level: 27 glass boxes (3 per section) with warm ceiling lights, partitions and a bar; balcony with 2 rows of premium seats and a glass balustrade.
+- Upper tier: 15 rows (0.85 m tread, 0.55 m rise, steeper), front parapet with a black LED band + adverts, aisles + handrails, rear walkway; "SUNDAY LEAGUE" in white seats (5×7 pixel font, 2 seats × 2 rows per pixel).
+- Floodlights: a gantry with 32 lamps along the roof edge + 2 lattice masts (40 m) at the front corners, 6×4 lamp heads aimed at the centre spot.
+- Ends: clad end walls + glazed wind screens up to the roof. Back: simple clad facade (Marcel's choice for now), window band, 3 stair cores with entrances + canopies, "SUNDAY LEAGUE" sign.
+- Pitch-side: advert boards + 2 perspex dugouts.
+- 6,516 seats (6,354 + 162 premium) and 1,872 fans (29%, fuller in the middle; 65% primary shirts, 15% secondary, 20% other colours; 3 skin tones).
+- Note: Claude's estimate before building was ~8,500 seats; with 20 seats per 11.5 m section (aisles take the rest) it is ~6,500.
+
+**How it is built:**
+- `tools/blender/build_big_stand.py` → `assets/models/big_stand.glb` (structure, ~22k faces, 2.4 MB) + `big_stand_layout.json` (every seat/fan).
+- In Godot `scripts/big_stand.gd` draws seats and fans with MultiMesh + `instanced_parts.gdshader` (part mask in vertex colour, colour per instance). `set_club_colours(primary, secondary)` recolours seats, the club name, club shirts and the `Club_*` materials of the structure live — ready for the club colours upgrade (§10f).
+- Dev: `godot -- --bigstand` (north side, 6 m behind the touchline); `--club-colours=C8102E,F2F2F2` to demo recolouring.
+
+**Seen and fixed during the build:** fans too wide (letters unreadable) → slimmer; open gap between back wall and roof → clad up to the roof, glazed end screens; two stacked rows of colourful boards → front wall now concrete + club band; facade sign was mirrored and hidden behind the centre core/columns → mirrored, moved up, narrower.
+
+**Known limits:** the seat text is only partly readable when 30% full (fans in white shirts look like letter pixels, aisles break letters); the rear back-stays cross the facade sign in 3/4 views; Godot shots here use `--new-light` (fancy/SDFGI too slow on the software renderer); stands are not yet in the hub/economy (sections vs slots still open).
 
 ## 10b. Economy
 
@@ -430,6 +450,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
+| 2026-11-07 | Big stand POC: full side, cantilever, skyboxes, floodlight bar + masts, 20/15 rows, ~30% fans in club colours, club name in seats, simple facade (§10i) |
 | 2026-11-07 | Fancy lighting is the default; audio goes into the public repo (royalty free); minimum cheer volume |
 | 2026-11-07 | Lighting: options 1–4 behind `--new-light`, option 5 behind `--fancy-light`; old lighting stays default until Marcel compares (§10g) |
 | 2026-11-07 | Menus/UI: style, English with i18n in mind, live build preview, rotatable camera, 9×5×9×5 sections, pro-rata demolish refund (75%→10% over ~3 seasons), instant build for now, settings list |

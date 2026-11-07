@@ -3,7 +3,7 @@
 > Living document. Only contains what Marcel has decided. Anything not decided is listed under **Open questions**.
 > Rule for this project: Claude decides nothing unless Marcel explicitly says Claude may decide.
 
-Last updated: 2026-11-07 (design session 1: economy)
+Last updated: 2026-11-07 (design session 1: economy, stadium)
 
 ---
 
@@ -101,6 +101,28 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Long-term stadium includes **trainers, staff, referees, linesmen** and above all **fans**.
 - The number of fans grows with your club status, eventually perhaps **thousands, with simple animations**.
 
+## 10a. Stadium & facilities (upgrades)
+
+### What you start with and grow into
+- **Very small things first:** one chair, one bench, one ball bag with better balls (roll further, shoot further, less affected by weather and wind), one hand lawnmower for better pitch recovery after bad weather (reduces a randomness factor).
+- **Later:** staff slots and staff who **maintain** the basics (they don't upgrade them).
+- **Eventually:** stands, floodlights, catering, shops and facilities.
+
+### What upgrades do
+- More income, more fans, better match play, better player development, etc.
+
+### Building takes time
+- Construction takes time, so you may choose to build during the **off-season**.
+- The off-season is an auto-skip of x weeks.
+
+### Location
+- The ground grows **in place**, and it sits **in a residential area**.
+- There's always enough room to expand, but you can see houses around it, or a car driving past on the nearby road.
+
+### Promotion requirements
+- Some tiers require certain stadium upgrades before you can be promoted, so you have something to work towards.
+- **Requirements are kept low**: a pretty crappy ground should still be able to play at the highest level.
+
 ## 10b. Economy
 
 ### Income
@@ -186,6 +208,7 @@ What's in it now (v4):
 | 2026-11-07 | Play 100% / autoplay 75% as the single baseline |
 | 2026-11-07 | Fan approval as a core resource, separate from fan count (§10c) |
 | 2026-11-07 | Pace: fast through non-league, 2–3 seasons per division higher up (§10d) |
+| 2026-11-07 | Stadium: tiny upgrades first, grows in place in a residential area, build time, low promotion requirements (§10a) |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
 ## 13. Open questions
@@ -205,6 +228,7 @@ What's in it now (v4):
 - In which tiers there are 2 cups instead of 1.
 
 **Matches**
+- Weather and wind: the upgrades imply they affect matches (ball behaviour, pitch condition). Scope to confirm.
 - Which player stats you feel when playing yourself (speed, shooting, passing, keeping, stamina, …).
 - Camera height / zoom on the full-size pitch.
 - Fouls, free kicks for fouls, penalties, cards.
@@ -212,7 +236,9 @@ What's in it now (v4):
 **Not discussed yet** (here so they don't get lost)
 - Economy: safety net (see §10b), exact expense list, performance bonuses.
 - Player ageing/retirement over a long save (starting squad likely retires before the top).
-- Stadium upgrade list: categories and contents.
+- Stadium upgrade list: full categories, costs and effects (§10a has the direction).
+- Does construction temporarily reduce capacity?
+- Off-season length (x weeks).
 - How fans are counted and what they do for you.
 - Training, staff roles, youth.
 - Season calendar (pre-season, cups, Europe).

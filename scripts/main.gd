@@ -192,6 +192,8 @@ func _ready() -> void:
 			hub_zoom = float(v[2])
 			if v.size() > 3:
 				hub_yaw = deg_to_rad(float(v[3]))
+			if v.size() > 4:
+				hub_pitch = float(v[4])   # degrees above the ground
 			hub.root.visible = false
 			_hub_camera()
 	if "--shed" in args:
@@ -334,17 +336,41 @@ func _cancel_placing() -> void:
 	hub.refresh()
 
 
-# hub camera: WASD / arrows to pan, mouse wheel to zoom
-var hub_focus := Vector3(8.0, 0, -HALF_W - 2.0)
+# hub camera (Marcel, 2026-11-07: free look between matches + reset).
+# WASD/arrows pan (relative to the view), wheel zoom, Q/E rotate, R/F tilt,
+# hold right or middle mouse and drag to orbit + tilt, C or the button resets. All tunable.
+const HUB_DEFAULT_FOCUS := Vector3(8.0, 0, -HALF_W - 2.0)
+const HUB_DEFAULT_PITCH := 45.0     # degrees above the ground
+const HUB_DIST := 36.8              # camera distance at zoom 1
+const HUB_PITCH_MIN := 8.0
+const HUB_PITCH_MAX := 85.0
+const HUB_ZOOM_MIN := 0.12
+const HUB_ZOOM_MAX := 3.0
+const HUB_ROTATE_SPEED := 1.6       # rad/s with Q/E
+const HUB_TILT_SPEED := 40.0        # deg/s with R/F
+const HUB_DRAG_SENS := 0.006        # rad per pixel
+const HUB_PAN_LIMIT := 45.0         # metres beyond the pitch
+var hub_focus := HUB_DEFAULT_FOCUS
 var hub_zoom := 1.0
-
-
 var hub_yaw := 0.0   # orbit angle around the focus point
+var hub_pitch := HUB_DEFAULT_PITCH
+var _hub_drag := false
+var _hub_drag_moved := 0.0
+
+
+func reset_hub_camera() -> void:
+	hub_focus = HUB_DEFAULT_FOCUS
+	hub_zoom = 1.0
+	hub_yaw = 0.0
+	hub_pitch = HUB_DEFAULT_PITCH
 
 
 func _hub_camera() -> void:
-	camera.position = hub_focus + (Vector3(0, 26.0, 26.0) * hub_zoom).rotated(Vector3.UP, hub_yaw)
-	camera.look_at(hub_focus, Vector3.UP)
+	var p := deg_to_rad(hub_pitch)
+	var offset := Vector3(0, sin(p), cos(p)) * HUB_DIST * hub_zoom
+	camera.position = hub_focus + offset.rotated(Vector3.UP, hub_yaw)
+	camera.position.y = maxf(camera.position.y, 1.2)
+	camera.look_at(hub_focus + Vector3(0, 0.5 if hub_zoom < 0.4 else 0.0, 0), Vector3.UP)
 
 
 func _hub_process(delta: float) -> void:
@@ -358,9 +384,17 @@ func _hub_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		pan.x += 1.0
 	if pan != Vector3.ZERO:
-		hub_focus += pan.normalized() * 30.0 * hub_zoom * delta
-		hub_focus.x = clampf(hub_focus.x, -HALF_L - 8.0, HALF_L + 8.0)
-		hub_focus.z = clampf(hub_focus.z, -HALF_W - 8.0, HALF_W + 8.0)
+		hub_focus += pan.normalized().rotated(Vector3.UP, hub_yaw) * 30.0 * maxf(hub_zoom, 0.3) * delta
+		hub_focus.x = clampf(hub_focus.x, -HALF_L - HUB_PAN_LIMIT, HALF_L + HUB_PAN_LIMIT)
+		hub_focus.z = clampf(hub_focus.z, -HALF_W - HUB_PAN_LIMIT, HALF_W + HUB_PAN_LIMIT)
+	if Input.is_key_pressed(KEY_Q):
+		hub_yaw += HUB_ROTATE_SPEED * delta
+	if Input.is_key_pressed(KEY_E):
+		hub_yaw -= HUB_ROTATE_SPEED * delta
+	if Input.is_key_pressed(KEY_R):
+		hub_pitch = clampf(hub_pitch + HUB_TILT_SPEED * delta, HUB_PITCH_MIN, HUB_PITCH_MAX)
+	if Input.is_key_pressed(KEY_F):
+		hub_pitch = clampf(hub_pitch - HUB_TILT_SPEED * delta, HUB_PITCH_MIN, HUB_PITCH_MAX)
 	_hub_camera()
 	if placing_item == "":
 		return
@@ -814,18 +848,35 @@ func _restart() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if mode == "hub":
-		if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		if event is InputEventMouseMotion and _hub_drag:
+			var mm := event as InputEventMouseMotion
+			hub_yaw -= mm.relative.x * HUB_DRAG_SENS
+			hub_pitch = clampf(hub_pitch + rad_to_deg(mm.relative.y * HUB_DRAG_SENS), HUB_PITCH_MIN, HUB_PITCH_MAX)
+			_hub_drag_moved += mm.relative.length()
+		elif event is InputEventMouseButton:
 			var mb0 := event as InputEventMouseButton
-			if mb0.button_index == MOUSE_BUTTON_WHEEL_UP:
-				hub_zoom = clampf(hub_zoom * 0.9, 0.35, 2.6)
-			elif mb0.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				hub_zoom = clampf(hub_zoom * 1.1, 0.35, 2.6)
-			elif mb0.button_index == MOUSE_BUTTON_LEFT:
-				_hub_click()
-			elif mb0.button_index == MOUSE_BUTTON_RIGHT:
+			if mb0.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+				if mb0.pressed:
+					_hub_drag = true
+					_hub_drag_moved = 0.0
+				else:
+					_hub_drag = false
+					# a right click without dragging still cancels placing
+					if mb0.button_index == MOUSE_BUTTON_RIGHT and _hub_drag_moved < 6.0:
+						_cancel_placing()
+			elif mb0.pressed:
+				if mb0.button_index == MOUSE_BUTTON_WHEEL_UP:
+					hub_zoom = clampf(hub_zoom * 0.9, HUB_ZOOM_MIN, HUB_ZOOM_MAX)
+				elif mb0.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+					hub_zoom = clampf(hub_zoom * 1.1, HUB_ZOOM_MIN, HUB_ZOOM_MAX)
+				elif mb0.button_index == MOUSE_BUTTON_LEFT:
+					_hub_click()
+		elif event is InputEventKey and (event as InputEventKey).pressed:
+			var hk := (event as InputEventKey).keycode
+			if hk == KEY_ESCAPE:
 				_cancel_placing()
-		elif event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ESCAPE:
-			_cancel_placing()
+			elif hk == KEY_C:
+				reset_hub_camera()
 		return
 	if mode != "match":
 		return

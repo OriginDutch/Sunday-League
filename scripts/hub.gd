@@ -80,6 +80,18 @@ func build(m: Main) -> void:
 	hint_label.label_settings = _font(22)
 	root.add_child(hint_label)
 
+	# camera reset
+	var cam_btn := Button.new()
+	cam_btn.text = "Reset camera (C)"
+	cam_btn.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	cam_btn.offset_left = -620
+	cam_btn.offset_right = -440
+	cam_btn.offset_top = -110
+	cam_btn.offset_bottom = -70
+	cam_btn.focus_mode = Control.FOCUS_NONE
+	cam_btn.pressed.connect(func() -> void: main.reset_hub_camera())
+	root.add_child(cam_btn)
+
 	# dev: wipe save
 	wipe_btn = Button.new()
 	wipe_btn.text = "New game"
@@ -232,7 +244,7 @@ func _update_hint() -> void:
 	if main.placing_item != "":
 		hint_label.text = "Click a free spot for your %s  ·  right-click / Esc to cancel" % main.placing_item
 	else:
-		hint_label.text = "WASD to look around · mouse wheel to zoom"
+		hint_label.text = "WASD move · wheel zoom · Q/E rotate · R/F tilt · right-drag look around · C reset"
 
 
 func _shop_button(item: String, text: String) -> void:

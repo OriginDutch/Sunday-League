@@ -60,7 +60,7 @@ TOP_BACK_Z, TOP_TIP_Z = U_TOP + 9.5, U_TOP + 5.0
 BOT_BACK_Z, BOT_TIP_Z = U_TOP + 2.6, U_TOP + 4.3
 
 # vomitories (lower tier only; upper tier is reached from the rear walkway): on 4 stairs, opening onto the cross-aisle
-VOM_AISLES, VOM_ROWS, VOM_W = (2, 4, 5, 7), range(10, 14), 3.0
+VOM_AISLES, VOM_ROWS, VOM_W = (1, 3, 6, 8), range(10, 14), 3.0   # Marcel: x = ±17.25 and ±40.25
 VOM_WALL, SIDE_AISLE = 0.2, 0.9
 VOM_CLEAR = VOM_W / 2 + VOM_WALL + SIDE_AISLE    # 2.6 m each side of the stair centre
 LANDING_ROW = VOM_ROWS[-1] + 1                    # above the tunnel the two side stairs merge
@@ -688,7 +688,7 @@ if "--render" in sys.argv:
         "head_on": ((0.0, -95.0, 22.0), (0.0, 14.0, 12.0), 30),
         "lower_tier": ((14.0, -9.0, 2.5), (-4.0, 14.0, 12.0), 22),
         "outside_back": ((70.0, 95.0, 26.0), (0.0, 25.0, 12.0), 30),
-        "tunnel": ((-5.75, -7.0, 7.5), (-5.75, 12.0, 5.0), 30),
+        "tunnel": ((-17.25, -7.0, 7.5), (-17.25, 12.0, 5.0), 30),
     }
     only = sys.argv[sys.argv.index("--views") + 1].split(",") if "--views" in sys.argv else list(views)
     for name in only:

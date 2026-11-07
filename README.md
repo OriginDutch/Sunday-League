@@ -17,7 +17,7 @@ Proof of fun for Sunday League. Godot 4.7, GDScript, no assets: everything is bu
 | Key | Action |
 |---|---|
 | WASD / arrows | move |
-| Shift | sprint |
+| Shift | walk (sprint is the default) |
 | Mouse | aim |
 | Left click | pass (white ring = who gets it, else a pass into space) |
 | Hold right click | charge shot. aim the arrow at the goal: the yellow ring on the goal shows where it goes. more power = faster + higher but less accurate |

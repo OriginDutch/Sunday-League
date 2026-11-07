@@ -1002,7 +1002,8 @@ func _update_human(delta: float) -> void:
 	else:
 		controlled.desired_move = Vector3.ZERO
 	if not (RECEIVE_ASSIST and ball.pass_target == controlled and ball.owner_player == null):
-		controlled.wants_sprint = Input.is_key_pressed(KEY_SHIFT)
+		# sprint is the default; hold Shift to walk (Marcel, 2026-11-07: holding Shift all match hurts)
+		controlled.wants_sprint = not Input.is_key_pressed(KEY_SHIFT)
 
 	if charging:
 		charge = minf(charge + delta / 0.9, 1.0)
@@ -1910,7 +1911,7 @@ func _build_hud() -> void:
 	layer.add_child(msg_label)
 
 	var hint := Label.new()
-	hint.text = "WASD move · Shift sprint · LMB pass (white ring = receiver, red = offside) · hold RMB shoot (aim at the goal) · Space tackle · Q switch · R restart · Esc quit"
+	hint.text = "WASD move (sprint by default) · Shift walk · LMB pass (white ring = receiver, red = offside) · hold RMB shoot (aim at the goal) · Space tackle · Q switch · R restart · Esc quit"
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	hint.offset_left = 14
 	hint.offset_top = -34

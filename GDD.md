@@ -196,6 +196,11 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 **Seen in the first renders and fixed:** roof sheet tilted the wrong way; front wall hid the front row (walkway and steps raised).
 
+**Rules (Marcel, 2026-11-07):**
+- Bought per section (11.5 m).
+- Adjacent sections join up: the side screen between them is removed (only the outer ends of a run keep a side screen). Not built yet.
+- Club colours: buyable upgrade, applied by the player (recolours `Club_Primary_*` / `Club_Secondary_*`).
+
 **Known limits:** colours in Godot look flatter than in Blender (game lighting, not the model); no textures yet (flat colours, matches low-poly).
 
 ## 10b. Economy
@@ -379,6 +384,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | UI: ChatGPT designs, Claude builds; chosen style = Chalkboard style in Clubhouse Canteen colours, Barlow + Caveat (Caveat also for headings for now), slim floating bottom strip, both crests in Next Match |
 | 2026-11-07 | Panel texture: ChatGPT grain and Claude's procedural versions rejected; new ChatGPT round with 3 directions pending |
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
+| 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Menus/UI: style, English with i18n in mind, live build preview, rotatable camera, 9×5×9×5 sections, pro-rata demolish refund (75%→10% over ~3 seasons), instant build for now, settings list |
 | 2026-11-07 | Playtest round 3: layered defensive block, step-out, attacking runs (in behind / come short / hold) |
 | 2026-11-07 | Playtest round 2: Q nearest+cycle, 4 auto-switch rules, receiver comes to the ball, active defending, real dead balls, stackable chairs, save after purchases, sound, minimap + edge arrows, chants |
@@ -416,7 +422,8 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 
 **3D assets (raised 2026-11-07)**
 - Marcel will pay for a month of ChatGPT only if Claude or ChatGPT can build a good set of 3D models (stadium parts, shops, other assets). First test: Claude builds **The Shed** (see §10f). Verdict pending — Marcel judges the renders + in-game shot.
-- Not decided: whether stands are bought per 11.5 m section, how sections replace the current chair/bench slots, how club colours get applied (UI or automatic), corners, bigger stands (more rows, second tier).
+- Decided (Marcel, 2026-11-07): stands are **bought per 11.5 m section**; when sections stand side by side, the **side screen between them disappears**; **club colours are a buyable upgrade** that you apply yourself.
+- Not decided: how sections replace the current chair/bench slots, corners, bigger stands (more rows, second tier).
 
 **Not discussed yet** (here so they don't get lost)
 - Economy: safety net (see §10b), exact expense list, performance bonuses.

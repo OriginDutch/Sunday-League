@@ -132,6 +132,7 @@ var hud_layer: CanvasLayer
 var opponent_name := "AWAY"
 var match_home := true                 # league: are we at home this match
 var match_opp_strength := 1.0          # league: opponent strength (speed multiplier)
+const AWAY_TRAVEL_SHARE := 0.2         # share of your fans that come along to away matches (tunable)
 var placing_item := ""
 var hover_slot := -1
 var name_label: Label3D
@@ -231,6 +232,13 @@ func _ready() -> void:
 				hub_pitch = float(v[4])   # degrees above the ground
 			hub.root.visible = false
 			_hub_camera()
+	for arg in args:
+		if arg.begins_with("--away-view="):
+			# dev: show the seeded away ground of a club name with its crowd, e.g. --away-view="Red Lion FC"
+			var nm := arg.trim_prefix("--away-view=")
+			var hf := grounds.use_away(nm, 1.0)
+			grounds.spawn_crowd(hf, 12)
+			print("AWAY %s: %d home fans, %d spots" % [nm, hf, grounds.active_slots.size()])
 	if "--shed" in args:
 		# dev: preview the first 3D asset (The Shed, one 11.5 m section) on the north side
 		var shed: Node3D = load("res://assets/models/the_shed.glb").instantiate()
@@ -302,6 +310,7 @@ func _enter_hub() -> void:
 	ball.visible = false
 	name_label.visible = false
 	grounds.clear_crowd()
+	grounds.use_home()
 	if sfx != null:
 		sfx.set_murmur(false)
 	_hub_camera()
@@ -326,10 +335,13 @@ func start_friendly() -> void:
 	for k in stats:
 		stats[k] = [0, 0]
 	if match_home:
+		grounds.use_home()
 		grounds.spawn_crowd(club.fans)
 	else:
-		grounds.clear_crowd()   # away grounds come in block 3; until then nobody shows up
-	sfx.crowd_level = clampf(club.fans / 100.0, 0.05, 1.0) if match_home else 0.05
+		# seeded away ground per club (block 3); some of your fans travel along
+		var home_fans := grounds.use_away(opponent_name, match_opp_strength)
+		grounds.spawn_crowd(home_fans, int(round(club.fans * AWAY_TRAVEL_SHARE)))
+	sfx.crowd_level = clampf(club.fans / 100.0, 0.05, 1.0) if match_home else clampf(club.fans * AWAY_TRAVEL_SHARE / 100.0, 0.03, 0.4)
 	sfx.set_murmur(true)
 	mode = "match"
 	hub.show_hub(false)

@@ -4,6 +4,7 @@ extends Node3D
 ## Reacts to goals, saves and tackles.
 
 var seated := false
+var supports_us := true          # false = home fans at an away ground: they cheer for the other side
 var home_spot := Vector3.ZERO     # seat position, or the group spot for standing fans
 var face_yaw := 0.0
 var body: Node3D
@@ -52,6 +53,8 @@ func setup(is_seated: bool, spot: Vector3, yaw: float, shirt: Color, skin: Color
 
 
 func react(kind: String) -> void:
+	if not supports_us:
+		kind = {"goal_for": "goal_against", "goal_against": "goal_for", "save": "chance", "chance": "save"}.get(kind, kind)
 	match kind:
 		"goal_for":
 			jump_t = randf_range(1.6, 2.6)

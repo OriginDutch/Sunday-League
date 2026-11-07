@@ -21,6 +21,10 @@ var furniture_root: Node3D
 var marker_root: Node3D
 var crowd_root: Node3D
 var pitchside_root: Node3D
+var away_root: Node3D             # extras of the current away ground (clubhouse, hedges, trees)
+var board_labels: Array[Label3D] = []
+var active_slots: Dictionary = {}   # the furniture on show: yours, or the home club's at an away ground
+var away_mode := false
 var markers: Array[MeshInstance3D] = []
 var fans: Array[Fan] = []
 var free_mat: StandardMaterial3D
@@ -37,7 +41,10 @@ func setup(s: ClubState) -> void:
 	add_child(crowd_root)
 	pitchside_root = Node3D.new()
 	add_child(pitchside_root)
+	away_root = Node3D.new()
+	add_child(away_root)
 	_build_pitchside()
+	active_slots = state.slots
 	free_mat = Util.mat(Color(1, 1, 1, 0.35), true)
 	hover_mat = Util.mat(Color(1.0, 0.85, 0.1, 0.9), true)
 	for i in slot_count():
@@ -121,10 +128,12 @@ func show_markers(on: bool, item: String = "", hover: int = -1) -> void:
 func rebuild_furniture() -> void:
 	for c in furniture_root.get_children():
 		c.queue_free()
-	for key in state.slots:
+	if not away_mode:
+		active_slots = state.slots
+	for key in active_slots:
 		var i := int(key)
-		var item: String = state.slots[key]
-		var n_chairs := state.chairs_in(str(key))
+		var item: String = active_slots[key]
+		var n_chairs := _chairs(active_slots, str(key))
 		var root := Node3D.new()
 		root.position = slot_position(i)
 		root.rotation.y = slot_yaw(i)
@@ -179,6 +188,7 @@ func _build_pitchside() -> void:
 		l.outline_size = 0
 		l.position = Vector3(0, 0.45, -BOARD_OFFSET + 0.05)
 		root.add_child(l)
+		board_labels.append(l)
 
 
 func _dugout(root: Node3D, x: float) -> void:
@@ -192,14 +202,103 @@ func _dugout(root: Node3D, x: float) -> void:
 	Util.box(root, Vector3(2.5, 0.08, 0.4), Vector3(x, 0.45, -d - 0.3), Color(0.6, 0.42, 0.22))  # bench
 
 
+static func _chairs(slots: Dictionary, key: String) -> int:
+	if not slots.has(key):
+		return 0
+	var v: String = slots[key]
+	return int(v.substr(7)) if v.begins_with("chairs:") else 0
+
+
+## Your own ground: your furniture, blank boards, no away extras.
+func use_home() -> void:
+	away_mode = false
+	active_slots = state.slots
+	for c in away_root.get_children():
+		c.queue_free()
+	for l in board_labels:
+		l.text = "YOUR AD HERE"
+	rebuild_furniture()
+
+
+## A simple seeded away ground (GDD block 3, first version): the same club always gets the same
+## ground. Benches/chairs, a clubhouse, hedges and trees; bigger with a stronger club / higher level.
+## Returns how many home fans turn up.
+func use_away(team_name: String, strength: float, level: int = 0) -> int:
+	away_mode = true
+	for c in away_root.get_children():
+		c.queue_free()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(team_name)
+	var size := clampf((strength - 0.92) / 0.16, 0.0, 1.0) + level * 0.5   # 0..1 at the bottom level
+	# furniture: a few spots on the far side around halfway, sometimes some behind a goal
+	var slots := {}
+	var spots := rng.randi_range(2, 5) + int(size * 6.0)
+	var far_secs := [4, 3, 5, 2, 6]
+	var placed := 0
+	for sec in far_secs:
+		for k in ClubState.SPOTS_PER_SECTION:
+			if placed >= spots:
+				break
+			if sec == DUGOUT_SECTION and rng.randf() < 0.5:
+				continue
+			if rng.randf() < 0.75:
+				slots[str(sec * ClubState.SPOTS_PER_SECTION + k)] = "bench" if rng.randf() < 0.5 else "chairs:%d" % rng.randi_range(2, 4)
+				placed += 1
+	if rng.randf() < 0.35:
+		var end_sec := 2 * ClubState.SECTIONS_LONG + rng.randi_range(0, 2 * ClubState.SECTIONS_SHORT - 1)
+		for k in rng.randi_range(1, 3):
+			slots[str(end_sec * ClubState.SPOTS_PER_SECTION + k + 1)] = "bench"
+	active_slots = slots
+	# boards: some carry the home club's name, the rest stay blank
+	for l in board_labels:
+		l.text = team_name.to_upper() if rng.randf() < 0.3 else ""
+	# clubhouse behind one corner
+	var cx := (Main.HALF_L - 6.0) * (1.0 if rng.randf() < 0.5 else -1.0)
+	var cz := -(Main.HALF_W + 14.0)
+	var house := Node3D.new()
+	house.position = Vector3(cx, 0, cz)
+	house.rotation.y = rng.randf_range(-0.2, 0.2)
+	away_root.add_child(house)
+	var walls: Color = [Color(0.75, 0.68, 0.55), Color(0.6, 0.35, 0.25), Color(0.85, 0.85, 0.8), Color(0.45, 0.5, 0.45)][rng.randi_range(0, 3)]
+	var w := rng.randf_range(10.0, 16.0) + size * 6.0
+	Util.box(house, Vector3(w, 3.0, 7.0), Vector3(0, 1.5, 0), walls)
+	Util.box(house, Vector3(w + 0.6, 0.3, 7.6), Vector3(0, 3.15, 0), Color(0.3, 0.3, 0.32))
+	Util.box(house, Vector3(1.2, 2.1, 0.1), Vector3(-w * 0.25, 1.05, 3.52), Color(0.25, 0.18, 0.12))
+	for wx in [0.0, w * 0.25]:
+		var x: float = wx
+		Util.box(house, Vector3(1.8, 1.0, 0.1), Vector3(x, 1.8, 3.52), Color(0.6, 0.75, 0.85))
+	var sign := Label3D.new()
+	sign.text = team_name.to_upper()
+	sign.font_size = 72
+	sign.pixel_size = 0.012
+	sign.outline_size = 8
+	sign.position = Vector3(0, 3.7, 3.6)
+	house.add_child(sign)
+	# hedges along one or two sides, and a few extra trees
+	if rng.randf() < 0.6:
+		Util.box(away_root, Vector3(2.0 * Main.HALF_L + 30.0, 1.6, 1.2), Vector3(0, 0.8, Main.HALF_W + 12.0), Color(0.2, 0.4, 0.2))
+	if rng.randf() < 0.5:
+		var hx := (Main.HALF_L + 12.0) * (1.0 if rng.randf() < 0.5 else -1.0)
+		Util.box(away_root, Vector3(1.2, 1.6, 2.0 * Main.HALF_W + 20.0), Vector3(hx, 0.8, 0), Color(0.2, 0.4, 0.2))
+	for i in rng.randi_range(3, 8):
+		var p := Vector3(rng.randf_range(-Main.HALF_L - 25.0, Main.HALF_L + 25.0), 0, (Main.HALF_W + rng.randf_range(16.0, 30.0)) * (1.0 if rng.randf() < 0.5 else -1.0))
+		var sc := rng.randf_range(0.8, 1.5)
+		Util.cylinder(away_root, 0.25 * sc, 0.3 * sc, 1.6 * sc, p + Vector3(0, 0.8 * sc, 0), Color(0.4, 0.27, 0.15), 6)
+		Util.cylinder(away_root, 0.0, 1.8 * sc, 3.2 * sc, p + Vector3(0, 3.0 * sc, 0), Color(0.2, 0.45, 0.2), 7)
+	rebuild_furniture()
+	return rng.randi_range(6, 18) + int(size * 25.0)
+
+
 ## World positions (and facing) of every seat you own.
 func seat_list() -> Array:
 	var out := []
-	for key in state.slots:
+	for key in active_slots:
 		var i := int(key)
 		var base := slot_position(i)
 		var yaw := slot_yaw(i)
-		var offsets: Array = CHAIR_OFFSETS.slice(0, state.seats_in(str(key)))
+		var item: String = active_slots[key]
+		var n := ClubState.BENCH_SEATS if item == "bench" else _chairs(active_slots, str(key))
+		var offsets: Array = CHAIR_OFFSETS.slice(0, n)
 		for o in offsets:
 			var ox: float = o
 			var local := Vector3(ox, 0.0, 0).rotated(Vector3.UP, yaw)
@@ -207,7 +306,9 @@ func seat_list() -> Array:
 	return out
 
 
-func spawn_crowd(attendance: int) -> void:
+## attendance = fans of the club whose ground this is; travelling = your fans at an away ground
+## (they stand together behind the near touchline).
+func spawn_crowd(attendance: int, travelling: int = 0) -> void:
 	clear_crowd()
 	var seats := seat_list()
 	seats.shuffle()
@@ -216,12 +317,15 @@ func spawn_crowd(attendance: int) -> void:
 	for i in seated:
 		var s: Dictionary = seats[i]
 		_add_fan(true, s["pos"], s["yaw"])
+	for i in mini(travelling, 60):
+		var spot := Vector3(randf_range(-14.0, 14.0), 0, Main.HALF_W + STAND_OFFSET + randf_range(-0.4, 0.6))
+		_add_fan(false, spot, PI, true)
 	# the rest stands along the far touchline in little groups, for free
 	var standing := visible_count - seated
 	var groups := maxi(1, int(ceil(standing / 5.0)))
 	var placed := 0
 	for g in groups:
-		var side := -1.0 if (g % 3 != 2) else 1.0
+		var side := -1.0 if (g % 3 != 2 or away_mode) else 1.0
 		var gx := randf_range(-45.0, 45.0)
 		if side < 0.0 and absf(gx) < DUGOUT_CLEAR_X:
 			gx = signf(gx + 0.01) * randf_range(DUGOUT_CLEAR_X, 45.0)
@@ -235,11 +339,14 @@ func spawn_crowd(attendance: int) -> void:
 			break
 
 
-func _add_fan(is_seated: bool, spot: Vector3, yaw: float) -> void:
+func _add_fan(is_seated: bool, spot: Vector3, yaw: float, travelling: bool = false) -> void:
 	var f := Fan.new()
 	crowd_root.add_child(f)
-	var shirts := [Main.HOME_SHIRT, Main.HOME_SHIRT, Color(0.95, 0.95, 0.95), Color(0.2, 0.25, 0.35),
-		Color(0.55, 0.15, 0.15), Color(0.85, 0.75, 0.3)]
+	var ours := not away_mode or travelling
+	f.supports_us = ours
+	var club_shirt := Main.HOME_SHIRT if ours else Main.AWAY_SHIRT
+	var shirts := [club_shirt, club_shirt, Color(0.95, 0.95, 0.95), Color(0.2, 0.25, 0.35),
+		Color(0.55, 0.15, 0.15) if ours else Color(0.15, 0.45, 0.25), Color(0.85, 0.75, 0.3)]
 	var skins := [Color(0.98, 0.82, 0.68), Color(0.87, 0.67, 0.5), Color(0.6, 0.42, 0.3), Color(0.42, 0.28, 0.2)]
 	f.setup(is_seated, spot, yaw, shirts.pick_random(), skins.pick_random())
 	fans.append(f)

@@ -368,6 +368,12 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
         - playing time: regular starter ×0.7, bench ×1.3; form: monster season ×0.6, bad season ×1.3; training complex ×1.0 → ×0.8; RNG ×0.8–1.2
         - cap −10 per season; floor 0 in the first 2 years past peak, then at least −1
         - examples: 1 y past peak, 90, monster season → 0; 4 y past, 88, regular → −2; 6 y past, 84, benched + bad → −8
+      - **Retirement chance — accepted to try (Marcel: "oogt goed, gaan we proberen"), tunable:** chance = base by age + modifiers, clamped 0–95%.
+        - base by age: ≤30 0%, 31–32 5%, 33 10%, 34 20%, 35 35%, 36 50%, 37 65%, 38+ 80%
+        - **drop below his highest rating ever (decided, not potential):** +1.5 pp per point below that peak, first 5 points free
+        - playing time: regular starter −5, rotation 0, bench +10; contract: years left −10, expiring/none +10; long injury this season (>3 months) +10, only from age 31
+        - examples: 33y 86 (peak 88) regular, 1 y contract → 0%; 34y 82 (peak 85) regular, expiring, long injury → 35%; 35y 76 (peak 88) bench, expiring → ~66%; 37y 70 (peak 90) bench, expiring → 95%
+        - **Timing (decided):** the player **announces it somewhere halfway through the season** ("this is my last season"), giving you time to find a replacement. He **can stop during a contract by mutual agreement**.
       - **Injuries (decided, Marcel 2026-11-07): no direct rating/potential hit.** Injured time counts as **not playing**: growth stalls for young players (already a big punishment), veterans decline faster (as if benched).
     - **Decided:** **playing well = faster growth**, with a bit of **RNG**.
     - A player **stops growing around his peak**, which differs per player (one at 27, another at 32).
@@ -537,6 +543,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
 | 2026-11-07 | Player value depends on age too: old stars cheap but short-lived (§10b) |
+| 2026-11-07 | Retirement chance accepted to try: age base + drop from highest rating ever + playing time/contract/injury; announced mid-season, can stop during contract by mutual agreement (§10b) |
 | 2026-11-07 | Growth & decline formulas accepted for now (% based, cap/floor, form + RNG); injuries only via lost playing time (§10b) |
 | 2026-11-07 | FIFA-style potentials: visible with light obfuscation, can change, growth from playing time/ratings/training complex/injuries, per-player peak 27–32, retirement chance rises with age (§10b) |
 | 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch (first tier only, no all-seater rule, standing = atmosphere vs seats = revenue); stage jump = 1 week demolition then build |

@@ -344,6 +344,12 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - Marcel (2026-11-07): transfer fees are not in the model yet and will drain money at the top ("70 miljoen voor een verdediger"). → Transfers as the big money sink higher up; still to be worked out.
   - **Decided (Marcel, 2026-11-07):** the surplus is a **free choice: build the stadium or strengthen the squad**. In the end you need both to some degree — too little capacity squeezes income or blocks promotion (requirements); players not good enough means never getting promoted.
   - **Decided (Marcel, 2026-11-07): player ratings on a 1–99 scale**; 99 is almost unreachable — "a Messi, but even better".
+- **v4 — transfers & ratings (2026-11-07, proposal, nothing decided):** new *Transfers* tab, 4 more sources (S28–S31).
+  - Real: gross transfer spend summer 2025 — Premier League £3.0bn (~£150m per club), Championship £240m (~£10m per club); below that fees are rare, a £0.6–1.5m non-league fee is a record/outlier. EA FC 26 top ratings: Mbappé 92, Salah 91, Haaland/Rodri/Van Dijk 90.
+  - **Value curve (proposal):** value = €4.5m × 1.25^(rating − 80). Exponential so +10 rating ≈ ×9 value: 99 ≈ €312m, 90 ≈ €42m, 80 = €4.5m, 70 ≈ €0.5m, 60 ≈ €52k, 50 ≈ €5.6k, below 40 practically free (fits "amateurs free"). Calibrated to the game economy, not real fees (game top income is flattened).
+  - **Avg squad rating per division (Claude's estimate):** NL3 15 → NL1 28 → L10 33 … L5 53 → L4 57 → L3 62 → L2 65 → L1 70 → Premier 80.
+  - **Transfer share of surplus (proposal):** 0% at the bottom → 50% League 4 → 80–85% League 1/Premier. Signing = avg + 2 rating.
+  - **Result:** pace after transfers ~0.3–1.1 sections per season up to League 4, ~2–6 from League 3 up (was 5–40). Premier: ~2.5 signings of ~82 per season, ~6 sections.
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
@@ -506,6 +512,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
 | 2026-11-07 | Surplus = free choice between stadium and squad (both needed); player ratings 1–99, 99 near-impossible |
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
+| 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
 | 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch (first tier only, no all-seater rule, standing = atmosphere vs seats = revenue); stage jump = 1 week demolition then build |
 | 2026-11-07 | Stands: stages + upgrades within stages; one stadium shape + per-corner on/off; shape changeable later; career ≥14 seasons, likely 20–25+ |
 | 2026-11-07 | Big stand POC: full side, cantilever, skyboxes, floodlight bar + masts, 20/15 rows, ~30% fans in club colours, club name in seats, simple facade (§10i) |

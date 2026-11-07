@@ -18,7 +18,7 @@ thin = Side(style="thin", color="C0C9B9")
 wb = Workbook()
 rm = wb.active; rm.title = "Read me"
 lines = [
- ("Sunday League — economy reference model v3 (2026-11-07): income, stand prices, expenses", BOLD),
+ ("Sunday League — economy reference model v4 (2026-11-07): income, stand prices, expenses, transfers & ratings", BOLD),
  ("One 'reference club' per division (an average club at that level). Stand prices are derived from it and then stay FIXED in the game,", BLACK),
  ("so a player who does better than average can afford things sooner, and prices never punish good play.", BLACK),
  ("", BLACK),
@@ -36,7 +36,7 @@ lines = [
  ("(1) National League → League Two (central money jumps ~25x in reality) and (2) Championship → Premier League (central money ~15x, commercial ~10x).", BLACK),
  ("The bottom stays on v0.1's values (€2 ticket; GDD's '€1.70 TV money for a season: one beer'). Real figures are £, game figures €; Claude treats them roughly 1:1 for feel.", BLACK),
  ("", BLACK),
- ("Tabs: Reference club · Stand prices · Expenses · Sources", BOLD),
+ ("Tabs: Reference club · Stand prices · Expenses · Transfers · Sources", BOLD),
 ]
 for i, (t, f) in enumerate(lines, 1):
     rm.cell(i, 1, t).font = f
@@ -195,6 +195,10 @@ S = [
  ("S25", "Step 5/6 players often paid only small match fees or expenses", "-", "Football in Berkshire", "https://footballinberkshire.co.uk/features/opinion/36476/the-insider-on-player-wages-at-non-league-step-5-and-6/"),
  ("S26", "Referees for adult grassroots games £20–45 per match", "per match", "The Soccer Store", "https://www.thesoccerstore.co.uk/blog/latest-news/how-much-does-it-cost-to-set-up-a-grassroots-football-team/"),
  ("S27", "Average pre-tax result per club 2024/25: PL −£31.1m, Championship −£15.1m, League One −£5.0m, League Two −£2.6m", "per club", "FootballTransfers (Swiss Ramble)", "https://www.footballtransfers.com/us/transfer-news/uk-premier-league/2026/03/only-four-clubs-in-the-top-four-divisions-in-england-in-profit-for-202425"),
+ ("S28", "Gross transfer spend summer 2025: Premier League £3.0bn (net £1.2bn); Championship £240m (receipts £355m)", "per league", "Deloitte", "https://www.deloitte.com/uk/en/about/press-room/deloitte-premier-league-spending-record-eclipsed.html"),
+ ("S29", "EA FC 26 ratings: Salah 91; Rodri, Van Dijk, Haaland 90; top-26 PL players 85–91; Mbappé 92 highest overall", "rating anchor", "GOAL; Everything Edinburgh", "https://www.goal.com/en/lists/ea-sports-fc-26-premier-league-player-ratings-mohamed-salah-erling-haaland-rodri-alexander-isak/blt9b473388c755fa75 ; https://everythingedinburgh.com/games/gaming/ea-fc-26-player-ratings/"),
+ ("S30", "Non-league fees: AFC Fylde → Peterborough £600k guaranteed (2nd-highest National League transfer); Vardy £1m (2012); record £1.5m (Abdulmalik)", "outliers", "Peterborough Today; DAZN", "https://www.peterboroughtoday.co.uk/sport/football/peterborough-united/peterborough-united-have-signed-a-new-striker-from-non-league-football-for-ps600k-8944375 ; https://www.dazn.com/en-CA/news/soccer/most-expensive-transfers-national-league-history-abdulmalik-vardy-jalal-taylor/ebal4uu1am5710yamz1y6zkip"),
+ ("S31", "Newly promoted Championship club Charlton paid £3.5m (up to £5m) for one player; Wrexham spent £32.7m in one window", "outliers", "EFL Analysis", "https://eflanalysis.com/transfers/every-championship-teams-summer-spending-compared/"),
  ("S20", "Non-league sponsorship: 'five figure' shirt deal at NL North level; a 'six-figure' deal called among the biggest in non-league", "order of magnitude", "Pink Un; Erewash Sound", "https://www.pinkun.com/news/22711788.kings-lynn-town-secure-five-figure-sponsorship-deal/ ; https://www.erewashsound.com/node/51640"),
 ]
 for r, s_ in enumerate(S, 2):
@@ -264,6 +268,80 @@ ex.cell(20, 1, "Game percentages are Claude's proposal (2026-11-07): surplus 55%
 widths = [17, 28, 30, 11, 16, 11, 9, 13, 13, 9, 9, 15, 15, 30, 15, 12, 50]
 for i, w in enumerate(widths, 1): ex.column_dimensions[L(i)].width = w
 ex.freeze_panes = "C5"
+
+
+# ---------------------------------------------------------------- Transfers
+tr = wb.create_sheet("Transfers", 3)
+tr["A1"] = "Transfers & player ratings (1–99). Marcel: the surplus is a free choice — build the stadium or strengthen the squad; you need both. 99 = 'a Messi, but even better', almost unreachable."; tr["A1"].font = BOLD
+tr["A3"] = "Value of a rating-80 player (€)"; tr["A3"].font = BOLD
+tr["B3"] = 4500000; tr["B3"].font = BLUE; tr["B3"].fill = YEL; tr["B3"].number_format = EUR
+tr["C3"] = "Calibrated to the GAME economy (top income is flattened), not real-world fees. A top club can afford ~2–3 signings around 82 per season."; tr["C3"].font = GREYI
+tr["A4"] = "Value multiplier per rating point"; tr["A4"].font = BOLD
+tr["B4"] = 1.25; tr["B4"].font = BLUE; tr["B4"].fill = YEL; tr["B4"].number_format = '0.00"x"'
+tr["C4"] = "Exponential: +1 rating = ×1.25 value, so +10 ≈ ×9. Low ratings become practically free (fits GDD: amateurs are free)."; tr["C4"].font = GREYI
+for c, h in enumerate(["Rating", "Player value (€)", "Rough real-world feel"], 1):
+    cell = tr.cell(6, c, h); cell.font = HEAD; cell.fill = HFILL
+feel = {99: "mythical: better than Messi at his peak", 95: "best player in the world", 90: "world class (EA FC 26 top: Salah 91, Rodri/Haaland 90)", 85: "Premier League star", 80: "solid Premier League starter", 75: "Premier League squad / Championship star", 70: "Championship regular", 65: "League One regular", 60: "League Two regular", 55: "National League", 50: "National League North/South", 45: "Step 3–4", 40: "Step 5", 30: "Step 7 / county", 20: "Sunday league", 10: "park kickabout", 1: "your mate who came along"}
+ratings = [99, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 30, 20, 10, 1]
+for i, rt in enumerate(ratings):
+    r = 7 + i
+    tr.cell(r, 1, rt).font = BLACK
+    tr.cell(r, 2, f"=$B$3*$B$4^(A{r}-80)").number_format = EUR2 if rt < 40 else EUR
+    tr.cell(r, 3, feel[rt]).font = GREYI
+# per division
+R0 = 26
+tr.cell(R0 - 1, 1, "Per division: reference transfer spend and what is left for the stadium").font = BOLD
+heads = ["Division (game)", "Real-world equivalent", "Gross transfer spend per club per season REAL (£)",
+ "Avg squad rating GAME", "Share of surplus spent on transfers GAME (%)", "Surplus per season (€)",
+ "Transfer budget (€)", "Value of a signing at avg + 2 (€)", "≈ Signings per season",
+ "Left for the stadium (€)", "Stand stage you'd be building", "Cost per section (€)", "Sections per season after transfers",
+ "Basis of the REAL numbers"]
+for c, h in enumerate(heads, 1):
+    cell = tr.cell(R0, c, h); cell.font = HEAD; cell.fill = HFILL
+    cell.alignment = Alignment(wrap_text=True, vertical="center")
+tr.row_dimensions[R0].height = 72
+T = [  # real gross spend £, avg rating, transfer share %, basis
+ ("~0 (players walk in)", 15, 0, "No fees at this level (GDD: amateurs free)"),
+ ("~0", 22, 0, "No fees"),
+ ("~0", 28, 5, "No fees"),
+ ("~0", 33, 10, "No fees; est."),
+ ("~0", 37, 15, "Fees rare; est."),
+ ("~0", 41, 20, "Fees rare; est."),
+ ("small (compensation)", 45, 25, "Est."),
+ ("small (compensation)", 49, 30, "Est."),
+ ("~£5k (est.)", 53, 40, "Est."),
+ (30000, 57, 50, "Est.; record fees received £0.6–1.5m are outliers [S30]"),
+ (200000, 62, 60, "Est."),
+ (1000000, 65, 70, "Est.; e.g. a newly promoted club paying £3.5m for one player is an outlier [S31]"),
+ (10000000, 70, 80, "£240m gross across 24 clubs, summer 2025 [S28]"),
+ (150000000, 80, 85, "£3.0bn gross across 20 clubs, summer 2025 [S28]; ratings anchor: EA FC 26 top 91 [S29]"),
+]
+for i, row in enumerate(T):
+    r = R0 + 1 + i
+    er = 5 + i    # Expenses row
+    rr = 4 + i    # Reference club row
+    tr.cell(r, 1, f"='Reference club'!A{rr}").font = GREEN
+    tr.cell(r, 2, f"='Reference club'!B{rr}").font = GREEN
+    c3 = tr.cell(r, 3, row[0]); c3.font = GREY; c3.fill = RFILL
+    if isinstance(row[0], (int, float)): c3.number_format = GBP
+    tr.cell(r, 4, row[1]).font = BLUE
+    c5 = tr.cell(r, 5, row[2] / 100); c5.font = BLUE; c5.number_format = "0%"; c5.fill = YEL
+    tr.cell(r, 6, f"=Expenses!M{er}").number_format = EUR; tr.cell(r, 6).font = GREEN
+    tr.cell(r, 7, f"=F{r}*E{r}").number_format = EUR
+    tr.cell(r, 8, f"=$B$3*$B$4^(D{r}+2-80)").number_format = EUR
+    tr.cell(r, 9, f"=IFERROR(G{r}/H{r},0)").number_format = "0.0"
+    tr.cell(r, 10, f"=F{r}-G{r}").number_format = EUR
+    tr.cell(r, 11, f"=Expenses!N{er}").font = GREEN
+    tr.cell(r, 12, f"=Expenses!O{er}").number_format = EUR; tr.cell(r, 12).font = GREEN
+    tr.cell(r, 13, f"=IFERROR(J{r}/L{r},0)").number_format = "0.0"
+    for c in (7, 8, 9, 10, 13): tr.cell(r, c).font = BLACK
+    tr.cell(r, 14, row[3]).font = GREYI
+    for c in range(1, 15): tr.cell(r, c).border = Border(bottom=thin)
+tr.cell(R0 + 16, 1, "Avg ratings below the Premier League are Claude's estimates on the 1–99 scale (EA FC only rates the top of the pyramid). Shares and the value curve are proposals, nothing decided.").font = GREYI
+tr.cell(R0 + 17, 1, "≈ Signings per season counts only fees; at the bottom players are free, so 0 there is expected.").font = GREYI
+widths = [17, 28, 22, 10, 13, 15, 14, 15, 10, 15, 30, 14, 12, 55]
+for i, w in enumerate(widths, 1): tr.column_dimensions[L(i)].width = w
+tr.column_dimensions["C"].width = 22
 
 wb.active = 1
 wb.save("Sunday_League_economy_model.xlsx")

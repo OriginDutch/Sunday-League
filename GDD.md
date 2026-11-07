@@ -225,6 +225,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Murmur loop **removed** (Marcel, 2026-11-07: "moet er nu uit"). Then **all** procedural crowd sounds removed too (cheer/groan/ooh; Marcel: "alle ruis geluiden mogen eruit"). Kick + whistle stay (tonal, not noise) unless Marcel says otherwise.
 - **First recordings in (2026-11-07):** Marcel supplied Motion Array files. Kept: goal cheers #1 (1, 2, last) and #2 (1–3) → `assets/audio/crowd/cheer_1..6.ogg`; all ball kicks → `kicks/kick_1..7.ogg` (normal) and `kick_big_1..4.ogg` ("goalie kicks").
 - How they play (Claude's picks, tunable): kicks at ≥20 m/s use the big set; random pick, slight pitch variation. Goal cheer only on a home goal, random of 6, full volume for 8 s then 4 s fade. Volume still scales with attendance (fans/100, floor 0.05).
+- Kicks re-cut (Marcel: "trappen moet een instant geluid geven"): some clips had 0.2–0.25 s silence in front and the 50 ms fade-in softened the hit. Now cut 2 ms before the transient, 1 ms fade-in, peak-normalised, stored as **.wav** (no decode delay). Cheers stay .ogg.
 - Licence: repo is public, so the recordings are **not committed** (`assets/audio/` gitignored); Claude places them in Marcel's folder directly. Code skips missing files (falls back to the procedural kick). Open: make the repo private, or keep audio out of git.
 - Next: real recordings from free/CC0 libraries (Marcel downloads, Claude cuts + loops + builds in). Open: keep the procedural sounds as fallback or remove them.
 

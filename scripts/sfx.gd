@@ -23,8 +23,8 @@ const CHEER_FADE := 4.0
 func _ready() -> void:
 	_kick = _make_kick()
 	# licensed recordings are not in git (GDD §10h); missing files are skipped
-	_kicks = _load_all("res://assets/audio/kicks/kick_%d.ogg", 7)
-	_kicks_big = _load_all("res://assets/audio/kicks/kick_big_%d.ogg", 4)
+	_kicks = _load_all("res://assets/audio/kicks/kick_%d.wav", 7)
+	_kicks_big = _load_all("res://assets/audio/kicks/kick_big_%d.wav", 4)
 	_cheers = _load_all("res://assets/audio/crowd/cheer_%d.ogg", 6)
 	if _kicks.is_empty():
 		_kicks.append(_kick)

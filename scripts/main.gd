@@ -1605,10 +1605,20 @@ func _build_environment() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.4
 	env.glow_bloom = 0.05
+	# depth fog (Marcel, 2026-11-07: the exponential fog made a haze over everything when zoomed out):
+	# nothing up to FOG_BEGIN, then builds up to the horizon
 	env.fog_enabled = true
+	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = Color(0.75, 0.82, 0.9)
-	env.fog_density = 0.0025
+	env.fog_density = 1.0
+	env.fog_depth_begin = FOG_BEGIN
+	env.fog_depth_end = FOG_END
+	env.fog_depth_curve = 1.6
 	env.fog_sky_affect = 0.0
+
+
+const FOG_BEGIN := 120.0   # metres (tunable)
+const FOG_END := 400.0
 
 
 func _build_pitch() -> void:

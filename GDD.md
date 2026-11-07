@@ -374,6 +374,8 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
         - playing time: regular starter −5, rotation 0, bench +10; contract: years left −10, expiring/none +10; long injury this season (>3 months) +10, only from age 31
         - examples: 33y 86 (peak 88) regular, 1 y contract → 0%; 34y 82 (peak 85) regular, expiring, long injury → 35%; 35y 76 (peak 88) bench, expiring → ~66%; 37y 70 (peak 90) bench, expiring → 95%
         - **Timing (decided):** the player **announces it somewhere halfway through the season** ("this is my last season"), giving you time to find a replacement. He **can stop during a contract by mutual agreement**.
+        - **Decided (Marcel, 2026-11-07):** he always **announces it as soon as it's decided**, then **plays the season out, unless he gets injured** (then he stops right away).
+        - **Decided:** you **can refuse** his request to stop, but then **he plays worse (morale)**. How morale works (small one-off penalty vs a full morale system) is still open.
       - **Injuries (decided, Marcel 2026-11-07): no direct rating/potential hit.** Injured time counts as **not playing**: growth stalls for young players (already a big punishment), veterans decline faster (as if benched).
     - **Decided:** **playing well = faster growth**, with a bit of **RNG**.
     - A player **stops growing around his peak**, which differs per player (one at 27, another at 32).

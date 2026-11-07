@@ -334,6 +334,9 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
 - Draft workbook: `design/economy/Sunday_League_economy_model.xlsx` (built by `build_economy_model.py`). Tab *Reference club*: attendance, ticket, spend per visitor, sponsors, TV, prize money per division → income per home match/season. Tab *Stand prices*: per stage → cost per section/place/full ground.
 - First try priced stands as "N home matches of all-in income" → exploded at the top (TV/sponsors; ~€530k per place for a third tier). Now priced by **target payback in seasons** from the extra tickets + spend of those places (0.3 season for chairs … 3 seasons for a third tier). Gives ~€12/place for chairs (= v0.1's €12 chair) up to ~€2.4k/place for a third tier.
 - All values are Claude's first guesses; nothing decided. Known gap: salaries/expenses are not modelled yet, so top clubs look very rich.
+- **v2 (2026-11-07, Marcel: "onderbouwen, dan een middenweg die de gameplay smooth laat lijken"):** every division now has a **real-world column** (English football 2024/25, £, with 20 sources on a *Sources* tab) next to the **game column** (€, middle ground). Proposed mapping: Premier Division = Premier League, League 1 = Championship, League 2 = League One, League 3 = League Two, League 4 = National League, League 5 = NL North/South, League 6–10 = Steps 3–7, Non-League 1–3 = below the official pyramid (estimates only).
+  - Middle ground: follows reality where it's smooth; flattens the two real cliffs (National League → League Two central money ~25×, Championship → Premier League ~10–15×). Result: season income grows ~1.9–2.7× per division, 3.6× into the Premier Division.
+  - Mapping, game values and the cliff flattening are Claude's proposal — nothing decided.
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.

@@ -150,6 +150,20 @@ func refresh() -> void:
 	_shop_button("bench", "Bench — £%d  (%d seats)" % [ClubState.BENCH_PRICE, ClubState.BENCH_SEATS])
 	_small("Fans only pay (£%d) if they have a seat. Everyone else watches for free." % ClubState.TICKET_PRICE)
 
+	_header("BUILD (per section)")
+	var dem := "+%d wk demolition if the section has chairs/benches" % int(ClubState.DEMOLITION_WEEKS)
+	_shop_button("bleachers", "Open bleachers — £%d  (%d rows, %d seats · %s wk)" % [club.build_cost("bleachers"),
+		ClubState.BLEACHER_ROWS[0], ClubState.BLEACHER_ROWS[0] * ClubState.BLEACHER_SEATS_PER_ROW, _wk(club.build_weeks("bleachers"))])
+	_shop_button("bleachers_rush", "  rush — £%d  (%s wk)" % [club.build_cost("bleachers_rush"), _wk(club.build_weeks("bleachers_rush"))])
+	_shop_button("rows", "+2 rows on bleachers — £%d  (+%d seats · %s wk)" % [club.build_cost("rows"),
+		2 * ClubState.BLEACHER_SEATS_PER_ROW, _wk(club.build_weeks("rows"))])
+	_shop_button("rows_rush", "  rush — £%d  (%s wk)" % [club.build_cost("rows_rush"), _wk(club.build_weeks("rows_rush"))])
+	_small("A section is closed while it's being built (%s). Max %d rows." % [dem, ClubState.BLEACHER_ROWS[-1]])
+	if not club.builds.is_empty():
+		_header("UNDER CONSTRUCTION")
+		for b in club.builds:
+			_small("Section %d: bleachers, %d rows — ready %s" % [int(b["sec"]) + 1, int(b["rows"]), club.ready_label(b)])
+
 	_header("WHO CAN PLAY FOR YOU")
 	var full := club.squad.size() >= ClubState.SQUAD_SIZE
 	for i in club.candidates.size():
@@ -231,6 +245,10 @@ func _league_block(lg: LeagueScript) -> void:
 	list_box.add_child(grid)
 
 
+static func _wk(w: float) -> String:
+	return str(int(w)) if is_equal_approx(w, round(w)) else "%.2f" % w if not is_equal_approx(w * 2.0, round(w * 2.0)) else "%.1f" % w
+
+
 static func _ordinal(n: int) -> String:
 	if n <= 0:
 		return "—"
@@ -242,7 +260,10 @@ static func _ordinal(n: int) -> String:
 
 func _update_hint() -> void:
 	if main.placing_item != "":
-		hint_label.text = "Click a free spot for your %s  ·  right-click / Esc to cancel" % main.placing_item
+		if main.placing_item in ClubState.SECTION_ITEMS:
+			hint_label.text = "Click a section to build  ·  right-click / Esc to cancel"
+		else:
+			hint_label.text = "Click a free spot for your %s  ·  right-click / Esc to cancel" % main.placing_item
 	else:
 		hint_label.text = "WASD move · wheel zoom · Q/E rotate · R/F tilt · right-drag look around · C reset"
 

@@ -309,6 +309,10 @@ func _enter_hub() -> void:
 	ball.visible = false
 	name_label.visible = false
 	grounds.clear_crowd()
+	var done := club.complete_builds()
+	if not done.is_empty():
+		club.save()
+		toast("Construction finished: %d section(s)" % done.size())
 	grounds.use_home()
 	if sfx != null:
 		sfx.set_murmur(false)
@@ -355,7 +359,9 @@ func back_to_hub() -> void:
 
 func next_season() -> void:
 	club.league.start_new_season()
+	club.complete_builds()   # the 10-week off-season passes
 	club.save()
+	grounds.rebuild_furniture()
 	hub.refresh()
 
 
@@ -477,6 +483,10 @@ func _hub_test() -> void:
 				else:
 					for c in 4:
 						club.place("chair", spot)
+		club.sections["7"] = {"stage": "bleachers", "rows": 3}
+		club.sections["13"] = {"stage": "bleachers", "rows": 7}
+		club.place("bleachers", 1)
+		grounds.rebuild_furniture()
 		print("FILL seats ", club.seats())
 	var legacy := ClubState.from_dict({"version": 1, "money": 999, "slots": {"7": "chair"}})
 	print("v1 save -> new game: money ", legacy.money, " slots ", legacy.slots)
@@ -488,6 +498,7 @@ func _hub_test() -> void:
 	print("ROUNDTRIP money %d fans %d slots %s squad %d" % [back.money, back.fans, str(back.slots), back.squad.size()])
 	grounds.spawn_crowd(maxi(club.fans + 10, club.seats() + 30))
 	_league_test()
+	_build_test()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--sim-rounds="):
 			# dev: play N league rounds with random scores (to see the table / season end in the hub)
@@ -1707,6 +1718,27 @@ func _build_goals() -> void:
 		Util.box(root, Vector3(GOAL_DEPTH, 0.03, GOAL_W), Vector3(gx + sx * GOAL_DEPTH * 0.5, GOAL_H, 0), net, false)
 		Util.box(root, Vector3(GOAL_DEPTH, GOAL_H, 0.03), Vector3(gx + sx * GOAL_DEPTH * 0.5, GOAL_H * 0.5, -half), net, false)
 		Util.box(root, Vector3(GOAL_DEPTH, GOAL_H, 0.03), Vector3(gx + sx * GOAL_DEPTH * 0.5, GOAL_H * 0.5, half), net, false)
+
+
+func _build_test() -> void:
+	# dev: build bleachers on a section with chairs (demolition), rush on an empty one, rows on top
+	var c := ClubState.new_game()
+	c.money = 99999
+	c.place("chair", 2 * ClubState.SPOTS_PER_SECTION)          # section 2 gets a chair
+	var seats0 := c.seats()
+	print("BUILD start now %.1f seats %d" % [c.now(), seats0])
+	print("BUILD bleachers on sec 2 (chairs): ", c.place("bleachers", 2), " weeks ", c.build_weeks("bleachers", 3), " chair gone: ", not c.slots.has("10"))
+	print("BUILD rush on sec 3: ", c.place("bleachers_rush", 3), " cost ", c.build_cost("bleachers_rush"), " finish ", c.build_of(3)["finish"])
+	print("BUILD chair on building sec 2 refused: ", not c.can_place("chair", 11), " rows refused while building: ", not c.can_build("rows", 2))
+	print("BUILD seats while building %d" % c.seats())
+	c.league.play_round(1, 0)
+	print("BUILD after 1 round now %.1f done %d seats %d" % [c.now(), c.complete_builds().size(), c.seats()])
+	while c.now() < 3.0:
+		c.league.play_round(1, 0)
+	print("BUILD now %.1f done %d sections %s seats %d" % [c.now(), c.complete_builds().size(), str(c.sections), c.seats()])
+	print("BUILD rows on 2: ", c.place("rows", 2), " ready ", c.ready_label(c.build_of(2)))
+	var back := ClubState.from_dict(JSON.parse_string(JSON.stringify(c.to_dict())))
+	print("BUILD roundtrip sections %s builds %d" % [str(back.sections), back.builds.size()])
 
 
 func _league_test() -> void:

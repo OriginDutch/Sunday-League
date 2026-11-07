@@ -15,6 +15,11 @@ const CHAIR_OFFSETS := [-0.75, -0.25, 0.25, 0.75]   # seat positions within a sp
 const END_EXTRA := 2.5          # sections behind the goals sit further back (clear of the nets)
 const DUGOUT_SECTION := 4         # middle section of the far (main) side
 const DUGOUT_CLEAR_X := 7.5       # no standing fans in front of the dugouts
+# open bleachers (block 4): procedural for now
+const BL_FIRST_D := 4.0           # first row, metres behind the line (same as the chairs)
+const BL_TREAD := 0.8             # row depth
+const BL_RISE := 0.38             # row height step
+const BL_FIRST_H := 0.45          # seat height of the first row
 
 var state: ClubState
 var furniture_root: Node3D
@@ -26,6 +31,7 @@ var board_labels: Array[Label3D] = []
 var active_slots: Dictionary = {}   # the furniture on show: yours, or the home club's at an away ground
 var away_mode := false
 var markers: Array[MeshInstance3D] = []
+var section_markers: Array[MeshInstance3D] = []
 var fans: Array[Fan] = []
 var free_mat: StandardMaterial3D
 var hover_mat: StandardMaterial3D
@@ -58,6 +64,18 @@ func setup(s: ClubState) -> void:
 		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		marker_root.add_child(m)
 		markers.append(m)
+	for sec in section_count():
+		var m := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(ClubState.SECTION_W - 0.8, 0.04, 3.2)
+		m.mesh = bm
+		m.material_override = free_mat
+		var f := section_frame(sec)
+		m.position = section_point(sec, 0.0, SEAT_OFFSET + 1.2) + Vector3(0, 0.03, 0)
+		m.rotation.y = f["yaw"]
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		marker_root.add_child(m)
+		section_markers.append(m)
 	marker_root.visible = false
 	rebuild_furniture()
 
@@ -106,6 +124,17 @@ static func slot_yaw(i: int) -> float:
 
 
 func nearest_free_slot(p: Vector3, item: String, max_dist: float = 3.0) -> int:
+	if item in ClubState.SECTION_ITEMS:
+		var bs := -1
+		var bd := 7.0
+		for sec in section_count():
+			if not state.can_build(item, sec):
+				continue
+			var d := Util.flat_dist(section_point(sec, 0.0, SEAT_OFFSET + 1.2), p)
+			if d < bd:
+				bd = d
+				bs = sec
+		return bs
 	var best := -1
 	var best_d := max_dist
 	for i in slot_count():
@@ -120,9 +149,13 @@ func nearest_free_slot(p: Vector3, item: String, max_dist: float = 3.0) -> int:
 
 func show_markers(on: bool, item: String = "", hover: int = -1) -> void:
 	marker_root.visible = on
+	var sec_item := item in ClubState.SECTION_ITEMS
 	for i in markers.size():
-		markers[i].visible = item != "" and state.can_place(item, i)
-		markers[i].material_override = hover_mat if i == hover else free_mat
+		markers[i].visible = item != "" and not sec_item and state.can_place(item, i)
+		markers[i].material_override = hover_mat if i == hover and not sec_item else free_mat
+	for i in section_markers.size():
+		section_markers[i].visible = sec_item and state.can_build(item, i)
+		section_markers[i].material_override = hover_mat if i == hover and sec_item else free_mat
 
 
 func rebuild_furniture() -> void:
@@ -130,6 +163,12 @@ func rebuild_furniture() -> void:
 		c.queue_free()
 	if not away_mode:
 		active_slots = state.slots
+		for key in state.sections:
+			var sec := int(key)
+			if not state.is_building(sec):
+				_bleachers(sec, int(state.sections[key]["rows"]))
+		for b in state.builds:
+			_construction(int(b["sec"]), int(b["rows"]), state.ready_label(b))
 	for key in active_slots:
 		var i := int(key)
 		var item: String = active_slots[key]
@@ -200,6 +239,62 @@ func _dugout(root: Node3D, x: float) -> void:
 	Util.box(root, Vector3(0.08, 1.7, 1.2), Vector3(x + 1.4, 0.85, -d), shell)
 	Util.box(root, Vector3(2.9, 0.06, 1.3), Vector3(x, 1.72, -d), roof)                   # roof
 	Util.box(root, Vector3(2.5, 0.08, 0.4), Vector3(x, 0.45, -d - 0.3), Color(0.6, 0.42, 0.22))  # bench
+
+
+## Open aluminium bleachers: one bench plank + footboard per row, frame, back rail.
+func _bleachers(sec: int, rows: int) -> void:
+	var root := Node3D.new()
+	var f := section_frame(sec)
+	root.position = f["line"]
+	root.rotation.y = f["yaw"]
+	furniture_root.add_child(root)
+	var alu := Color(0.72, 0.74, 0.76)
+	var frame := Color(0.42, 0.44, 0.47)
+	var w := 10.2
+	for r in rows:
+		var d := BL_FIRST_D + r * BL_TREAD
+		var h := BL_FIRST_H + r * BL_RISE
+		Util.box(root, Vector3(w, 0.05, 0.3), Vector3(0, h, -d), alu)                      # seat plank
+		Util.box(root, Vector3(w, 0.04, 0.3), Vector3(0, h - 0.42, -d + 0.3), alu)       # footboard
+	var back_d := BL_FIRST_D + (rows - 1) * BL_TREAD + 0.25
+	var top_h := BL_FIRST_H + (rows - 1) * BL_RISE
+	for x in [-5.0, -2.5, 0.0, 2.5, 5.0]:
+		var fx: float = x
+		# a sloped stringer and posts down to the ground
+		for r in rows:
+			var h := BL_FIRST_H + r * BL_RISE
+			Util.box(root, Vector3(0.06, h, 0.06), Vector3(fx, h * 0.5, -(BL_FIRST_D + r * BL_TREAD)), frame)
+		Util.box(root, Vector3(0.06, 1.0, 0.06), Vector3(fx, top_h + 0.5, -back_d), frame)
+	Util.box(root, Vector3(w, 0.05, 0.05), Vector3(0, top_h + 1.0, -back_d), alu)       # back rail
+	Util.box(root, Vector3(w, 0.05, 0.05), Vector3(0, top_h + 0.55, -back_d), alu)
+
+
+## Construction site: fence around the footprint, a crane-ish mast and a sign with the ready date.
+func _construction(sec: int, rows: int, ready: String) -> void:
+	var root := Node3D.new()
+	var f := section_frame(sec)
+	root.position = f["line"]
+	root.rotation.y = f["yaw"]
+	furniture_root.add_child(root)
+	var depth := rows * BL_TREAD + 1.0
+	var d0 := BL_FIRST_D - 0.6
+	var fence := Color(0.95, 0.55, 0.15)
+	Util.box(root, Vector3(10.6, 1.1, 0.05), Vector3(0, 0.55, -d0), fence)
+	Util.box(root, Vector3(10.6, 1.1, 0.05), Vector3(0, 0.55, -d0 - depth), fence)
+	Util.box(root, Vector3(0.05, 1.1, depth), Vector3(-5.3, 0.55, -d0 - depth * 0.5), fence)
+	Util.box(root, Vector3(0.05, 1.1, depth), Vector3(5.3, 0.55, -d0 - depth * 0.5), fence)
+	# half-built frame inside
+	for x in [-4.0, 0.0, 4.0]:
+		var fx: float = x
+		Util.box(root, Vector3(0.08, 1.6, 0.08), Vector3(fx, 0.8, -d0 - depth * 0.6), Color(0.42, 0.44, 0.47))
+	Util.box(root, Vector3(0.6, 0.6, 0.6), Vector3(3.0, 0.3, -d0 - depth * 0.35), Color(0.55, 0.4, 0.25))   # pallet
+	var l := Label3D.new()
+	l.text = "UNDER CONSTRUCTION\nready: %s" % ready
+	l.font_size = 64
+	l.pixel_size = 0.01
+	l.outline_size = 10
+	l.position = Vector3(0, 2.2, -d0)
+	root.add_child(l)
 
 
 static func _chairs(slots: Dictionary, key: String) -> int:
@@ -303,6 +398,17 @@ func seat_list() -> Array:
 			var ox: float = o
 			var local := Vector3(ox, 0.0, 0).rotated(Vector3.UP, yaw)
 			out.append({"pos": base + local, "yaw": yaw})
+	if not away_mode:
+		for key in state.sections:
+			var sec := int(key)
+			if state.is_building(sec):
+				continue
+			var yaw: float = section_frame(sec)["yaw"]
+			for r in int(state.sections[key]["rows"]):
+				for i in ClubState.BLEACHER_SEATS_PER_ROW:
+					var x := -4.75 + i * 0.5
+					var p := section_point(sec, x, BL_FIRST_D + r * BL_TREAD) + Vector3(0, BL_FIRST_H + r * BL_RISE - 0.45, 0)
+					out.append({"pos": p, "yaw": yaw})
 	return out
 
 

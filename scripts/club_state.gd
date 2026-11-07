@@ -22,6 +22,17 @@ const SECTION_W := 11.5
 const SECTIONS_LONG := 9
 const SECTIONS_SHORT := 5
 const SPOTS_PER_SECTION := 5        # 5 bench-wide spots of 4 seats = 20 seats in a row
+# ---- building (GDD block 4): stages per section, build time in weeks, rush build ------------
+# Prices from design/economy (Stand prices tab): open bleachers ≈ £1,800 per 3-row section ≈ £30 a place.
+const BLEACHER_ROWS := [3, 5, 7]          # rows per stage step (rows proposal)
+const BLEACHER_SEATS_PER_ROW := 20
+const BLEACHER_PRICE_PER_PLACE := 30
+const BLEACHER_WEEKS := 1.0               # build time per section
+const ROW_UPGRADE_WEEKS := 0.5            # extra rows within a stage: half the stage time
+const DEMOLITION_WEEKS := 1.0             # stage jump: clear the old furniture first
+const RUSH_COST := 1.5                    # rush build: +50% cost...
+const RUSH_TIME := 0.75                   # ...for 75% of the build time
+const SECTION_ITEMS := ["bleachers", "bleachers_rush", "rows", "rows_rush"]
 const SAVE_VERSION := 3             # v2 = sections, v3 = league; older saves start a new game
 const CLUB_NAME := "Your club"     # placeholder until the player can name the club
 
@@ -47,6 +58,8 @@ var record := {"w": 0, "d": 0, "l": 0}
 var matches_played := 0
 var fans_carry := 0.0               # fractional fan growth carried over
 var league: LeagueScript                  # your division: fixtures, results, table
+var sections: Dictionary = {}       # section index (String) -> {"stage": "bleachers", "rows": n}
+var builds: Array = []              # [{"sec", "stage", "rows", "finish" (absolute week), "start"}]
 
 
 static func new_game() -> ClubState:
@@ -76,7 +89,114 @@ func seats() -> int:
 	var n := 0
 	for k in slots:
 		n += seats_in(str(k))
+	for k in sections:
+		if not is_building(int(k)):
+			n += int(sections[k]["rows"]) * BLEACHER_SEATS_PER_ROW
 	return n
+
+
+# ------------------------------------------------------------------ time & building
+
+## Absolute week since the start of the career: 52 per year (42 season + 10 off-season).
+func now() -> float:
+	return float((league.season - 1) * (LeagueScript.SEASON_WEEKS + LeagueScript.OFFSEASON_WEEKS) + league.current_week())
+
+
+func is_building(sec: int) -> bool:
+	for b in builds:
+		if int(b["sec"]) == sec:
+			return true
+	return false
+
+
+func build_of(sec: int) -> Dictionary:
+	for b in builds:
+		if int(b["sec"]) == sec:
+			return b
+	return {}
+
+
+## Week number (in its season) a build is ready, for the UI.
+func ready_label(b: Dictionary) -> String:
+	var year := LeagueScript.SEASON_WEEKS + LeagueScript.OFFSEASON_WEEKS
+	var f := ceili(float(b["finish"]) - 0.001)
+	var season := (f - 1) / year + 1
+	var week := (f - 1) % year + 1
+	if week > LeagueScript.SEASON_WEEKS:
+		return "season %d pre-season" % (season + 1)
+	return "season %d week %d" % [season, week]
+
+
+func _section_has_furniture(sec: int) -> bool:
+	for k in SPOTS_PER_SECTION:
+		if slots.has(str(sec * SPOTS_PER_SECTION + k)):
+			return true
+	return false
+
+
+func bleacher_rows(sec: int) -> int:
+	var k := str(sec)
+	return int(sections[k]["rows"]) if sections.has(k) else 0
+
+
+## Section items: "bleachers" on a section without a stand; "rows" adds the next row step.
+func can_build(item: String, sec: int) -> bool:
+	if sec < 0 or is_building(sec):
+		return false
+	if item.begins_with("bleachers"):
+		return bleacher_rows(sec) == 0
+	if item.begins_with("rows"):
+		var r := bleacher_rows(sec)
+		return r > 0 and r < BLEACHER_ROWS[-1]
+	return false
+
+
+func build_cost(item: String, sec: int = -1) -> int:
+	var places := BLEACHER_ROWS[0] * BLEACHER_SEATS_PER_ROW
+	if item.begins_with("rows"):
+		places = 2 * BLEACHER_SEATS_PER_ROW
+		var r := bleacher_rows(sec) if sec >= 0 else 0
+		var i := BLEACHER_ROWS.find(r)
+		if i >= 0 and i + 1 < BLEACHER_ROWS.size():
+			places = (BLEACHER_ROWS[i + 1] - r) * BLEACHER_SEATS_PER_ROW
+	var cost := places * BLEACHER_PRICE_PER_PLACE
+	return int(round(cost * (RUSH_COST if item.ends_with("_rush") else 1.0)))
+
+
+func build_weeks(item: String, sec: int = -1) -> float:
+	var w := BLEACHER_WEEKS if item.begins_with("bleachers") else ROW_UPGRADE_WEEKS
+	if item.ends_with("_rush"):
+		w *= RUSH_TIME
+	if item.begins_with("bleachers") and sec >= 0 and _section_has_furniture(sec):
+		w += DEMOLITION_WEEKS   # stage jump: one week demolition first (not rushed)
+	return w
+
+
+func start_build(item: String, sec: int) -> bool:
+	if not can_build(item, sec) or money < build_cost(item, sec):
+		return false
+	money -= build_cost(item, sec)
+	var rows := BLEACHER_ROWS[0]
+	if item.begins_with("rows"):
+		rows = BLEACHER_ROWS[BLEACHER_ROWS.find(bleacher_rows(sec)) + 1]
+	var weeks := build_weeks(item, sec)
+	# demolish the old furniture in this section
+	for k in SPOTS_PER_SECTION:
+		slots.erase(str(sec * SPOTS_PER_SECTION + k))
+	builds.append({"sec": sec, "stage": "bleachers", "rows": rows, "start": now(), "finish": now() + weeks})
+	return true
+
+
+## Finish every build whose time has come. Returns the finished builds (for a message).
+func complete_builds() -> Array:
+	var done: Array = []
+	var t := now()
+	for b in builds.duplicate():
+		if float(b["finish"]) <= t + 0.001:
+			sections[str(int(b["sec"]))] = {"stage": b["stage"], "rows": int(b["rows"])}
+			builds.erase(b)
+			done.append(b)
+	return done
 
 
 func seats_in(key: String) -> int:
@@ -99,6 +219,11 @@ func chairs_in(key: String) -> int:
 
 ## Bench: only on an empty section. Chair: empty section, or one with fewer than 4 chairs.
 func can_place(item: String, slot: int) -> bool:
+	if item in SECTION_ITEMS:
+		return can_build(item, slot)
+	var sec := slot / SPOTS_PER_SECTION
+	if bleacher_rows(sec) > 0 or is_building(sec):
+		return false
 	var key := str(slot)
 	if item == "bench":
 		return not slots.has(key)
@@ -106,10 +231,14 @@ func can_place(item: String, slot: int) -> bool:
 
 
 func price_of(item: String) -> int:
+	if item in SECTION_ITEMS:
+		return build_cost(item)
 	return BENCH_PRICE if item == "bench" else CHAIR_PRICE
 
 
 func place(item: String, slot: int) -> bool:
+	if item in SECTION_ITEMS:
+		return start_build(item, slot)
 	var key := str(slot)
 	if not can_place(item, slot) or money < price_of(item):
 		return false
@@ -188,7 +317,7 @@ func to_dict() -> Dictionary:
 		"version": SAVE_VERSION, "money": money, "fans": fans, "approval": approval, "squad": squad,
 		"candidates": candidates, "slots": slots, "record": record,
 		"matches_played": matches_played, "fans_carry": fans_carry,
-		"league": league.to_dict(),
+		"league": league.to_dict(), "sections": sections, "builds": builds,
 	}
 
 
@@ -207,6 +336,13 @@ static func from_dict(d: Dictionary) -> ClubState:
 	s.matches_played = int(d.get("matches_played", 0))
 	s.fans_carry = float(d.get("fans_carry", 0.0))
 	s.league = LeagueScript.from_dict(d.get("league", {}))
+	s.sections = d.get("sections", {})
+	for k in s.sections:
+		s.sections[k]["rows"] = int(s.sections[k]["rows"])
+	s.builds = d.get("builds", [])
+	for b in s.builds:
+		b["sec"] = int(b["sec"])
+		b["rows"] = int(b["rows"])
 	s.refill_candidates()
 	return s
 

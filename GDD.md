@@ -249,10 +249,10 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 **What Claude built** (numbers are Claude's picks, tunable):
 - 103.5 m wide, ~35 m deep, roof front edge ~26 m high, cantilevered ~36 m from the rear columns (no columns in front of the view); white warren trusses at every section boundary, rear columns + back-stay ties, corrugated roof with a 4 m translucent strip at the front, club-colour fascia.
-- Lower tier: 20 rows (0.80 m tread, 0.36 m rise) on a raised walkway behind a pitch-side wall with a club-colour band; 8 aisles with half-steps, yellow nosings and handrails; 3 vomitories (tunnel mouths) in sections 2, 5, 8.
+- Lower tier: 20 rows (0.80 m tread, 0.36 m rise) on a raised walkway behind a pitch-side wall with a club-colour band; 8 stairs with yellow nosings and handrails; cross-aisle + 4 tunnels (see feedback round 1).
 - Skybox level: 27 glass boxes (3 per section) with warm ceiling lights, partitions and a bar; balcony with 2 rows of premium seats and a glass balustrade.
 - Upper tier: 15 rows (0.85 m tread, 0.55 m rise, steeper), front parapet with a black LED band + adverts, aisles + handrails, rear walkway; "SUNDAY LEAGUE" in white seats (5×7 pixel font, 2 seats × 2 rows per pixel).
-- Floodlights: a gantry with 32 lamps along the roof edge + 2 lattice masts (40 m) at the front corners, 6×4 lamp heads aimed at the centre spot.
+- Floodlights: a gantry with 32 lamps along the roof edge + lattice masts (40 m) with 6×4 lamp heads aimed at the centre spot (now 4, see feedback round 1).
 - Ends: clad end walls + glazed wind screens up to the roof. Back: simple clad facade (Marcel's choice for now), window band, 3 stair cores with entrances + canopies, "SUNDAY LEAGUE" sign.
 - Pitch-side: advert boards + 2 perspex dugouts.
 - 6,516 seats (6,354 + 162 premium) and 1,872 fans (29%, fuller in the middle; 65% primary shirts, 15% secondary, 20% other colours; 3 skin tones).
@@ -262,6 +262,13 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - `tools/blender/build_big_stand.py` → `assets/models/big_stand.glb` (structure, ~22k faces, 2.4 MB) + `big_stand_layout.json` (every seat/fan).
 - In Godot `scripts/big_stand.gd` draws seats and fans with MultiMesh + `instanced_parts.gdshader` (part mask in vertex colour, colour per instance). `set_club_colours(primary, secondary)` recolours seats, the club name, club shirts and the `Club_*` materials of the structure live — ready for the club colours upgrade (§10f).
 - Dev: `godot -- --bigstand` (north side, 6 m behind the touchline); `--club-colours=C8102E,F2F2F2` to demo recolouring.
+
+**Marcel's feedback round 1 (2026-11-07) and what changed:**
+- "Tunnels connect straight onto the seats, not to the stairs — unrealistic." Marcel chose: tunnels on the stairs + a cross-aisle + the stair goes around the tunnel and merges again. Built: a 1.6 m cross-aisle behind row 9 over the full width (rows behind it start 0.54 m higher, with a rail on that edge, open at every stair); 4 tunnels (on the stairs at x = ±5.75 and ±28.75 — 4 instead of 3 to stay symmetric with the stairs) opening onto the cross-aisle; behind it the stair splits into two 0.9 m stairs alongside the tunnel walls, which merge on a landing above the tunnel mouth into one stair again. Steps are now max ~0.3 m (3 steps where the cross-aisle jump is).
+- "The floodlight mast stands behind the pitch, not in the corner." Marcel chose: **masts in all 4 corners**. Now a separate model `assets/models/floodlight_mast.glb` (the far-side masts don't belong to the stand), placed 8 m diagonally out from each corner flag, aimed at the centre spot.
+- "Everyone wears black trousers." Now 6 trouser colours (jeans, dark, black, grey, beige, light jeans), packed with the skin tone into the instance data.
+- Seats now 6,464, fans 1,830 (the tunnel zones took some seats).
+- Godot loads BigStand by path (a new class_name made the game fail before the editor rescanned), and a missing import gives a clear message. New models/sounds need `godot --path . --headless --import` (or opening the editor once) after a pull.
 
 **Seen and fixed during the build:** fans too wide (letters unreadable) → slimmer; open gap between back wall and roof → clad up to the roof, glazed end screens; two stacked rows of colourful boards → front wall now concrete + club band; facade sign was mirrored and hidden behind the centre core/columns → mirrored, moved up, narrower.
 

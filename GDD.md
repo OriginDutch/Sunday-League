@@ -357,6 +357,8 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
     - Potential **can change**.
     - Growth is driven by **playing time, ratings, training complex, injuries** (among others).
       - "Ratings" here = the **player's own rating, what's left of his stats** (not match grades). Marcel's example: a player who once had 90 potential but now sits at a stats level of 30 will want to stop → a big drop from his peak/potential raises the retirement chance.
+    - **Growth per season (Marcel, 2026-11-07, direction):** work in **percentages of the potential, with a cap and a floor** — a great season can't give e.g. +24 in one season, but a 89/93 player with a monster season shouldn't get 0 either. Exact numbers open (Claude proposal pending).
+    - **Decided:** **playing well = faster growth**, with a bit of **RNG**.
     - A player **stops growing around his peak**, which differs per player (one at 27, another at 32).
     - **Retirement:** the older the player, the higher the chance he stops, but it also depends on keeping his rating up, playing time, contract length and injuries.
     - Value now = rating + potential + age (replaces the blunt age multiplier table Claude showed; exact formula in the model, tunable).

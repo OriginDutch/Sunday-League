@@ -129,7 +129,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 ### Building takes time
 - Construction takes time, so you may choose to build during the **off-season**.
 - During construction you **lose capacity**, and you see the build progress in phases: **25% → 50% → 75% → 100%**.
-- The off-season is an auto-skip of x weeks.
+- The off-season is an auto-skip of **10 weeks** (starting point, §10a build times).
 
 ### Location
 - The ground grows **in place**, and it sits **in a residential area**.
@@ -151,7 +151,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Build times (Marcel, 2026-11-07: "voelt best goed"), per section, tunable:** chairs/benches instant · bleachers 1 wk · The Shed 2 · main stand 4 · modern tier 6 · 2nd tier 8 · 3rd tier 12 weeks. Extra rows within a stage = half the stage time; corner section ×1.2; +1 week demolition on a stage jump. A section under construction is **closed** (no income from those places).
   - **No limit** on how many sections you build at once (money is the limit) — decided.
   - **Rush build** — decided in principle: pay **+50% cost for 75% of the build time** (Marcel's numbers, tunable).
-  - Off-season length still open (real reference discussed in chat).
+  - **Off-season: 10 weeks** as a starting point (Marcel, 2026-11-07). Real 2025 reference: PL ~11.5 wk, Championship ~14 wk between last and first match. Effect: everything up to a 2nd tier (8 wk) fits in one summer; a 3rd tier (12 wk) spills 2 weeks into the season, or just fits with rush build (9 wk).
 - **Settings (for now):** volume (separate for music / effects / crowd), match length, camera speed.
 - **Navigation:** three mockups made (bottom dock, left sidebar, top tabs) — superseded by the ChatGPT design direction below.
 
@@ -549,6 +549,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
 | 2026-11-07 | Player value depends on age too: old stars cheap but short-lived (§10b) |
+| 2026-11-07 | Off-season = 10 weeks (starting point) |
 | 2026-11-07 | Build times per section per stage, sections closed while building, no parallel limit, rush build +50% cost → 75% time (§10a) |
 | 2026-11-07 | Refusing a retirement = light 'unhappy' flag (form ×0.8 till contract end), no full morale system yet (§10b) |
 | 2026-11-07 | Retirement chance accepted to try: age base + drop from highest rating ever + playing time/contract/injury; announced mid-season, can stop during contract by mutual agreement (§10b) |
@@ -602,7 +603,6 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 **Not discussed yet** (here so they don't get lost)
 - Economy: safety net (see §10b), exact expense list, performance bonuses.
 - Stadium upgrade list: full categories, costs and effects (§10a has the direction).
-- Off-season length (x weeks).
 - How fans are counted and what they do for you.
 - Training, staff roles, youth.
 - Season calendar (pre-season, cups, Europe).

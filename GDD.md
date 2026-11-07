@@ -58,11 +58,12 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - On top of league matches: cups, European matches and pre-season.
 - League names are open, and so is the exact tier count (see §13).
 
-### Promotion / relegation (leaning, not final)
+### Promotion / relegation (Marcel, 2026-11-07)
 
-- Leaning towards **3 up, 3 down**.
-- Plus play-offs in which **5 teams from the lower league and 1 team from the upper league** fight for promotion/relegation. Roughly the Dutch system, without period titles.
-- Exact play-off rules: open.
+- **1st–2nd promote directly; 19th–20th are relegated directly.**
+- **Play-offs:** **3rd–7th** of a division plus the **18th of the division above** fight for one last promotion/relegation spot. That makes 3 up / 3 down in total. Roughly the Dutch system, without period titles.
+- **Per division the lines can be switched off:** the bottom division (Non-League 3) has no relegation and no 18th-place play-off; the top division (Premier Division) has no promotion and no 3rd–7th play-offs. Later: European places as extra lines on the table.
+- Open: play-off format (bracket, one or two legs, home advantage).
 
 ### Cups & Europe
 
@@ -221,6 +222,11 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Build mode:** the preview card (cost, refund, what it adds, Build it / Cancel) **floats beside the 3D ghost**; the **catalogue and the bottom strip stay visible** while building; removals are marked red with "£x back"; Esc stops building.
 - **Camera in hub/build:** **Q/E rotate + hold right mouse**, as already built in the hub camera.
 - **All "Now" screens mocked up** in noticeboard style, club colours red/white, light: main menu, hub, hub with Play disabled (squad 9/11), recruitment, squad, settings (as a modal over the hub, incl. Light/Dark), post-match summary (+ one dark check), in-match HUD, build preview, build replace, component sheet — canvas page "Round 4". The in-match controls hint uses the real bindings from `main.gd` (dev keys left out).
+
+### League table (Marcel, 2026-11-07)
+- **Hub:** the Next Match index card gets a **mini table** under the fixture: 2 teams above, your club, 2 below (Pos, Team, P, Pts), your row marked with a club-colour **highlighter stroke**, and a "Full table →" link in pen style.
+- **Full table:** a modal over the hub — an A4 ruled sheet pinned to the board (pin, slight rotation, margin line), header in Kalam ("League table — Season 1"), numbers in Work Sans with tabular figures, columns #, Team, P, W, D, L, GD, Pts, close button top right.
+- **Zone lines** (dashed pen lines, Kalam labels in the right margin): "Promotion ↑" under 2nd, a "Play-offs" bracket over 3rd–7th ("+ 18th of the division above"), "Play-off ↕" around 18th, "Relegation ↓" above 19th. Switched on/off per division (see §6). Mock-ups: canvas page "Round 5".
 
 ### UI open points
 - UI-scale setting (100/125/150%): at 1280×720 uniform scaling makes 14 px text ~9 px.
@@ -620,6 +626,8 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | UI style revised: chalkboard dropped (all textures rejected); **Clubhouse Noticeboard** with club colours on the accents, Kalam + Work Sans; light default, simple dark mode (surfaces dark, text inverted, accents unchanged) as an option (§10e) |
 | 2026-11-07 | UI design round done by Claude instead of ChatGPT (same brief) |
 | 2026-11-07 | UI: 5th nav item "Club"; build preview floats beside the ghost; catalogue + bottom strip stay visible in build mode; camera Q/E + right mouse; all "Now" screens mocked up (canvas "Round 4") |
+| 2026-11-07 | Promotion/relegation: 1–2 up, 19–20 down, play-offs 3rd–7th + 18th of the division above for the last spot; lines switch off per division (no relegation from Non-League 3, no promotion from the Premier Division) (§6) |
+| 2026-11-07 | League table UI: mini table on the Next Match card + full table as a pinned A4 sheet with zone lines (§10e) |
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
@@ -658,7 +666,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 **Pyramid**
 - League names.
 - Exact tier count: is League 1 the "Premier Division", or does the Premier Division sit above League 1?
-- Play-off rules (leaning described in §6).
+- Play-off format (bracket, one or two legs, home advantage); who takes part is decided (§6).
 - Exact European qualification rules.
 - In which tiers there are 2 cups instead of 1.
 

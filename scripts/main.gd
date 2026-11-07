@@ -84,7 +84,6 @@ const RECEIVE_ASSIST := true           # your receiver runs to the ball by himse
 const LOB_PASS_DISTANCE := 30.0        # passes longer than this go through the air
 const LOOSE_SWITCH_MARGIN := 5.0       # auto-switch on a loose ball only if a teammate is this much closer
 const BEATEN_MARGIN := 3.0             # ball carrier this far past you -> switch to a goal-side teammate
-const Q_CYCLE_WINDOW := 1.2            # press Q again within this time to cycle to the next nearest
 const THROW_IN_DISTANCE := 3.0         # opponents keep this distance at a throw-in (9.15 m otherwise)
 const AI_SHOOT_RANGE := 25.0
 
@@ -1083,8 +1082,6 @@ func _pass_target_in_cone(p: Player, aim: Vector3) -> Player:
 ## a loose ball that a teammate is clearly closer to, and when you've been beaten.
 ## Plus, from earlier decisions: your keeper while he holds the ball, and your own set pieces.
 var manual_lock := 0.0          # after Q, distance-based auto-switching waits a moment
-var q_cycle: Array[Player] = []
-var q_index := 0
 var q_time := 99.0
 
 
@@ -1132,21 +1129,23 @@ func _auto_switch() -> void:
 				switch_cooldown = 1.0
 
 
-## Q: nearest teammate to the ball; pressing again quickly cycles to the next nearest.
+## Q (Marcel, 2026-11-07: cycling drifted away from the ball): always the teammate nearest to where
+## the ball is going, other than the one you control — recomputed on every press. Pressing again
+## therefore bounces between the two nearest players instead of walking further away.
 func _manual_switch() -> void:
-	if q_time > Q_CYCLE_WINDOW or q_cycle.is_empty():
-		q_cycle.clear()
-		for p in home:
-			if p.role != "GK" and p != controlled:
-				q_cycle.append(p)
-		q_cycle.sort_custom(func(a: Player, b: Player) -> bool:
-			return Util.flat_dist(a.position, ball.position) < Util.flat_dist(b.position, ball.position))
-		q_index = 0
-	else:
-		q_index = (q_index + 1) % q_cycle.size()
-	if q_cycle.is_empty():
+	var target := Util.flat(ball.position + ball.vel * 0.4)
+	var best: Player = null
+	var best_d := INF
+	for p in home:
+		if p.role == "GK" or p == controlled:
+			continue
+		var d := Util.flat_dist(p.position, target)
+		if d < best_d:
+			best_d = d
+			best = p
+	if best == null:
 		return
-	controlled = q_cycle[q_index]
+	controlled = best
 	q_time = 0.0
 	manual_lock = 1.5
 

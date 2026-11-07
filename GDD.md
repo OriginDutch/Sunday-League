@@ -329,6 +329,12 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
 - Player performance bonuses.
 - Exact list partly open.
 
+### Reference model (draft, 2026-11-07)
+- Marcel: "one home match of income" is no fixed unit (depends on capacity, attendance, concessions, sponsors…). Agreed approach: a fixed **reference club per division** (average club at that level); prices are derived from it and then **stay fixed in the game**, so doing better than average lets you build sooner.
+- Draft workbook: `design/economy/Sunday_League_economy_model.xlsx` (built by `build_economy_model.py`). Tab *Reference club*: attendance, ticket, spend per visitor, sponsors, TV, prize money per division → income per home match/season. Tab *Stand prices*: per stage → cost per section/place/full ground.
+- First try priced stands as "N home matches of all-in income" → exploded at the top (TV/sponsors; ~€530k per place for a third tier). Now priced by **target payback in seasons** from the extra tickets + spend of those places (0.3 season for chairs … 3 seasons for a third tier). Gives ~€12/place for chairs (= v0.1's €12 chair) up to ~€2.4k/place for a third tier.
+- All values are Claude's first guesses; nothing decided. Known gap: salaries/expenses are not modelled yet, so top clubs look very rich.
+
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
 

@@ -358,6 +358,12 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
     - Growth is driven by **playing time, ratings, training complex, injuries** (among others).
       - "Ratings" here = the **player's own rating, what's left of his stats** (not match grades). Marcel's example: a player who once had 90 potential but now sits at a stats level of 30 will want to stop → a big drop from his peak/potential raises the retirement chance.
     - **Growth per season (Marcel, 2026-11-07, direction):** work in **percentages of the potential, with a cap and a floor** — a great season can't give e.g. +24 in one season, but a 89/93 player with a monster season shouldn't get 0 either. Exact numbers open (Claude proposal pending).
+      - **Accepted (Marcel: "de cijfers ogen goed"), tunable:** growth = gap (potential − rating) × base% × playing time × form × training complex × RNG, then cap/floor.
+        - base% by age: ≤21 35%, 22–24 25%, 25 → peak 15%
+        - playing time ×0.3 (never plays) → ×1.0 (regular starter); form (avg match grade) ×0.7 → ×1.4 (monster season); training complex ×1.0 → ×1.3; RNG ×0.8–1.2
+        - cap +8 per season; floor +1 when playing regularly, +2 in a monster season; never above potential
+        - examples: 19y 68→88 good regular season → +8 (76); same player benched → +2; 26y 89→93 monster season → +2 (91)
+      - **Decline after the peak: same approach** (Marcel, 2026-11-07); numbers open (Claude proposal pending).
     - **Decided:** **playing well = faster growth**, with a bit of **RNG**.
     - A player **stops growing around his peak**, which differs per player (one at 27, another at 32).
     - **Retirement:** the older the player, the higher the chance he stops, but it also depends on keeping his rating up, playing time, contract length and injuries.

@@ -18,7 +18,7 @@ const HALF_SECONDS := 180.0      # 3 minutes per half
 const KEEPER_RUSH_DEPTH := 7.0   # keeper comes off his line for loose balls inside this zone
 const KEEPER_RUSH_HALF_W := 10.0
 const SUPPORT_PUSH := 20.0       # how far the team pushes up when in possession
-const MARK_RADIUS := 12.0        # defenders pick up attackers this close to their zone
+const MARK_RADIUS := 9.0        # defenders pick up attackers this close to their zone
 
 # ---- difficulty / feel knobs ------------------------------------------------
 const HUMAN_SPEED_BONUS := 1.1         # your player runs a bit faster than the AI
@@ -31,6 +31,12 @@ const HUMAN_STEAL_TIME := 0.3          # you pressing the AI carrier
 const HUMAN_TACKLE_SUCCESS := 0.85
 const AI_TACKLE_SUCCESS := 0.55
 const AI_TACKLE_RATE_VS_HUMAN := 0.45  # tackle attempts per second when close to you
+const AI_TACKLE_START_RANGE := 1.4     # AI only lunges when this close to the ball
+const AI_TACKLE_LUNGE := 7.0           # lunge speed (m/s) for 0.35 s
+const HUMAN_TACKLE_LUNGE := 10.0
+const AI_JOCKEY_DISTANCE := 2.0        # AI presser keeps this gap when you have the ball
+const MARK_DISTANCE := 3.0             # markers stand this far goal-side of their man
+const LOB_PASS_DISTANCE := 30.0        # passes longer than this go through the air
 const AI_SHOOT_RANGE := 18.0
 const AI_SHOT_ERROR := 1.6             # 1.0 = as accurate as you
 const KEEPER_REACTION := [0.14, 0.28]  # seconds before the keeper reacts to a shot: [yours, theirs]
@@ -145,6 +151,8 @@ func _ready() -> void:
 			_shot_test_begin()
 	else:
 		_enter_hub()
+	if "--pass-test" in args:
+		_pass_test()
 	if "--hub-test" in args:
 		_hub_test()
 	if "--quick-friendly" in args:
@@ -152,6 +160,34 @@ func _ready() -> void:
 		start_friendly()
 		time_left = 3.0
 		_quick = true
+
+
+func _pass_test() -> void:
+	# dev: lead passes to a running receiver; prints how close the ball gets and how fast it is then
+	var passer := home[5]
+	var recv := home[6]
+	var cases := [[Vector3(15, 0, 10), Vector3(0, 0, -6)], [Vector3(25, 0, 0), Vector3(6, 0, 0)],
+		[Vector3(8, 0, -12), Vector3(-4, 0, -4)], [Vector3(35, 0, 15), Vector3(5, 0, -3)], [Vector3(10, 0, 0), Vector3(0, 0, 0)]]
+	for c in cases:
+		var rp: Vector3 = c[0]
+		var rv: Vector3 = c[1]
+		passer.position = Vector3.ZERO
+		recv.position = rp
+		recv.vel = rv
+		ball.reset_to(passer.position)
+		ball.owner_player = passer
+		passer.pass_to(recv)
+		var best := INF
+		var spd_at := 0.0
+		for i in 300:
+			recv.position += rv * (1.0 / 60.0)
+			ball.step(1.0 / 60.0)
+			var d := Util.flat_dist(ball.position, recv.position)
+			if d < best:
+				best = d
+				spd_at = ball.flat_speed()
+		print("PASS to %s running %s: closest %.2f m, ball speed there %.1f m/s" % [str(rp), str(rv), best, spd_at])
+	get_tree().quit()
 
 
 # ================================================================== hub / club flow
@@ -428,6 +464,8 @@ func _team_attacking(side: float) -> int:
 
 ## Ball fully over a line (not a goal): award throw-in / corner / goal kick.
 func _check_out() -> void:
+	if ball.owner_player != null and ball.owner_player.restart_kind != "":
+		return   # ball is being held for a set piece
 	var p := ball.position
 	var last := ball.last_touch
 	var last_team := last.team if last != null else 0
@@ -474,6 +512,8 @@ func _award_restart(kind: String, t: int, spot: Vector3) -> void:
 			p.position = spot + away_dir.normalized() * 9.2
 	taker.position = spot
 	taker.vel = Vector3.ZERO
+	if t == 0 and not autoplay:
+		controlled = taker
 	taker.face_towards(Vector3(-spot.x * 0.3, 0, -spot.z))
 	_give_ball(taker)
 	taker.restart_kind = kind
@@ -657,10 +697,17 @@ func _unhandled_input(event: InputEvent) -> void:
 				if state == "play" and controlled != null and not controlled.has_ball():
 					controlled.start_tackle()
 			KEY_Q:
-				if state == "play":
+				if state == "play" or state == "restart":
+					aim_point = _mouse_ground_point()
 					_manual_switch()
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			match_zoom = clampf(match_zoom * 0.9, 0.5, 1.8)
+			return
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			match_zoom = clampf(match_zoom * 1.1, 0.5, 1.8)
+			return
 		if (state != "play" and state != "restart") or controlled == null:
 			return
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
@@ -780,41 +827,31 @@ func _pass_target_in_cone(p: Player, aim: Vector3) -> Player:
 	return best
 
 
+## Control only switches on your own passes (see _human_pass). Exceptions, from earlier decisions:
+## you control your keeper while he holds the ball, and you take your own set pieces.
 func _auto_switch() -> void:
 	var holder := ball.owner_player
-	if holder != null and holder.team == 0:
-		controlled = holder   # includes your keeper once he has the ball
+	if holder != null and holder.team == 0 and (holder.role == "GK" or holder.restart_kind != ""):
+		controlled = holder
 		return
-	var pt := ball.pass_target
-	if pt != null and pt.team == 0 and pt.role != "GK":
-		controlled = pt
-		return
-	if controlled != null and controlled.role == "GK":
-		# keeper only stays yours while he holds the ball
+	if controlled != null and controlled.role == "GK" and holder != controlled:
+		# keeper has released the ball (long kick): hand control back to an outfielder
 		controlled = _nearest_to_ball(home, true)
-		switch_cooldown = 0.3
-		return
-	if switch_cooldown > 0.0 or controlled == null:
-		return
-	var best := _nearest_to_ball(home, true)
-	if best != null and best != controlled:
-		var target := ball.position + ball.vel * 0.2
-		if Util.flat_dist(best.position, target) < Util.flat_dist(controlled.position, target) - 1.5:
-			controlled = best
-			switch_cooldown = 0.4
 
 
+## Q: switch to the teammate nearest to the mouse pointer.
 func _manual_switch() -> void:
-	var candidates: Array[Player] = []
+	var best: Player = null
+	var best_d := INF
 	for p in home:
-		if p.role != "GK" and p != controlled:
-			candidates.append(p)
-	if candidates.is_empty():
-		return
-	candidates.sort_custom(func(a: Player, b: Player) -> bool:
-		return Util.flat_dist(a.position, ball.position) < Util.flat_dist(b.position, ball.position))
-	controlled = candidates[0]
-	switch_cooldown = 1.0
+		if p.role == "GK" or p == controlled:
+			continue
+		var d := Util.flat_dist(p.position, aim_point)
+		if d < best_d:
+			best_d = d
+			best = p
+	if best != null:
+		controlled = best
 
 
 func _mouse_ground_point() -> Vector3:
@@ -843,7 +880,7 @@ func _resolve_possession(delta: float) -> void:
 			continue
 		var d := Util.flat_dist(opp.position, ball.position)
 		# lunging tackle
-		var tackle_reach := 1.3 if opp.is_human else 1.0
+		var tackle_reach := 1.2 if opp.is_human else 0.8
 		if opp.tackle_timer > 0.0 and d < tackle_reach and holder.protect <= 0.0:
 			var success := HUMAN_TACKLE_SUCCESS if opp.is_human else AI_TACKLE_SUCCESS
 			if randf() < success:
@@ -878,7 +915,7 @@ func _try_collect() -> void:
 			continue
 		var keeper := p.role == "GK" and p.in_own_box()
 		var reach: float = KEEPER_REACH[p.team] if keeper else (0.85 if p.is_human else 0.7)
-		var max_h := 2.4 if keeper else 1.0
+		var max_h := 2.4 if keeper else (1.7 if ball.pass_target == p else 1.0)   # receivers can chest a lobbed pass down
 		if ball.position.y > max_h:
 			continue
 		var d := Util.flat_dist(p.position, ball.position)
@@ -962,8 +999,14 @@ func _separate_players() -> void:
 			var d := diff.length()
 			if d < min_d and d > 0.001:
 				var push := diff / d * (min_d - d) * 0.5
-				a.position += push
-				b.position -= push
+				# a set-piece taker can't be shoved off his spot
+				if a.restart_kind != "":
+					b.position -= push * 2.0
+				elif b.restart_kind != "":
+					a.position += push * 2.0
+				else:
+					a.position += push
+					b.position -= push
 
 
 # ================================================================== AI helpers (used by Player)
@@ -1321,13 +1364,16 @@ func _update_camera(delta: float) -> void:
 	var focus := ball.position
 	if controlled != null and not autoplay:
 		focus = focus.lerp(controlled.position, 0.3)
-	var want := Vector3(clampf(focus.x + lead, -HALF_L + 8.0, HALF_L - 8.0), 0, clampf(focus.z * 0.85, -HALF_W + 8.0, HALF_W - 6.0))
+	var want := Vector3(clampf(focus.x + lead, -HALF_L + 8.0, HALF_L - 8.0), 0, clampf(focus.z * 0.9, -HALF_W + 4.0, HALF_W - 2.0))
 	cam_target = cam_target.lerp(want, clampf(delta * 2.5, 0.0, 1.0))
 	_place_camera()
 
 
+var match_zoom := 1.0   # mouse wheel during a match
+
+
 func _place_camera() -> void:
-	camera.position = cam_target + Vector3(0, 18.0, 15.0)
+	camera.position = cam_target + Vector3(0, 25.0, 21.0) * match_zoom
 	camera.look_at(cam_target + Vector3(0, 0, -1.0), Vector3.UP)
 
 

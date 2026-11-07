@@ -102,6 +102,11 @@ func step(delta: float) -> void:
 
 	if tackle_timer > 0.0:
 		tackle_timer -= delta
+		if is_human:
+			# your lunge homes in on the ball a little, so a tackle goes where you meant it
+			var to_ball := Util.flat(main.ball.position - position)
+			if to_ball.length() > 0.05:
+				vel = vel.slerp(to_ball.normalized() * vel.length(), clampf(delta * 8.0, 0.0, 1.0))
 		vel = vel.move_toward(Vector3.ZERO, 12.0 * delta)
 	else:
 		var max_speed := SPRINT if wants_sprint else SPEED
@@ -161,17 +166,76 @@ func _animate(delta: float) -> void:
 
 # ------------------------------------------------------------------ actions
 
+const MAX_PASS_SPEED := 28.0
+const PASS_ARRIVAL_SPEED := 7.0   # how fast the ball should be when it reaches the receiver
+
+
+## Ground-ball speed needed to cover `d` metres in `t` seconds with the ball's rolling friction.
+static func pass_speed_for(d: float, t: float) -> float:
+	var a := Ball.ROLL_DECEL
+	var k := Ball.ROLL_DRAG
+	return (d + (a / k) * t) * k / (1.0 - exp(-k * t)) - a / k
+
+
+static func arrival_speed(v0: float, t: float) -> float:
+	var a := Ball.ROLL_DECEL
+	var k := Ball.ROLL_DRAG
+	return (v0 + a / k) * exp(-k * t) - a / k
+
+
+## Pass into the run of the receiver: find the moment where the ball and the running
+## receiver meet, arriving at a comfortable speed.
 func pass_to(receiver: Player) -> void:
-	var lead := receiver.position + receiver.vel * 0.35
-	var to := Util.flat(lead - position)
-	var spd := clampf(5.5 + to.length() * 0.85, 8.0, 24.0)
+	var run := receiver.vel
+	if receiver.is_human or receiver.team == 0 and main.controlled == receiver:
+		run = receiver.desired_move * Player.SPEED
+	var best_target := receiver.position
+	var best_v := 10.0
+	var best_score := INF
+	var t := 0.3
+	while t <= 3.5:
+		var target := receiver.position + run * t
+		target.x = clampf(target.x, -Main.HALF_L + 1.0, Main.HALF_L - 1.0)
+		target.z = clampf(target.z, -Main.HALF_W + 1.0, Main.HALF_W - 1.0)
+		var d := Util.flat_dist(position, target)
+		var v0 := pass_speed_for(d, t)
+		if v0 <= MAX_PASS_SPEED and v0 > 0.0:
+			var score := absf(arrival_speed(v0, t) - PASS_ARRIVAL_SPEED)
+			if score < best_score:
+				best_score = score
+				best_target = target
+				best_v = v0
+		t += 0.05
+	if best_score == INF or Util.flat_dist(position, best_target) > Main.LOB_PASS_DISTANCE:
+		_lob_to(receiver, run)
+		return
+	var to := Util.flat(best_target - position)
 	face_towards(to)
-	main.ball.kick(to.normalized() * spd + Vector3.UP * 0.4, self, receiver)
+	main.ball.kick(to.normalized() * best_v + Vector3.UP * 0.4, self, receiver)
+	main.ball.pass_meet = best_target
+
+
+## Long ball through the air into the receiver's run.
+func _lob_to(receiver: Player, run: Vector3) -> void:
+	var t := 1.0
+	var target := receiver.position
+	for i in 4:   # refine flight time against the moving target
+		target = receiver.position + run * t
+		target.x = clampf(target.x, -Main.HALF_L + 1.0, Main.HALF_L - 1.0)
+		target.z = clampf(target.z, -Main.HALF_W + 1.0, Main.HALF_W - 1.0)
+		t = clampf(Util.flat_dist(position, target) / 20.0, 0.9, 2.3)
+	var to := Util.flat(target - position)
+	var vh := to.length() / t * (1.0 + Ball.AIR_DRAG * t * 0.5)   # compensate air drag
+	var vy := 0.5 * Ball.GRAVITY * t + (Ball.RADIUS - Ball.RADIUS) / t
+	face_towards(to)
+	main.ball.kick(to.normalized() * vh + Vector3.UP * vy, self, receiver)
+	main.ball.pass_meet = target
 
 
 func pass_towards(point: Vector3) -> void:
 	var to := Util.flat(point - position)
-	var spd := clampf(5.5 + to.length() * 0.85, 8.0, 24.0)
+	# arrive at the point at roughly the comfortable speed
+	var spd := clampf(sqrt(PASS_ARRIVAL_SPEED * PASS_ARRIVAL_SPEED + 2.0 * (Ball.ROLL_DECEL + Ball.ROLL_DRAG * 10.0) * to.length()), 8.0, MAX_PASS_SPEED)
 	face_towards(to)
 	main.ball.kick(to.normalized() * spd + Vector3.UP * 0.4, self, null)
 
@@ -206,7 +270,7 @@ func start_tackle() -> void:
 		return
 	var to := Util.flat(main.ball.position - position)
 	if to.length() > 0.01:
-		vel = to.normalized() * (11.0 if is_human else 9.5)
+		vel = to.normalized() * (Main.HUMAN_TACKLE_LUNGE if is_human else Main.AI_TACKLE_LUNGE)
 		face_towards(to)
 	tackle_timer = 0.35
 
@@ -261,12 +325,21 @@ func _ai_outfield(delta: float) -> void:
 		wants_sprint = Util.flat_dist(position, spot) > 6.0
 		return
 
+	if b.pass_target == self and b.pass_meet != Vector3.INF and Util.flat_dist(position, b.position) > 4.0:
+		# keep making the run to where the pass is going
+		desired_move = _seek(b.pass_meet, 1.0)
+		wants_sprint = Util.flat_dist(position, b.pass_meet) > 2.0
+		return
 	if b.pass_target == self or main.is_chaser(self):
 		var target := Util.flat(b.position + b.vel * 0.25)
 		var d := Util.flat_dist(position, target)
+		if holder != null and holder.team != team and holder.is_human:
+			# jockey: stay goal-side at a little distance instead of running into you
+			var own_goal := Vector3(-Main.HALF_L * attack_dir, 0, 0)
+			target = holder.position + Util.flat(own_goal - holder.position).normalized() * Main.AI_JOCKEY_DISTANCE
 		desired_move = _seek(target, 1.0)
 		wants_sprint = d > 3.0
-		if holder != null and holder.team != team and d < 1.8:
+		if holder != null and holder.team != team and d < Main.AI_TACKLE_START_RANGE:
 			var rate := Main.AI_TACKLE_RATE_VS_HUMAN if holder.is_human else 1.2
 			if randf() < rate * delta:
 				start_tackle()
@@ -376,11 +449,16 @@ func _defend_spot() -> Vector3:
 	var b := main.ball.position
 	# zone: formation spot shifted with the ball
 	var spot := Vector3(home_pos.x + b.x * 0.55, 0, home_pos.z * 0.85 + b.z * 0.25)
+	# don't drop into your own box unless the ball is in or near it
+	var ball_depth := (b.x - own_goal.x) * attack_dir
+	var min_depth := Main.BOX_DEPTH + 1.0 if ball_depth > Main.BOX_DEPTH + 6.0 else 6.0
+	if (spot.x - own_goal.x) * attack_dir < min_depth:
+		spot.x = own_goal.x + attack_dir * min_depth
 	# pick up an attacker who wanders into the zone
 	var mark := mark_target
 	if mark != null and Util.flat_dist(mark.position, spot) < Main.MARK_RADIUS:
 		var to_goal := Util.flat(own_goal - mark.position).normalized()
-		spot = mark.position + to_goal * 1.6
+		spot = mark.position + to_goal * Main.MARK_DISTANCE
 	spot.x = clampf(spot.x, -Main.HALF_L + 1.5, Main.HALF_L - 1.5)
 	spot.z = clampf(spot.z, -Main.HALF_W + 1.0, Main.HALF_W - 1.0)
 	return spot

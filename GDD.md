@@ -72,7 +72,9 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 - **Always 11v11 on a full-size pitch.**
 - Match length is adjustable. Default: **3 minutes per half**, teams switch sides at half-time → 6 minutes per match.
-- You control the player nearest the ball (auto-switch). AI teammates know roughly where to go and which position they belong in.
+- **Switching (2026-11-07):** control only switches automatically to the **receiver of your own pass**. **Q switches to the teammate nearest your mouse pointer.** You still control your keeper while he holds the ball, and you take your own set pieces. AI teammates know roughly where to go and which position they belong in.
+- **Passing (2026-11-07):** the passer plays the ball **into the run** of the receiver. Long passes (30 m+) go through the air.
+- **Camera (2026-11-07):** further out by default, and the mouse wheel zooms during a match.
 - WASD to move, mouse to aim passes/shots.
 - **Player ratings affect the matches you play yourself.**
 - Long term: real rules, with referees and linesmen.
@@ -301,6 +303,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
 | 2026-11-07 | v0.1 scope and done-criterion (§11b); random friendlies, ticket sales only, fans pay only for a seat |
 | 2026-11-07 | v0.1 build: chair + bench, pick a slot, growth from winning + facilities, fixed ticket price, recruit to 11 (free, can't play short), approval from results/entertainment/seating, autosave after match |
+| 2026-11-07 | Playtest fixes: auto-switch only on your passes, Q = nearest to mouse, passes into the run, camera further out + wheel zoom |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
 ## 13. Open questions

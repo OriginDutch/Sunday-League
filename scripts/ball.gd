@@ -16,7 +16,10 @@ var vel := Vector3.ZERO
 var owner_player: Player = null   # who is dribbling it right now
 var last_touch: Player = null
 var pass_target: Player = null    # intended receiver of the last pass
+var pass_meet := Vector3.INF      # where passer and receiver are supposed to meet
 var time_since_kick := 99.0
+var hold_time := 0.0               # how long the current owner has had it
+var _last_owner: Player = null
 var offside_players: Array[Player] = []   # players caught offside by the last kick
 var main: Main
 var visual: Node3D
@@ -60,6 +63,7 @@ func kick(v: Vector3, by: Player, receiver: Player = null) -> void:
 	vel = v
 	last_touch = by
 	pass_target = receiver
+	pass_meet = Vector3.INF
 	time_since_kick = 0.0
 	if by != null:
 		by.touch_cooldown = 0.3
@@ -109,7 +113,16 @@ func _dribble(delta: float) -> void:
 	var target := Vector3(p.position.x, RADIUS, p.position.z) + p.facing * 0.62
 	if p.restart_kind != "":
 		target = Vector3(p.position.x, RADIUS, p.position.z)  # held for a throw-in / set piece
-	position = position.lerp(target, clampf(delta * 16.0, 0.0, 1.0))
+		position = target
+		vel = Vector3.ZERO
+		return
+	if p != _last_owner:
+		_last_owner = p
+		hold_time = 0.0
+	hold_time += delta
+	# ease the ball onto the foot when receiving (no teleport), then keep it tight to the foot
+	var follow := 8.0 if hold_time < 0.3 else 22.0
+	position = position.lerp(target + p.vel * (1.0 / follow), clampf(delta * follow, 0.0, 1.0))
 	vel = p.vel
 	_spin(delta)
 

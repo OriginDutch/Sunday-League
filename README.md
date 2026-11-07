@@ -22,11 +22,13 @@ Proof of fun for Sunday League. Godot 4.7, GDScript, no assets: everything is bu
 | Left click | pass (white ring = who gets it, else a pass into space) |
 | Hold right click | charge shot. aim the arrow at the goal: the yellow ring on the goal shows where it goes. more power = faster + higher but less accurate |
 | Space | sliding/lunge tackle (no ball) |
-| Q | switch to next player |
+| Q | switch to the teammate nearest your mouse |
+| Mouse wheel | zoom the camera |
 | R | restart match |
 | Esc | quit |
 
-Control auto-switches to the outfielder nearest the ball, and to the receiver when you pass.
+Control only switches automatically to the receiver of your pass; use Q for everything else.
+You also take your own set pieces (corner, throw-in, goal kick).
 When your keeper holds the ball, you control him: LMB pass, hold RMB for a long kick.
 If you don't press anything while a pass is coming to you, your player runs to meet it.
 

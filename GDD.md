@@ -217,6 +217,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - All numbers are Claude's picks (tunable). Before/after shots in `design/lighting/`.
 - Option 5 could not be screenshotted here (software renderer too slow for SDFGI); runs without errors, Marcel judges it on his GPU.
 - First `--new-light` attempt was too dark/muddy (ambient 0.38, sun 1.35); brightened.
+- Marcel tested both (2026-11-07): leans towards **fancy** — "iets meer helder en voelt wat zonniger". Not yet made the default.
 
 ## 10b. Economy
 

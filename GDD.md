@@ -241,7 +241,11 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Roof: **cantilever** (no columns in front of the view).
 - Between the tiers: **a row of skyboxes** (glass boxes with balcony).
 - Floodlights: **both** — light bar on the roof edge + separate masts.
-- Still to ask: rows per tier, how full / what the people look like, seat colours/pattern, back facade, deliverables.
+- Rows: **20 lower / 15 upper**.
+- People: **~30% full, mostly in club colours** (low-poly figures).
+- Seats: **club name spelled out in the seats** (second colour).
+- Back: **simple facade** (cladding + stair cores) for now, to be revisited later.
+- Still to ask: which text in the seats for the POC; go-ahead to build.
 
 ## 10b. Economy
 

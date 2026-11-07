@@ -1,5 +1,6 @@
 class_name Minimap
 extends Control
+const Kit = preload("res://scripts/ui_kit.gd")
 ## Radar of the whole pitch (bottom-right) + arrows at the screen edge for teammates out of view.
 
 const MAP_W := 260.0
@@ -40,10 +41,11 @@ func _draw() -> void:
 	if main == null or main.mode != "match":
 		return
 	var r := Rect2(Vector2.ZERO, size)
-	draw_rect(r.grow(MARGIN), Color(0, 0, 0, 0.45))
-	draw_rect(r, Color(0.2, 0.5, 0.2, 0.55))
-	var line := Color(1, 1, 1, 0.5)
-	draw_rect(r, line, false, 1.0)
+	# noticeboard index card (GDD §10e)
+	draw_style_box(Kit.box(Kit.c("card"), 3), r.grow(MARGIN + 4.0))
+	var pen := Kit.c("pen")
+	var line := Color(pen.r, pen.g, pen.b, 0.5)
+	draw_rect(r, pen, false, 2.0)
 	draw_line(Vector2(size.x * 0.5, 0), Vector2(size.x * 0.5, size.y), line, 1.0)
 	draw_arc(size * 0.5, 9.15 / Main.HALF_L * 0.5 * size.x, 0, TAU, 24, line, 1.0)
 	for s in [-1.0, 1.0]:
@@ -52,14 +54,14 @@ func _draw() -> void:
 		var b := _to_map(Vector3(sx * (Main.HALF_L - Main.BOX_DEPTH), 0, Main.BOX_HALF_W))
 		draw_rect(Rect2(Vector2(minf(a.x, b.x), a.y), Vector2(absf(b.x - a.x), b.y - a.y)), line, false, 1.0)
 	for p in main.players:
-		var c := Main.HOME_SHIRT if p.team == 0 else Main.AWAY_SHIRT
-		if p.role == "GK":
-			c = Main.HOME_GK if p.team == 0 else Main.AWAY_GK
+		var c := Kit.c("primary") if p.team == 0 else Kit.c("ink")
 		var mp := _to_map(p.position)
 		draw_circle(mp, 4.0, c)
 		if p == main.controlled:
-			draw_arc(mp, 7.0, 0, TAU, 16, Color(1.0, 0.85, 0.1), 2.0)
-	draw_circle(_to_map(main.ball.position), 3.0, Color.WHITE)
+			draw_arc(mp, 7.0, 0, TAU, 16, Kit.c("pen"), 2.0)
+	var bp := _to_map(main.ball.position)
+	draw_circle(bp, 4.0, Kit.c("ink"))
+	draw_circle(bp, 2.6, Color.WHITE)
 
 
 func _draw_arrows() -> void:

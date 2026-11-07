@@ -1,6 +1,7 @@
 class_name Main
 extends Node3D
 const LeagueScript = preload("res://scripts/league.gd")
+const Kit = preload("res://scripts/ui_kit.gd")
 ## Football PoC — builds the pitch, spawns teams, handles input, possession, match flow and HUD.
 ## 11v11 on a full-size pitch: two halves (switching sides), throw-ins, corners, goal kicks, offside.
 
@@ -147,8 +148,18 @@ var score_label: Label
 var msg_label: Label
 var toast_label: Label
 var toast_timer := 0.0
-var power_bg: ColorRect
-var power_fill: ColorRect
+var hud_board: Control
+var hud_team_l: Label
+var hud_team_r: Label
+var hud_crest_l: TextureRect
+var hud_crest_r: TextureRect
+var hud_half: Label
+var hud_clock: Label
+var hud_msg_note: Control
+var hud_toast: Control
+var hud_power: Control
+var hud_power_bar: ProgressBar
+var hud_power_pct: Label
 
 
 # lighting (GDD §10g): "fancy" = default (options 1-5), "new" = 1-4 (--new-light), "old" = original (--old-light)
@@ -2029,61 +2040,153 @@ func _update_indicators() -> void:
 # ================================================================== HUD
 
 func _build_hud() -> void:
+	# Clubhouse Noticeboard in-match HUD (GDD §10e, mock-up "In-match HUD"), on a 1920×1080 board
 	var layer := CanvasLayer.new()
 	hud_layer = layer
 	add_child(layer)
-
-	score_label = Label.new()
-	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	score_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	score_label.offset_left = -450
-	score_label.offset_right = 450
-	score_label.offset_top = 14
-	score_label.label_settings = _font(34)
-	layer.add_child(score_label)
-
-	toast_label = Label.new()
-	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	toast_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	toast_label.offset_left = -300
-	toast_label.offset_right = 300
-	toast_label.offset_top = 64
-	toast_label.label_settings = _font(30)
-	layer.add_child(toast_label)
-
-	msg_label = Label.new()
-	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	msg_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	msg_label.label_settings = _font(72)
-	layer.add_child(msg_label)
-
-	var hint := Label.new()
-	hint.text = "WASD move (sprint by default) · Shift walk · LMB pass (white ring = receiver, red = offside) · hold RMB shoot (aim at the goal) · Space tackle · Q switch · R restart · Esc quit · dev: F2 end, F3/F4 goal us/them, F5 free cam"
-	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	hint.offset_left = 14
-	hint.offset_top = -34
-	hint.label_settings = _font(16)
-	layer.add_child(hint)
-
 	var mm := Minimap.new()
 	mm.setup(self)
 	layer.add_child(mm.arrows)
 	layer.add_child(mm)
+	hud_board = Control.new()
+	hud_board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(hud_board)
+	get_viewport().size_changed.connect(_fit_hud)
+	_fit_hud()
 
-	power_bg = ColorRect.new()
-	power_bg.color = Color(0, 0, 0, 0.5)
-	power_bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	power_bg.offset_left = -150
-	power_bg.offset_right = 150
-	power_bg.offset_top = -80
-	power_bg.offset_bottom = -60
-	layer.add_child(power_bg)
-	power_fill = ColorRect.new()
-	power_fill.color = Color(1.0, 0.75, 0.1)
-	power_fill.position = Vector2(3, 3)
-	power_fill.size = Vector2(0, 14)
-	power_bg.add_child(power_fill)
+	# score chip (top left)
+	var chip := PanelContainer.new()
+	var sb := Kit.box(Kit.c("paper"), 3)
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	chip.add_theme_stylebox_override("panel", sb)
+	chip.position = Vector2(32, 24)
+	chip.custom_minimum_size = Vector2(0, 64)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	chip.add_child(row)
+	hud_crest_l = Kit.icon("crest_home", 32, Kit.c("pen"))
+	hud_crest_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(hud_crest_l)
+	hud_team_l = Kit.label("YOU", false, 22, 700, Kit.c("ink"))
+	hud_team_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(hud_team_l)
+	var pill := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Kit.c("ink")
+	ps.set_corner_radius_all(4)
+	ps.content_margin_left = 12
+	ps.content_margin_right = 12
+	pill.add_theme_stylebox_override("panel", ps)
+	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	score_label = Kit.label("0 – 0", false, 26, 700, Kit.c("paper"))
+	pill.add_child(score_label)
+	row.add_child(pill)
+	hud_team_r = Kit.label("OPP", false, 22, 700, Kit.c("ink"))
+	hud_team_r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(hud_team_r)
+	hud_crest_r = Kit.icon("crest_away", 32, Kit.c("ink"))
+	hud_crest_r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(hud_crest_r)
+	var div := ColorRect.new()
+	div.color = Kit.c("div")
+	div.custom_minimum_size = Vector2(1, 36)
+	div.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(div)
+	hud_half = Kit.label("1st half", false, 16, 600, Kit.c("muted"))
+	hud_half.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(hud_half)
+	hud_clock = Kit.label("3:00", false, 22, 700, Kit.c("ink"))
+	hud_clock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(hud_clock)
+	hud_board.add_child(chip)
+
+	# big messages (GOAL!, HALF TIME, ...) on a sticky note
+	var note := Kit.sheet("note", 440, -4.0, Vector4(24, 18, 24, 16), 0)
+	hud_msg_note = note["root"]
+	msg_label = Kit.label("", true, 60, 700, Kit.c("primary"), true)
+	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	(note["body"] as VBoxContainer).add_child(msg_label)
+	Kit.tape(hud_msg_note, Vector2(172, -14), 3)
+	hud_board.add_child(hud_msg_note)
+	hud_msg_note.anchor_left = 0.5
+	hud_msg_note.anchor_right = 0.5
+	hud_msg_note.offset_left = -220
+	hud_msg_note.offset_right = 220
+	hud_msg_note.offset_top = 150
+
+	# toasts (SAVE!, PARRIED!, ...) as a small paper tag
+	var tt := PanelContainer.new()
+	var ts := Kit.box(Kit.c("paper"), 3)
+	ts.content_margin_left = 16
+	ts.content_margin_right = 16
+	ts.content_margin_top = 4
+	ts.content_margin_bottom = 4
+	tt.add_theme_stylebox_override("panel", ts)
+	toast_label = Kit.label("", true, 28, 700, Kit.c("pen"))
+	tt.add_child(toast_label)
+	hud_toast = tt
+	hud_board.add_child(tt)
+	tt.anchor_left = 0.5
+	tt.anchor_right = 0.5
+	tt.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	tt.offset_top = 104
+	tt.rotation_degrees = 1.0
+
+	# controls hint (bottom left), real bindings only (dev keys are listed in the F1 panel)
+	var hp := PanelContainer.new()
+	var hs := Kit.box(Kit.c("paper"), 3)
+	hs.content_margin_left = 14
+	hs.content_margin_right = 14
+	hs.content_margin_top = 10
+	hs.content_margin_bottom = 10
+	hp.add_theme_stylebox_override("panel", hs)
+	hp.add_child(Kit.label("WASD move (sprint by default) · Shift walk · LMB pass · hold RMB shoot · Space tackle · Q switch · R restart · Esc quit",
+		false, 14, 500, Kit.c("ink")))
+	hud_board.add_child(hp)
+	hp.anchor_top = 1.0
+	hp.anchor_bottom = 1.0
+	hp.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	hp.offset_left = 32
+	hp.offset_bottom = -24
+
+	# shot power
+	var pw := PanelContainer.new()
+	var pws := Kit.box(Kit.c("paper"), 3)
+	pws.content_margin_left = 18
+	pws.content_margin_right = 18
+	pws.content_margin_top = 12
+	pws.content_margin_bottom = 12
+	pw.add_theme_stylebox_override("panel", pws)
+	var pv := VBoxContainer.new()
+	pv.add_theme_constant_override("separation", 8)
+	var ph := HBoxContainer.new()
+	var pl := Kit.caps("Shot power", Kit.c("muted"))
+	pl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ph.add_child(pl)
+	hud_power_pct = Kit.label("0%", false, 16, 700, Kit.c("ink"))
+	ph.add_child(hud_power_pct)
+	pv.add_child(ph)
+	hud_power_bar = Kit.progress(0.0, false)
+	pv.add_child(hud_power_bar)
+	pw.add_child(pv)
+	hud_power = pw
+	hud_board.add_child(pw)
+	pw.anchor_left = 0.5
+	pw.anchor_right = 0.5
+	pw.anchor_top = 1.0
+	pw.anchor_bottom = 1.0
+	pw.offset_left = -210
+	pw.offset_right = 210
+	pw.offset_top = -96 - 64
+	pw.offset_bottom = -96
+
+
+func _fit_hud() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var sc := minf(vp.x / Kit.DESIGN.x, vp.y / Kit.DESIGN.y)
+	hud_board.scale = Vector2(sc, sc)
+	hud_board.size = vp / sc
 
 
 func _font(size: int) -> LabelSettings:
@@ -2094,12 +2197,31 @@ func _font(size: int) -> LabelSettings:
 	return ls
 
 
+static func _abbr(n: String) -> String:
+	if n == ClubState.CLUB_NAME:
+		return "YOU"
+	return n.substr(0, 3).to_upper()
+
+
 func _update_hud() -> void:
-	score_label.text = "YOU%s  %d - %d  %s     %s" % ["" if match_home else " (A)", score[0], score[1], opponent_name.to_upper(), _clock_text()]
-	toast_label.visible = toast_timer > 0.0
-	power_bg.visible = charging
-	power_fill.size = Vector2(294.0 * charge, 14)
-	power_fill.color = Color(1.0, 0.75, 0.1).lerp(Color(1.0, 0.2, 0.1), charge)
+	var us_left := match_home
+	hud_team_l.text = _abbr(ClubState.CLUB_NAME if us_left else opponent_name)
+	hud_team_r.text = _abbr(opponent_name if us_left else ClubState.CLUB_NAME)
+	hud_crest_l.texture = Kit.icon_tex("crest_home" if us_left else "crest_away")
+	hud_crest_r.texture = Kit.icon_tex("crest_away" if us_left else "crest_home")
+	hud_crest_l.modulate = Kit.c("pen") if us_left else Kit.c("ink")
+	hud_crest_r.modulate = Kit.c("ink") if us_left else Kit.c("pen")
+	var l: int = score[0] if us_left else score[1]
+	var r: int = score[1] if us_left else score[0]
+	score_label.text = "%d – %d" % [l, r]
+	var t := int(ceil(time_left))
+	hud_half.text = "1st half" if half == 1 else "2nd half"
+	hud_clock.text = "%d:%02d" % [t / 60, t % 60]
+	hud_msg_note.visible = msg_label.text != ""
+	hud_toast.visible = toast_timer > 0.0
+	hud_power.visible = charging
+	hud_power_bar.value = 100.0 * charge
+	hud_power_pct.text = "%d%%" % int(round(100.0 * charge))
 
 
 func _clock_text() -> String:

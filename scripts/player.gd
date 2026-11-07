@@ -14,6 +14,8 @@ var role := "OUT"            # "GK" or "OUT"
 var home_pos := Vector3.ZERO # formation spot (already mirrored for the away team)
 var attack_dir := 1.0
 var is_human := false        # set every frame by Main
+var display_name := ""
+var speed_mult := 1.0
 var mark_target: Player = null  # who to mark when defending, assigned by Main
 var restart_kind := ""        # "throw-in" / "corner" / "goal kick" / "free kick" while taking a set piece
 
@@ -105,6 +107,7 @@ func step(delta: float) -> void:
 		var max_speed := SPRINT if wants_sprint else SPEED
 		if role == "GK":
 			max_speed = (Main.KEEPER_DIVE_SPEED[team] as float) if wants_sprint else GK_SPEED
+		max_speed *= speed_mult
 		if is_human:
 			max_speed *= Main.HUMAN_SPEED_BONUS
 		if has_ball():

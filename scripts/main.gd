@@ -73,6 +73,17 @@ var charging := false
 var charge := 0.0
 var switch_cooldown := 0.0
 
+# club / hub (v0.1)
+var mode := "hub"           # hub | match | summary
+var club: ClubState
+var grounds: Grounds
+var hub: Hub
+var hud_layer: CanvasLayer
+var opponent_name := "AWAY"
+var placing_item := ""
+var hover_slot := -1
+var name_label: Label3D
+
 var ring: MeshInstance3D
 var pass_ring: MeshInstance3D
 var aim_pivot: Node3D
@@ -99,18 +110,175 @@ func _ready() -> void:
 	ball = Ball.new()
 	add_child(ball)
 	ball.setup(self)
-	_spawn_teams()
 	_build_camera()
 	_build_hud()
 	_build_indicators()
-	_start_kickoff(0)
-	if "--shot-test" in args:
-		_shot_test_begin()
+	name_label = Label3D.new()
+	name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	name_label.font_size = 64
+	name_label.outline_size = 12
+	name_label.pixel_size = 0.01
+	name_label.no_depth_test = true
+	name_label.visible = false
+	add_child(name_label)
+
+	if autoplay:
+		club = ClubState.new_game()   # throwaway club for tests, never saved
+		while club.squad.size() < ClubState.SQUAD_SIZE:
+			club.recruit(0)
+	else:
+		club = ClubState.load_or_new()
+	grounds = Grounds.new()
+	add_child(grounds)
+	grounds.setup(club)
+	hub = Hub.new()
+	add_child(hub)
+	hub.build(self)
+	hub.set_club(club)
+
+	if autoplay or _ui_demo:
+		if _ui_demo:
+			while club.squad.size() < ClubState.SQUAD_SIZE:
+				club.recruit(0)
+		start_friendly()
+		if "--shot-test" in args:
+			_shot_test_begin()
+	else:
+		_enter_hub()
+	if "--hub-test" in args:
+		_hub_test()
+	if "--quick-friendly" in args:
+		# dev: play a 2x3s friendly with nobody at the controls, then show the summary
+		start_friendly()
+		time_left = 3.0
+		_quick = true
+
+
+# ================================================================== hub / club flow
+
+func _enter_hub() -> void:
+	mode = "hub"
+	hud_layer.visible = false
+	hub.hide_summary()
+	hub.show_hub(true)
+	for p in players:
+		p.visible = false
+	ball.visible = false
+	name_label.visible = false
+	grounds.clear_crowd()
+	_hub_camera()
+
+
+func start_friendly() -> void:
+	opponent_name = Names.opponent()
+	placing_item = ""
+	grounds.show_markers(false)
+	_spawn_teams()
+	ball.visible = true
+	score = [0, 0]
+	half = 1
+	time_left = HALF_SECONDS
+	for k in stats:
+		stats[k] = [0, 0]
+	grounds.spawn_crowd(club.fans)
+	mode = "match"
+	hub.show_hub(false)
+	hub.hide_summary()
+	hud_layer.visible = true
+	_start_kickoff(first_kickoff_team)
+
+
+func back_to_hub() -> void:
+	_enter_hub()
+
+
+func new_game() -> void:
+	ClubState.delete_save()
+	club = ClubState.new_game()
+	grounds.state = club
+	grounds.rebuild_furniture()
+	hub.last_seated = 0
+	hub.set_club(club)
+
+
+func begin_placing(item: String) -> void:
+	if club.money < club.price_of(item):
+		return
+	placing_item = item
+	grounds.show_markers(true)
+
+
+func _cancel_placing() -> void:
+	placing_item = ""
+	hover_slot = -1
+	grounds.show_markers(false)
+	hub.refresh()
+
+
+# hub camera: WASD / arrows to pan, mouse wheel to zoom
+var hub_focus := Vector3(8.0, 0, -HALF_W - 2.0)
+var hub_zoom := 1.0
+
+
+func _hub_camera() -> void:
+	camera.position = hub_focus + Vector3(0, 26.0, 26.0) * hub_zoom
+	camera.look_at(hub_focus, Vector3.UP)
+
+
+func _hub_process(delta: float) -> void:
+	var pan := Vector3.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+		pan.z -= 1.0
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+		pan.z += 1.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		pan.x -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		pan.x += 1.0
+	if pan != Vector3.ZERO:
+		hub_focus += pan.normalized() * 30.0 * hub_zoom * delta
+		hub_focus.x = clampf(hub_focus.x, -HALF_L, HALF_L)
+		hub_focus.z = clampf(hub_focus.z, -HALF_W - 6.0, HALF_W + 6.0)
+	_hub_camera()
+	if placing_item == "":
+		return
+	var p := _mouse_ground_point()
+	hover_slot = grounds.nearest_free_slot(p, 3.0)
+	grounds.show_markers(true, hover_slot)
+
+
+func _hub_click() -> void:
+	if placing_item == "" or hover_slot < 0:
+		return
+	if club.place(placing_item, hover_slot):
+		grounds.rebuild_furniture()
+	_cancel_placing()
+
+
+func _hub_test() -> void:
+	# dev: exercise the club flow without a mouse
+	print("HUB TEST start: money %d fans %d squad %d" % [club.money, club.fans, club.squad.size()])
+	while club.squad.size() < ClubState.SQUAD_SIZE:
+		club.recruit(0)
+	print("placed bench: ", club.place("bench", 3), " chair: ", club.place("chair", 25), " seats ", club.seats())
+	grounds.rebuild_furniture()
+	var summary := club.apply_match(2, 1, 5)
+	print("SUMMARY ", summary)
+	var d := club.to_dict()
+	var back := ClubState.from_dict(JSON.parse_string(JSON.stringify(d)))
+	print("ROUNDTRIP money %d fans %d slots %s squad %d" % [back.money, back.fans, str(back.slots), back.squad.size()])
+	grounds.spawn_crowd(club.fans + 10)
+	print("CROWD fans spawned: %d (seats %d)" % [grounds.fans.size(), club.seats()])
 
 
 # ================================================================== loop
 
 func _physics_process(delta: float) -> void:
+	if mode != "match":
+		if mode == "hub":
+			_hub_process(delta)
+		_debug_screenshot(delta)
+		return
 	match state:
 		"kickoff":
 			state_timer -= delta
@@ -200,7 +368,7 @@ var _ui_demo := false
 func _ui_demo_tick() -> void:
 	aim_point = Vector3(HALF_L, 0, 1.6) if not ("--ui-demo-still" in OS.get_cmdline_user_args()) else aim_point
 	if not controlled.has_ball():
-		controlled.position = Vector3(12, 0, 15)
+		controlled.position = Vector3(-10, 0, -24)
 		_give_ball(controlled)
 		toast("SAVE!")
 	charging = true
@@ -399,9 +567,12 @@ func _end_of_half() -> void:
 		_full_time()
 
 
+var _quick := false
+
+
 func _second_half() -> void:
 	half = 2
-	time_left = HALF_SECONDS
+	time_left = 3.0 if _quick else HALF_SECONDS
 	# switch sides
 	for p in players:
 		p.attack_dir = -p.attack_dir
@@ -419,15 +590,28 @@ func _goal(scoring_team: int) -> void:
 	var scorer := ball.last_touch
 	var own_goal := scorer != null and scorer.team != scoring_team
 	msg_label.text = "OWN GOAL!" if own_goal else "GOAL!"
+	if not own_goal and scorer != null and scorer.display_name != "":
+		msg_label.text = "GOAL!\n%s" % scorer.display_name
+	if grounds != null:
+		grounds.react("goal_for" if scoring_team == 0 else "goal_against")
 	print("[%s] GOAL team %d  -> %d - %d" % [_clock_text(), scoring_team, score[0], score[1]])
 
 
 func _full_time() -> void:
 	state = "fulltime"
-	msg_label.text = "FULL TIME  %d - %d\npress R to play again" % [score[0], score[1]]
+	msg_label.text = "FULL TIME  %d - %d" % [score[0], score[1]]
 	print("FULL TIME %d - %d   %s" % [score[0], score[1], str(stats)])
 	if autoplay:
 		get_tree().quit()
+		return
+	# friendly done: pay, grow, autosave, show summary
+	var ent: int = score[0] + score[1] + stats["saves"][0] + stats["saves"][1] + stats["steals"][0] + stats["steals"][1]
+	var summary := club.apply_match(score[0], score[1], ent)
+	club.save()
+	print("FRIENDLY DONE -> summary ", summary, " saved to ", ProjectSettings.globalize_path(ClubState.SAVE_PATH))
+	mode = "summary"
+	name_label.visible = false
+	hub.show_summary(summary, opponent_name)
 
 
 func _restart() -> void:
@@ -444,6 +628,22 @@ func _restart() -> void:
 # ================================================================== human input
 
 func _unhandled_input(event: InputEvent) -> void:
+	if mode == "hub":
+		if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			var mb0 := event as InputEventMouseButton
+			if mb0.button_index == MOUSE_BUTTON_WHEEL_UP:
+				hub_zoom = clampf(hub_zoom * 0.9, 0.35, 2.6)
+			elif mb0.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				hub_zoom = clampf(hub_zoom * 1.1, 0.35, 2.6)
+			elif mb0.button_index == MOUSE_BUTTON_LEFT:
+				_hub_click()
+			elif mb0.button_index == MOUSE_BUTTON_RIGHT:
+				_cancel_placing()
+		elif event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ESCAPE:
+			_cancel_placing()
+		return
+	if mode != "match":
+		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if not k.pressed or k.echo:
@@ -705,6 +905,7 @@ func _try_collect() -> void:
 		if spd > 12.0 and ball.last_touch != null and ball.last_touch.team != best.team:
 			stats["saves"][best.team] += 1
 			toast("SAVE!")
+			grounds.react("save" if best.team == 0 else "chance")
 	elif spd > (19.0 if best.is_human else 16.0) and ball.pass_target != best:
 		# too hot to control: deflection
 		ball.vel = Vector3(ball.vel.x * 0.4 + randf_range(-3.0, 3.0), 1.5, ball.vel.z * 0.4 + randf_range(-3.0, 3.0))
@@ -734,6 +935,8 @@ func _steal(winner: Player, loser: Player) -> void:
 	winner.contact_time = 0.0
 	winner.tackle_timer = 0.0
 	stats["steals"][winner.team] += 1
+	if winner.team == 0 and grounds != null:
+		grounds.react("tackle")
 	if winner.is_human:
 		toast("WON IT!")
 	elif loser.is_human:
@@ -938,6 +1141,13 @@ func _st_report() -> void:
 # ================================================================== spawning
 
 func _spawn_teams() -> void:
+	for p in players:
+		p.queue_free()
+	players.clear()
+	home.clear()
+	away.clear()
+	controlled = null
+	var opp_strength := randf_range(0.92, 1.08)   # friendlies: some opponents are a bit quicker
 	var slots: Array = FORMATION_433
 	for t in 2:
 		var mirror := 1.0 if t == 0 else -1.0
@@ -954,6 +1164,11 @@ func _spawn_teams() -> void:
 			p.setup(self, t, "OUT", Vector3(v.x * mirror, 0, v.y * mirror), HOME_SHIRT if t == 0 else AWAY_SHIRT)
 			list.append(p)
 			players.append(p)
+		for p in list:
+			p.speed_mult = 1.0 if t == 0 else opp_strength
+	for i in home.size():
+		if club != null and i < club.squad.size():
+			home[i].display_name = club.squad[i]["name"]
 
 
 # ================================================================== world building
@@ -1080,13 +1295,7 @@ func _build_scenery() -> void:
 		var sc := randf_range(0.8, 1.3)
 		Util.cylinder(root, 0.25 * sc, 0.3 * sc, 1.6 * sc, p + Vector3(0, 0.8 * sc, 0), Color(0.4, 0.27, 0.15), 6)
 		Util.cylinder(root, 0.0, 1.8 * sc, 3.2 * sc, p + Vector3(0, 3.0 * sc, 0), Color(0.2, 0.45, 0.2), 7)
-	# the bench
-	Util.box(root, Vector3(3.0, 0.08, 0.5), Vector3(0, 0.5, -HALF_W - 4.0), Color(0.6, 0.42, 0.22))
-	Util.box(root, Vector3(0.08, 0.5, 0.4), Vector3(-1.3, 0.25, -HALF_W - 4.0), Color(0.3, 0.3, 0.3))
-	Util.box(root, Vector3(0.08, 0.5, 0.4), Vector3(1.3, 0.25, -HALF_W - 4.0), Color(0.3, 0.3, 0.3))
-	# umbrella
-	Util.cylinder(root, 0.03, 0.03, 2.2, Vector3(1.6, 1.1, -HALF_W - 4.0), Color(0.3, 0.3, 0.3), 6)
-	Util.cylinder(root, 0.05, 1.2, 0.45, Vector3(1.6, 2.2, -HALF_W - 4.0), HOME_SHIRT, 8)
+	# seating is bought by the player now (see Grounds)
 
 
 func _build_camera() -> void:
@@ -1170,6 +1379,10 @@ func _build_indicators() -> void:
 
 func _update_indicators() -> void:
 	var human := controlled != null and not autoplay and state == "play"
+	name_label.visible = controlled != null and not autoplay and mode == "match" and controlled.display_name != ""
+	if name_label.visible:
+		name_label.text = controlled.display_name
+		name_label.position = controlled.position + Vector3(0, 2.6, 0)
 	ring.visible = human
 	pass_ring.visible = false
 	aim_pivot.visible = false
@@ -1212,13 +1425,14 @@ func _update_indicators() -> void:
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
+	hud_layer = layer
 	add_child(layer)
 
 	score_label = Label.new()
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	score_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	score_label.offset_left = -300
-	score_label.offset_right = 300
+	score_label.offset_left = -450
+	score_label.offset_right = 450
 	score_label.offset_top = 14
 	score_label.label_settings = _font(34)
 	layer.add_child(score_label)
@@ -1271,7 +1485,7 @@ func _font(size: int) -> LabelSettings:
 
 
 func _update_hud() -> void:
-	score_label.text = "HOME  %d - %d  AWAY     %s" % [score[0], score[1], _clock_text()]
+	score_label.text = "HOME  %d - %d  %s     %s" % [score[0], score[1], opponent_name.to_upper(), _clock_text()]
 	toast_label.visible = toast_timer > 0.0
 	power_bg.visible = charging
 	power_fill.size = Vector2(294.0 * charge, 14)

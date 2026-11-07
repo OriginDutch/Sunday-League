@@ -7,7 +7,13 @@ Proof of fun for Sunday League. Godot 4.7, GDScript, no assets: everything is bu
 2. Open Godot → **Import** → pick `project.godot` in this folder
 3. Press **F5** (or the ▶ button top right)
 
-## Controls
+## Hub (between matches)
+- Shop: buy a chair or bench, then click a free (highlighted) slot along a touchline. Right-click / Esc cancels.
+- "Who can play for you": recruit people until you have 11, then press **Play friendly**.
+- WASD / arrows pan the view, mouse wheel zooms.
+- The game autosaves after each match. "New game" (click twice) wipes the save.
+
+## Controls (match)
 | Key | Action |
 |---|---|
 | WASD / arrows | move |
@@ -40,4 +46,6 @@ Everything worth tuning is a `const` at the top of the scripts:
 ## Dev
 AI vs AI headless test: `godot --headless --path . --fixed-fps 60 -- --autoplay` (add `--trace` to log ball/holder every 5s)
 Set-piece test: `-- --autoplay --restart-test` forces corners, throw-ins, goal kicks and offsides.
+Club flow test: `-- --hub-test` (prints state, placement, match summary, save round-trip).
+Quick friendly (2x3 s, then summary + autosave): `-- --quick-friendly`.
 Shot test (90 shots at their keeper): `godot --headless --path . --fixed-fps 60 -- --shot-test`

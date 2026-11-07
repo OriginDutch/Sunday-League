@@ -217,13 +217,67 @@ What's in it now (v4):
 
 **Matches in v0.1:** random friendlies.
 
+**Decisions for the v0.1 build (2026-11-07):**
+- Upgrades: **chair** (1 seat) and **bench** (several seats). You **pick a slot** for each one along the touchlines.
+- New fans come from **winning** and **facilities** (seats), scaled by approval.
+- Ticket price is **fixed**.
+- Squad: you start with a few people and **recruit from the list to fill 11**. You **can't play until you have 11**. Recruiting is **free**.
+- Approval changes with **results, entertainment** (goals, saves, tackles) and **seating** (fans without a seat get grumpier).
+- **Autosave after each match.**
+- Claude may pick the starting numbers (marked as tunable).
+
 **Fans in v0.1:**
 - Fans **actually sit on the chairs and benches** you've placed.
 - Fans still come when there's no seat for them, but then **they don't pay**. They only pay for a seat (or a standing place on a stand).
 - **Later:** charging "real" entry for regular standing places too.
 - Fans cheer, jump, some wander around a little, gather in groups, and react to tackles and saves.
 
-## 12. Decisions log
+## 11c. PoC #2 (v0.1 build) — status
+
+Built on top of the 11v11 PoC.
+
+- **Hub** between matches:
+  - top bar with money, fans, approval, seats, squad, record and v0.1 goal progress
+  - shop (chair/bench), "Who can play for you" list with Recruit buttons, squad with positions
+  - "Play friendly" button, disabled until you have 11
+- **Placing seating:** buy → free slots light up (20 per touchline) → click one.
+- **Friendlies** against random opponents ("Railway Tavern Athletic", …). Some opponents are a bit quicker than others.
+- **Crowd:**
+  - every fan is visible: seated (paying) on your chairs/benches, the rest standing for free in small groups along the touchline
+  - they breathe/sway and shuffle around a little
+  - they jump and cheer on your goals, slump on goals against, and react to saves and tackles
+- **Names:** your players carry their names; the controlled player's name is shown above him, and the scorer's name on a goal.
+- **Post-match summary:**
+  - result, attendance (seated/standing), ticket income
+  - fans before/after, approval before/after with the breakdown
+  - then autosave
+- Save file: `user://save.json` (Windows: `%APPDATA%\Godot\app_userdata\Sunday League\save.json`).
+
+**Starting numbers picked by Claude (tunable, top of `scripts/club_state.gd`):**
+
+| Value | Number |
+|---|---|
+| Start money / fans / approval | £60 / 5 / 50% |
+| Start squad | 4 people |
+| List size | 8 |
+| Ticket price | £2 per seated fan |
+| Chair / bench | £12 (1 seat) / £40 (4 seats) |
+| Slots | 20 per touchline (max 160 seats) |
+| Fan growth per match | win 6, draw 2.5, loss 0.5, +0.05 per seat, × approval factor (−0.3 … +1.5) |
+| Approval per match | win +6, draw +1, loss −5, entertainment up to +6, seating up to −6 |
+
+Simulated pace to 100 paying supporters: about **20 matches** when winning half of them (~2 hours of play), about **30** when winning only 20%. Money is the bottleneck early on.
+
+**Added by Claude without a decision (please confirm or change):**
+- Hub camera: WASD/arrows to pan, mouse wheel to zoom (needed to see and pick slots on a 105 m pitch).
+- "New game" button in the hub (click twice) that wipes the save.
+- Positions follow recruitment order (1st = GK, then LB, CB, …). Placeholder until positions are designed.
+
+**Side effects to be aware of:**
+- Purchases and recruits between matches are only saved by the autosave after the next match.
+- R (restart match) still works during a friendly, as in the PoC.
+
+
 
 | Date | Decision |
 |---|---|
@@ -246,6 +300,7 @@ What's in it now (v4):
 | 2026-11-07 | Stadium: tiny upgrades first, grows in place in a residential area, build time, low promotion requirements (§10a) |
 | 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
 | 2026-11-07 | v0.1 scope and done-criterion (§11b); random friendlies, ticket sales only, fans pay only for a seat |
+| 2026-11-07 | v0.1 build: chair + bench, pick a slot, growth from winning + facilities, fixed ticket price, recruit to 11 (free, can't play short), approval from results/entertainment/seating, autosave after match |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
 ## 13. Open questions

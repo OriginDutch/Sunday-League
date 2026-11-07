@@ -280,6 +280,12 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 **POC verdict (Marcel, 2026-11-07):** "for a POC we now know enough that it is possible." Upper-tier access and the club-name size stay open for the real build. **Next step: design the series of stand stages** (between and above chairs/benches → Shed → big two-tier; how many tiers, how many styles, corners). Claude's proposal is in the chat; nothing decided yet.
 
 **Stand stages discussion (2026-11-07):** Claude proposed a ladder of 10 stages (0 grass/rope … 9 third tier), styles growing with the stage, open corners → corner infill → closed bowl. Marcel: is ~9 stages not too few from a gameplay view? And "styles" should also mean **ground shapes**: rectangular with corners, no corners, Spanish (almost no roof), big rounded corners, fully round/oval, partly cornered. Nothing decided yet.
+- Claude's answer: split **stages** (big visual jumps, costly 3D) from **upgrades within a stage** (rows, roof, seat type, LED, heating, scoreboard, skyboxes, kiosk…), and treat stands as a **cross-section profile swept along a path** (straight side, arc for a rounded corner, all arc for an oval), with three separate axes: profile (stage), shape (corners), roof.
+- **Decided (Marcel, 2026-11-07):**
+  1. Stages + upgrades within a stage: yes in principle. Row counts and the size of the jumps are still to be discussed.
+  2. Shape: one shape for the whole stadium (Claude's reading of "dat lijkt me het beste" — to confirm), plus switching individual corners on/off as customisation.
+  3. The shape can be changed later (rebuild), from a gameplay point of view.
+  4. Career length: **at least 14 seasons, probably 20–25+**.
 
 **Seen and fixed during the build:** fans too wide (letters unreadable) → slimmer; open gap between back wall and roof → clad up to the roof, glazed end screens; two stacked rows of colourful boards → front wall now concrete + club band; facade sign was mirrored and hidden behind the centre core/columns → mirrored, moved up, narrower.
 
@@ -468,6 +474,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
+| 2026-11-07 | Stands: stages + upgrades within stages; one stadium shape + per-corner on/off; shape changeable later; career ≥14 seasons, likely 20–25+ |
 | 2026-11-07 | Big stand POC: full side, cantilever, skyboxes, floodlight bar + masts, 20/15 rows, ~30% fans in club colours, club name in seats, simple facade (§10i) |
 | 2026-11-07 | Fancy lighting is the default; audio goes into the public repo (royalty free); minimum cheer volume |
 | 2026-11-07 | Lighting: options 1–4 behind `--new-light`, option 5 behind `--fancy-light`; old lighting stays default until Marcel compares (§10g) |

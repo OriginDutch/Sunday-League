@@ -1,0 +1,43 @@
+# Sunday League — PoC
+
+Proof of fun for Sunday League. Godot 4.7, GDScript, no assets: everything is built from primitives in code.
+
+## Starten
+1. Download Godot 4.7.2 (standard version, not .NET) from godotengine.org
+2. Open Godot → **Import** → pick `project.godot` in this folder
+3. Press **F5** (or the ▶ button top right)
+
+## Controls
+| Key | Action |
+|---|---|
+| WASD / arrows | move |
+| Shift | sprint |
+| Mouse | aim |
+| Left click | pass (white ring = who gets it, else a pass into space) |
+| Hold right click | charge shot. aim the arrow at the goal: the yellow ring on the goal shows where it goes. more power = faster + higher but less accurate |
+| Space | sliding/lunge tackle (no ball) |
+| Q | switch to next player |
+| R | restart match |
+| Esc | quit |
+
+Control auto-switches to the outfielder nearest the ball, and to the receiver when you pass.
+When your keeper holds the ball, you control him: LMB pass, hold RMB for a long kick.
+If you don't press anything while a pass is coming to you, your player runs to meet it.
+
+## Tweaking
+Everything worth tuning is a `const` at the top of the scripts:
+- `scripts/main.gd` → pitch (105 x 68 m), `HALF_SECONDS`, `FORMATION_433`, camera offset in `_place_camera()`
+- `scripts/main.gd` → difficulty block: steal times, tackle success, AI shot range/accuracy, keeper reaction/dive/reach per team
+- `scripts/player.gd` → speeds, acceleration
+- `scripts/ball.gd` → gravity, friction, bounce
+
+## Files
+- `scripts/main.gd` — world building, input, possession, match flow, HUD
+- `scripts/player.gd` — movement, visuals, AI
+- `scripts/ball.gd` — arcade ball physics
+- `scripts/util.gd` — mesh/material helpers
+
+## Dev
+AI vs AI headless test: `godot --headless --path . --fixed-fps 60 -- --autoplay` (add `--trace` to log ball/holder every 5s)
+Set-piece test: `-- --autoplay --restart-test` forces corners, throw-ins, goal kicks and offsides.
+Shot test (90 shots at their keeper): `godot --headless --path . --fixed-fps 60 -- --shot-test`

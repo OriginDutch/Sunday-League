@@ -228,6 +228,14 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Full table:** a modal over the hub — an A4 ruled sheet pinned to the board (pin, slight rotation, margin line), header in Kalam ("League table — Season 1"), numbers in Work Sans with tabular figures, columns #, Team, P, W, D, L, GD, Pts, close button top right.
 - **Zone lines** (dashed pen lines, Kalam labels in the right margin): "Promotion ↑" under 2nd, a "Play-offs" bracket over 3rd–7th ("+ 18th of the division above"), "Play-off ↕" around 18th, "Relegation ↓" above 19th. Switched on/off per division (see §6). Mock-ups: canvas page "Round 5".
 
+### UI build — round 1 (2026-11-08, Marcel: "Ja! Dat mag zeker")
+- Built in Godot: `scripts/ui_kit.gd` (tokens → paper, sticky note, ruled index card with club stripe, tape, pins, primary/link/icon buttons, nav items, stat tags, progress bar, highlighter) and a new `scripts/hub.gd`. Fonts Kalam + Work Sans (variable) in `assets/fonts/` (OFL), icons + crests as SVG in `assets/ui/icons/` (from the design generators).
+- Hub = top bar (crest, club name + tagline, stat tags: fans, approval, cash, seats, squad, league position, week/season) + bottom strip (ticker + nav). Tabs: **Club** (Our Goal note + Next Match card with both crests, Play, squad-short warning, mini table + "Full table →"), **Stadium** (build catalogue: Seating = chair/bench, Stands = bleachers/rows incl. rush; unaffordable cards show "£x short"; under-construction list), **Recruitment** (note + candidate cards), **Squad** (table). Full league table as a pinned A4 sheet with zone lines (bottom division: promotion + play-offs only). Dev cheats (F1) as a card.
+- Laid out in design pixels (1920×1080) on a board scaled to the window. 2D MSAA on (rotated paper needs it).
+- Claude's picks (Marcel can overrule): **club colours = the current green** (Main.HOME_SHIRT) with the spec's club-colour rules (green tape/pins/button/accents; button text follows the contrast rule → ink on green). **Finances** tab shown but disabled until it's built.
+- Not yet: post-match summary, in-match HUD, build preview card beside the ghost, main menu, settings/dark-mode toggle, formation card on Squad.
+- Screens: `design/ui-noticeboard/game/hub_*.png`.
+
 ### UI open points
 - UI-scale setting (100/125/150%): at 1280×720 uniform scaling makes 14 px text ~9 px.
 - Dark base colour (neutral #25292D, warmer, or club-tinted); club-colour swatches next to the club name.

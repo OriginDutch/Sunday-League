@@ -231,6 +231,13 @@ func _ready() -> void:
 				hub_pitch = float(v[4])   # degrees above the ground
 			hub.root.visible = false
 			_hub_camera()
+	for arg in args:
+		if arg.begins_with("--hub-tab="):
+			hub.tab = arg.trim_prefix("--hub-tab=")   # dev: open the hub on a tab (screenshots)
+			hub.refresh()
+	if "--table" in args:
+		hub.table_open = true   # dev: open the full league table
+		hub.refresh()
 	if "--cheats" in args:
 		hub.cheats_open = true   # dev: open the cheat panel at start (F1 toggles it)
 		hub.refresh()

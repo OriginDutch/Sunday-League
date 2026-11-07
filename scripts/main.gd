@@ -1700,13 +1700,43 @@ const FOG_BEGIN := 120.0   # metres (tunable)
 const FOG_END := 400.0
 
 
+# grass texture (GDD §10j, 2026-11-08): B_clumpy, world-space triplanar so it runs on across the stripe boxes.
+# GRASS_TINT_MODE (Marcel wanted to compare both):
+#   "match"    = tint compensated so the pitch averages the old flat colours, with blade detail on top
+#   "multiply" = old colours used as-is as tint -> texture x colour, a much darker pitch
+const GRASS_TINT_MODE := "match"
+const GRASS_TILE_M := 5.0   # metres per texture repeat (tunable)
+# average colour of grass_B_clumpy_albedo.png in linear space (used by "match")
+const GRASS_TEX_MEAN_LINEAR := Color(0.0878, 0.2688, 0.047)
+var _grass_albedo: Texture2D
+var _grass_normal: Texture2D
+
+
+func _grass_mat(color: Color) -> StandardMaterial3D:
+	if _grass_albedo == null:
+		_grass_albedo = load("res://assets/textures/pitch/grass_B_clumpy_albedo.png")
+		_grass_normal = load("res://assets/textures/pitch/grass_B_clumpy_normal.png")
+	var m := Util.mat(color)
+	if GRASS_TINT_MODE == "match":
+		m.albedo_color = (color.srgb_to_linear() / GRASS_TEX_MEAN_LINEAR).linear_to_srgb()
+	m.albedo_texture = _grass_albedo
+	m.normal_enabled = true
+	m.normal_texture = _grass_normal
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE / GRASS_TILE_M
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return m
+
+
 func _build_pitch() -> void:
 	var root := Node3D.new()
 	root.name = "Pitch"
 	add_child(root)
 	# surrounding grass
 	var surround := Color(0.3, 0.4, 0.2) if light_mode == "old" else Color(0.3, 0.4, 0.21)
-	Util.box(root, Vector3(320, 0.1, 240), Vector3(0, -0.06, 0), surround, false)
+	var sb := Util.box(root, Vector3(320, 0.1, 240), Vector3(0, -0.06, 0), surround, false)
+	sb.material_override = _grass_mat(surround)
 	# striped pitch (+ a few metres of run-off)
 	var stripes := 14
 	var w := (HALF_L * 2.0 + 8.0) / stripes
@@ -1714,7 +1744,8 @@ func _build_pitch() -> void:
 		var c := Color(0.22, 0.5, 0.2) if i % 2 == 0 else Color(0.19, 0.44, 0.17)
 		if light_mode != "old":
 			c = Color(0.25, 0.48, 0.2) if i % 2 == 0 else Color(0.21, 0.42, 0.17)  # 4. less neon
-		Util.box(root, Vector3(w, 0.02, HALF_W * 2.0 + 8.0), Vector3(-HALF_L - 4.0 + w * (i + 0.5), 0.0, 0), c, false)
+		var sm := Util.box(root, Vector3(w, 0.02, HALF_W * 2.0 + 8.0), Vector3(-HALF_L - 4.0 + w * (i + 0.5), 0.0, 0), c, false)
+		sm.material_override = _grass_mat(c)
 	var white := Color(0.95, 0.95, 0.95)
 	var ly := 0.015
 	# touchlines, goal lines, halfway line

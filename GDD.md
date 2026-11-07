@@ -4,7 +4,7 @@
 > Rule for this project: Claude decides nothing unless Marcel explicitly says Claude may decide.
 > Working agreement (2026-11-07): **everything we do, discuss, plan or decide is recorded in this document**, so nothing gets lost.
 
-Last updated: 2026-11-07 (design session 1: economy, stadium, v0.1 scope)
+Last updated: 2026-11-08 (pitch grass texture, §10j)
 
 ---
 
@@ -349,6 +349,26 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 **Known limits:** the seat text is only partly readable when 30% full (fans in white shirts look like letter pixels, aisles break letters); the rear back-stays cross the facade sign in 3/4 views; Godot shots here use `--new-light` (fancy/SDFGI too slow on the software renderer); stands are not yet in the hub/economy (sections vs slots still open).
 
+## 10j. Pitch grass texture (2026-11-08)
+**Why:** first real texture test for the pitch (flat stripe colours until now).
+
+**Brief (Marcel):** seamless top-down grass, stylised (not photoreal), 1024×1024, short well-kept grass with subtle blade detail, mid green #4F8A3A–#5E9A45, no stripes/lines/shadows/perspective, flat lighting, plus a greyscale height map.
+
+**How it was made:** procedural (Python), no image AI: periodic noise + ~95k tapered blades drawn with wrap-around, so it tiles perfectly. Three variants made (A_fine, B_clumpy, C_soft).
+
+**Marcel's choices (2026-11-08):**
+- **B_clumpy** (bigger blades, visible clumps), with **softer blade outlines**. Darkest pixels end up at #487F35, a little under the #4F8A3A floor of the brief; without outlines the blades disappeared in the narrow colour range.
+- Height map: 16-bit + 8-bit + a normal map (OpenGL/+Y, Godot convention).
+- Files in `assets/textures/pitch/`: `grass_B_clumpy_albedo.png`, `_height16.png`, `_height8.png`, `_normal.png`, plus `gen.py` (the generator: `python gen.py B_clumpy`).
+- In-game: pitch stripes **and** the surrounding grass get the texture, in **all** light modes (incl. `--old-light`).
+- Stripes: Marcel wants to compare two tint modes → `GRASS_TINT_MODE` in `scripts/main.gd`:
+  - `"match"` (default for now): tint compensated so the pitch averages the old flat stripe/surround colours, blade detail on top.
+  - `"multiply"`: old colours used as-is as tint → texture × colour, a much darker pitch.
+
+**Wiring (Claude's picks, tunable):** `_grass_mat()` in `main.gd` — world-space triplanar UVs (texture runs on across the separate stripe boxes), `GRASS_TILE_M = 5.0` m per repeat, anisotropic filtering, normal map on. Height map not used in-game yet (parallax would cost performance; only needed if the normal map is not enough).
+
+**Open:** which tint mode wins; tile size; whether the height map gets used.
+
 ## 10b. Economy
 
 ### Income
@@ -606,6 +626,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Playtest round 2: Q nearest+cycle, 4 auto-switch rules, receiver comes to the ball, active defending, real dead balls, stackable chairs, save after purchases, sound, minimap + edge arrows, chants |
 | 2026-11-07 | Playtest fixes: auto-switch only on your passes, Q = nearest to mouse, passes into the run, camera further out + wheel zoom |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
+| 2026-11-08 | Pitch grass texture: B_clumpy with softer outlines, on pitch + surround in all light modes; tint mode "match" vs "multiply" to compare (§10j) |
 
 ## 13. Open questions
 

@@ -24,7 +24,12 @@ var _structure: Node3D
 
 
 func _ready() -> void:
-	_structure = load(GLB).instantiate()
+	var scene := load(GLB) as PackedScene
+	if scene == null:
+		push_error("big_stand.glb is not imported yet: open the project in the Godot editor once")
+		_structure = Node3D.new()
+	else:
+		_structure = scene.instantiate()
 	add_child(_structure)
 	var f := FileAccess.open(LAYOUT, FileAccess.READ)
 	_layout = JSON.parse_string(f.get_as_text())

@@ -21,17 +21,48 @@ const KEEPER_RUSH_HALF_W := 10.0
 const SUPPORT_PUSH := 20.0       # how far the team pushes up when in possession
 const MARK_RADIUS := 12.0        # defenders pick up attackers this close to their zone
 
-# ---- difficulty / feel knobs ------------------------------------------------
-const HUMAN_SPEED_BONUS := 1.1         # your player runs a bit faster than the AI
-const HUMAN_DRIBBLE_SPEED := 0.92      # speed multiplier while you have the ball
+# ---- difficulty levels (Marcel, 2026-11-07: one fixed level for now, more later) ------------
+# Everything that makes the match easier or harder for YOU lives here, per level. Add a level =
+# add an entry; pick it with Main.difficulty. "normal" was tuned after "solo beats passing" (10-0).
+const DIFFICULTY_LEVELS := {
+	"normal": {
+		"human_speed_bonus": 1.04,       # was 1.10: your player runs a bit faster than the AI
+		"human_dribble_speed": 0.88,     # was 0.92: same as the AI's dribble speed now
+		"human_steal_time": 0.5,         # was 0.3: you pressing the AI carrier
+		"ai_steal_time_vs_human": 0.8,   # was 1.2: AI pressing you (same as AI vs AI now)
+		"human_tackle_success": 0.7,     # was 0.85
+		"ai_tackle_success": 0.6,        # was 0.55
+		"ai_tackle_rate_vs_human": 1.0,  # was 0.7 tackle attempts per second when close to you
+		"ai_shot_error": 1.4,            # was 1.6 (1.0 = as accurate as you)
+		"their_keeper_reaction": 0.18,   # was 0.28 s (yours: 0.14)
+		"their_keeper_dive": 8.0,        # was 7.0 m/s (yours: 8.5)
+		"their_keeper_reach": 0.88,      # was 0.80 m (yours: 0.90)
+		"their_keeper_parry": 0.5,       # was 0.6: chance their keeper parries instead of catching a hard shot
+	},
+}
+static var difficulty := "normal"
+
+
+static func diff(key: String) -> float:
+	return float(DIFFICULTY_LEVELS[difficulty][key])
+
+
+static func keeper_reaction(team: int) -> float:
+	return 0.14 if team == 0 else diff("their_keeper_reaction")
+
+
+static func keeper_dive(team: int) -> float:
+	return 8.5 if team == 0 else diff("their_keeper_dive")
+
+
+static func keeper_reach(team: int) -> float:
+	return 0.9 if team == 0 else diff("their_keeper_reach")
+
+
+# ---- feel knobs (same on every level) -----------------------------------------
 const AI_DRIBBLE_SPEED := 0.88          # same for AI ball carriers
 const HUMAN_PROTECT := 0.9             # seconds you can't be robbed after receiving
 const AI_STEAL_TIME := 0.8            # AI vs AI: pressing time needed to nick the ball
-const AI_STEAL_TIME_VS_HUMAN := 1.2    # AI pressing YOU needs this long
-const HUMAN_STEAL_TIME := 0.3          # you pressing the AI carrier
-const HUMAN_TACKLE_SUCCESS := 0.85
-const AI_TACKLE_SUCCESS := 0.55
-const AI_TACKLE_RATE_VS_HUMAN := 0.7   # tackle attempts per second when close to you
 const AI_TACKLE_RATE := 0.5            # AI vs AI tackle attempts per second when close
 const AI_TACKLE_START_RANGE := 1.4     # AI only lunges when this close to the ball
 const AI_TACKLE_LUNGE := 7.0           # lunge speed (m/s) for 0.35 s
@@ -48,17 +79,14 @@ const STEP_OUT_DISTANCE := 2.5         # zone owner steps out to this distance f
 const STEP_OUT_RADIUS := 10.0          # ...when the carrier is within this distance of his zone
 const INTERCEPT_RANGE := 5.0           # AI goes for a pass passing within this distance
 const PASS_LEAD := 0.7                 # how much of the receiver's run the pass leads
+const RECEIVE_REACH := 1.1             # the intended receiver controls the ball from this far (others: 0.7, you 0.85)
+const RECEIVE_ASSIST := true           # your receiver runs to the ball by himself while your pass is on its way
 const LOB_PASS_DISTANCE := 30.0        # passes longer than this go through the air
 const LOOSE_SWITCH_MARGIN := 5.0       # auto-switch on a loose ball only if a teammate is this much closer
 const BEATEN_MARGIN := 3.0             # ball carrier this far past you -> switch to a goal-side teammate
 const Q_CYCLE_WINDOW := 1.2            # press Q again within this time to cycle to the next nearest
 const THROW_IN_DISTANCE := 3.0         # opponents keep this distance at a throw-in (9.15 m otherwise)
 const AI_SHOOT_RANGE := 25.0
-const AI_SHOT_ERROR := 1.6             # 1.0 = as accurate as you
-const KEEPER_REACTION := [0.14, 0.28]  # seconds before the keeper reacts to a shot: [yours, theirs]
-const KEEPER_DIVE_SPEED := [8.5, 7.0]
-const KEEPER_REACH := [0.9, 0.8]
-const AWAY_KEEPER_PARRY := 0.6         # chance their keeper parries instead of catching a hard shot
 
 # 4-3-3 for a team attacking +X (x = length, y here = width; -y is the left flank). mirrored for the other side.
 const FORMATION_433 := [
@@ -86,7 +114,7 @@ var state := "kickoff"     # kickoff | play | restart | goal | halftime | fullti
 var state_timer := 0.0
 var autoplay := false      # `-- --autoplay`: AI vs AI, used for headless testing
 var _conceding_team := 0
-var stats := {"shots": [0, 0], "steals": [0, 0], "saves": [0, 0], "offside": [0, 0], "corners": [0, 0], "throw-ins": [0, 0], "goal kicks": [0, 0], "passes": [0, 0], "intercepts": [0, 0], "bailouts": [0, 0]}  # printed at full time (dev)
+var stats := {"shots": [0, 0], "steals": [0, 0], "saves": [0, 0], "offside": [0, 0], "corners": [0, 0], "throw-ins": [0, 0], "goal kicks": [0, 0], "passes": [0, 0], "completed": [0, 0], "intercepts": [0, 0], "bailouts": [0, 0]}  # printed at full time (dev)
 
 var camera: Camera3D
 var cam_target := Vector3.ZERO
@@ -180,6 +208,13 @@ func _ready() -> void:
 			_shot_test_begin()
 	else:
 		_enter_hub()
+	for arg in args:
+		if arg.begins_with("--fast="):
+			# dev: run the simulation N times faster with the same 1/60 s step (headless balance tests)
+			var n := int(arg.trim_prefix("--fast="))
+			Engine.physics_ticks_per_second = 60 * n
+			Engine.max_physics_steps_per_frame = 8 * n
+			Engine.time_scale = n
 	if "--pass-test" in args:
 		_pass_test()
 	if "--hub-test" in args:
@@ -941,14 +976,22 @@ func _update_human(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		mv.x += 1.0
 
-	if mv != Vector3.ZERO:
+	if RECEIVE_ASSIST and ball.pass_target == controlled and ball.owner_player == null:
+		# a pass is coming: run to where it was played (like the AI does), your input waits until you have it
+		var meet := ball.pass_meet if ball.pass_meet != Vector3.INF else Util.flat(ball.position)
+		if not ball.pass_lob and Util.flat_dist(controlled.position, ball.position) > 6.0:
+			meet = meet.lerp(Util.flat(ball.position), 0.35)
+		elif Util.flat_dist(controlled.position, ball.position) <= 6.0:
+			meet = Util.flat(ball.position + ball.vel * 0.15)
+		var to_meet := Util.flat(meet - controlled.position)
+		controlled.desired_move = to_meet.limit_length(1.0) if to_meet.length() > 0.3 else Vector3.ZERO
+		controlled.wants_sprint = to_meet.length() > 2.0
+	elif mv != Vector3.ZERO:
 		controlled.desired_move = mv.normalized()
-	elif ball.pass_target == controlled:
-		# no input while a pass is coming: go and meet it
-		controlled.desired_move = Util.flat(ball.position - controlled.position).limit_length(1.0)
 	else:
 		controlled.desired_move = Vector3.ZERO
-	controlled.wants_sprint = Input.is_key_pressed(KEY_SHIFT)
+	if not (RECEIVE_ASSIST and ball.pass_target == controlled and ball.owner_player == null):
+		controlled.wants_sprint = Input.is_key_pressed(KEY_SHIFT)
 
 	if charging:
 		charge = minf(charge + delta / 0.9, 1.0)
@@ -1124,7 +1167,7 @@ func _resolve_possession(delta: float) -> void:
 		# lunging tackle
 		var tackle_reach := 1.2 if opp.is_human else 0.8
 		if opp.tackle_timer > 0.0 and d < tackle_reach and holder.protect <= 0.0:
-			var success := HUMAN_TACKLE_SUCCESS if opp.is_human else AI_TACKLE_SUCCESS
+			var success := diff("human_tackle_success") if opp.is_human else diff("ai_tackle_success")
 			if randf() < success:
 				_steal(opp, holder)
 			else:
@@ -1143,9 +1186,9 @@ func _resolve_possession(delta: float) -> void:
 			opp.contact_time = maxf(0.0, opp.contact_time - delta * 2.0)
 		var needed := AI_STEAL_TIME
 		if opp.is_human:
-			needed = HUMAN_STEAL_TIME
+			needed = diff("human_steal_time")
 		elif holder.is_human:
-			needed = AI_STEAL_TIME_VS_HUMAN
+			needed = diff("ai_steal_time_vs_human")
 		if opp.contact_time > needed and holder.protect <= 0.0:
 			_steal(opp, holder)
 			return
@@ -1158,7 +1201,9 @@ func _try_collect() -> void:
 		if p.touch_cooldown > 0.0 or p.stun > 0.0:
 			continue
 		var keeper := p.role == "GK" and p.in_own_box()
-		var reach: float = KEEPER_REACH[p.team] if keeper else (0.85 if p.is_human else 0.7)
+		var reach: float = keeper_reach(p.team) if keeper else (0.85 if p.is_human else 0.7)
+		if ball.pass_target == p and not keeper:
+			reach = maxf(reach, RECEIVE_REACH)
 		var max_h := 2.4 if keeper else (1.7 if ball.pass_target == p else 1.0)   # receivers can chest a lobbed pass down
 		if ball.position.y > max_h:
 			continue
@@ -1175,7 +1220,7 @@ func _try_collect() -> void:
 		ball.offside_players.clear()
 	var spd := ball.flat_speed()
 	if best.role == "GK" and best.in_own_box():
-		var parry_chance := AWAY_KEEPER_PARRY if best.team == 1 else 0.35
+		var parry_chance := diff("their_keeper_parry") if best.team == 1 else 0.35
 		if spd > 18.0 and randf() < parry_chance:
 			ball.vel = Vector3(-ball.vel.x * 0.3, 3.0, ball.vel.z * 0.4 + randf_range(-5.0, 5.0))
 			ball.last_touch = best
@@ -1200,6 +1245,8 @@ func _try_collect() -> void:
 func _give_ball(p: Player) -> void:
 	if ball.last_touch != null and ball.last_touch.team != p.team and ball.owner_player == null:
 		stats["intercepts"][p.team] += 1
+	elif ball.pass_target != null and ball.last_touch != null and ball.last_touch != p and ball.last_touch.team == p.team:
+		stats["completed"][p.team] += 1
 	ball.owner_player = p
 	ball.pass_target = null
 	ball.last_touch = p
@@ -1439,7 +1486,7 @@ func _shot_test_step(delta: float) -> void:
 	ball.step(delta)
 	if _st_outcome != "":
 		return
-	if Util.flat_dist(_st_keeper.position, ball.position) < KEEPER_REACH[1] and ball.position.y < 2.4:
+	if Util.flat_dist(_st_keeper.position, ball.position) < keeper_reach(1) and ball.position.y < 2.4:
 		_st_outcome = "save"
 		ball.vel = Vector3.ZERO
 		ball.position = Vector3(0, Ball.RADIUS, 0)

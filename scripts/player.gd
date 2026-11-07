@@ -113,12 +113,12 @@ func step(delta: float) -> void:
 	else:
 		var max_speed := SPRINT if wants_sprint else SPEED
 		if role == "GK":
-			max_speed = (Main.KEEPER_DIVE_SPEED[team] as float) if wants_sprint else GK_SPEED
+			max_speed = Main.keeper_dive(team) if wants_sprint else GK_SPEED
 		max_speed *= speed_mult
 		if is_human:
-			max_speed *= Main.HUMAN_SPEED_BONUS
+			max_speed *= Main.diff("human_speed_bonus")
 		if has_ball():
-			max_speed *= Main.HUMAN_DRIBBLE_SPEED if is_human else Main.AI_DRIBBLE_SPEED
+			max_speed *= Main.diff("human_dribble_speed") if is_human else Main.AI_DRIBBLE_SPEED
 		var target_v := desired_move.limit_length(1.0) * max_speed
 		if stun > 0.0 or restart_kind != "":
 			target_v = Vector3.ZERO
@@ -169,7 +169,7 @@ func _animate(delta: float) -> void:
 # ------------------------------------------------------------------ actions
 
 const MAX_PASS_SPEED := 28.0
-const PASS_ARRIVAL_SPEED := 7.0   # how fast the ball should be when it reaches the receiver
+const PASS_ARRIVAL_SPEED := 13.0  # how fast the ball should be when it reaches the receiver (was 7: too slow, easy to cut out)
 
 
 ## Ground-ball speed needed to cover `d` metres in `t` seconds with the ball's rolling friction.
@@ -347,7 +347,7 @@ func _ai_outfield(delta: float) -> void:
 		desired_move = _seek(target, 1.0)
 		wants_sprint = d > 3.0
 		if holder != null and holder.team != team and d < Main.AI_TACKLE_START_RANGE:
-			var rate := Main.AI_TACKLE_RATE_VS_HUMAN if holder.is_human else Main.AI_TACKLE_RATE
+			var rate := Main.diff("ai_tackle_rate_vs_human") if holder.is_human else Main.AI_TACKLE_RATE
 			if randf() < rate * delta:
 				start_tackle()
 		return
@@ -426,7 +426,7 @@ func _ai_try_shoot() -> bool:
 	if randf() > chance:
 		return false
 	var aim_z := randf_range(-Main.GOAL_W * 0.5 + 0.3, Main.GOAL_W * 0.5 - 0.3)
-	shoot_at(Vector3(gx, 0, aim_z), randf_range(0.3, 0.8), randf_range(0.3, 1.6), Main.AI_SHOT_ERROR)
+	shoot_at(Vector3(gx, 0, aim_z), randf_range(0.3, 0.8), randf_range(0.3, 1.6), Main.diff("ai_shot_error"))
 	return true
 
 
@@ -599,7 +599,7 @@ func _ai_keeper(delta: float) -> void:
 	var half := Main.GOAL_W * 0.5
 	var target := Vector3(line_x, 0, clampf(b.position.z * 0.45, -half + 0.4, half - 0.4))
 	var bv := b.vel
-	var reaction: float = Main.KEEPER_REACTION[team]
+	var reaction: float = Main.keeper_reaction(team)
 	var incoming := b.owner_player == null and signf(bv.x) == -attack_dir and absf(bv.x) > 6.0
 	if incoming:
 		if b.time_since_kick > reaction:

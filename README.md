@@ -48,7 +48,7 @@ Everything worth tuning is a `const` at the top of the scripts:
 ## Dev
 AI vs AI headless test: `godot --headless --path . --fixed-fps 60 -- --autoplay` (add `--trace` to log ball/holder every 5s)
 Set-piece test: `-- --autoplay --restart-test` forces corners, throw-ins, goal kicks and offsides.
-Club flow test: `-- --hub-test` (prints state, placement, match summary, save round-trip). Add `--fill-test` to fill a few sections with benches/chairs (handy with `--hub-view` + `--shot`). `--sim-rounds=N` plays N league rounds with random scores (see the table / season end).
+Club flow test: `-- --hub-test` (prints state, placement, match summary, save round-trip). Add `--fill-test` to fill a few sections with benches/chairs (handy with `--hub-view` + `--shot`). `--sim-rounds=N` plays N league rounds with random scores (see the table / season end). `--fast=N` runs `--autoplay`/`--shot-test` N× faster (same physics step).
 Quick friendly (2x3 s, then summary + autosave): `-- --quick-friendly`.
 3D test asset The Shed on the north side: `-- --shed` (combine with `--hub-view=0,-30,0.55,25` for a close look). Rebuild the model: `python3 tools/blender/build_shed.py [--render]` (needs `pip install bpy`).
 After a pull with new models or sounds: `godot --path . --headless --import` once (or open the editor).

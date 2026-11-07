@@ -203,6 +203,21 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 **Known limits:** colours in Godot look flatter than in Blender (game lighting, not the model); no textures yet (flat colours, matches low-poly).
 
+## 10g. Lighting test (2026-11-07)
+**Why:** in-game the stand looked flatter than in Blender; the grass looked neon.
+
+**Marcel's choice:** do options 1–4, behind a dev flag first (compare before it becomes the default); option 5 as an extra dev flag for now (later possibly an in-game graphics setting).
+- `--new-light` = options 1–4:
+  1. AgX tonemapping (as in the Blender renders), ambient 0.55 → 0.5
+  2. SSAO (radius 1.2, intensity 2.2, power 1.6)
+  3. Lower, warmer sun (-40°, warm white, energy 1.7), softer shadows (blur 1.6, soft-medium filter), shadow distance 80 → 140 m
+  4. Less neon grass (stripes 0.25/0.48/0.20 and 0.21/0.42/0.17)
+- `--fancy-light` = 1–4 + option 5: SDFGI global illumination, light glow, faint distance haze.
+- Default stays the old lighting until Marcel decides.
+- All numbers are Claude's picks (tunable). Before/after shots in `design/lighting/`.
+- Option 5 could not be screenshotted here (software renderer too slow for SDFGI); runs without errors, Marcel judges it on his GPU.
+- First `--new-light` attempt was too dark/muddy (ambient 0.38, sun 1.35); brightened.
+
 ## 10b. Economy
 
 ### Income
@@ -386,6 +401,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
+| 2026-11-07 | Lighting: options 1–4 behind `--new-light`, option 5 behind `--fancy-light`; old lighting stays default until Marcel compares (§10g) |
 | 2026-11-07 | Menus/UI: style, English with i18n in mind, live build preview, rotatable camera, 9×5×9×5 sections, pro-rata demolish refund (75%→10% over ~3 seasons), instant build for now, settings list |
 | 2026-11-07 | Playtest round 3: layered defensive block, step-out, attacking runs (in behind / come short / hold) |
 | 2026-11-07 | Playtest round 2: Q nearest+cycle, 4 auto-switch rules, receiver comes to the ball, active defending, real dead balls, stackable chairs, save after purchases, sound, minimap + edge arrows, chants |

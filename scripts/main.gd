@@ -120,11 +120,19 @@ var power_bg: ColorRect
 var power_fill: ColorRect
 
 
+# dev: lighting test (GDD §10g). "old" = current default, "new" = options 1-4, "fancy" = 1-5
+var light_mode := "old"
+
+
 func _ready() -> void:
 	randomize()
 	var args := OS.get_cmdline_user_args()
 	autoplay = "--autoplay" in args or "--shot-test" in args
 	_ui_demo = "--ui-demo" in args
+	if "--fancy-light" in args:
+		light_mode = "fancy"
+	elif "--new-light" in args:
+		light_mode = "new"
 	_build_environment()
 	_build_pitch()
 	_build_goals()
@@ -1394,18 +1402,53 @@ func _build_environment() -> void:
 	sun.directional_shadow_max_distance = 80.0
 	add_child(sun)
 
+	if light_mode == "old":
+		return
+	# --- options 1-4 (tunable numbers, Claude's picks) ---
+	# 1. AgX tonemapping (same colour handling as the Blender renders) + less flat ambient
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.ambient_light_energy = 0.5
+	# 2. ambient occlusion: contact shadows under roofs, between seats, where things meet the ground
+	env.ssao_enabled = true
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 2.2
+	env.ssao_power = 1.6
+	# 3. lower, warmer sun with softer shadows that reach further
+	sun.rotation_degrees = Vector3(-40.0, -35.0, 0.0)
+	sun.light_color = Color(1.0, 0.95, 0.86)
+	sun.light_energy = 1.7
+	sun.shadow_blur = 1.6
+	sun.directional_shadow_max_distance = 140.0
+	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM)
+	# 4. grass colour is handled in _build_pitch (less neon)
+	if light_mode != "fancy":
+		return
+	# --- option 5: global illumination, glow, distance haze ---
+	env.sdfgi_enabled = true
+	env.sdfgi_use_occlusion = true
+	env.glow_enabled = true
+	env.glow_intensity = 0.4
+	env.glow_bloom = 0.05
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.75, 0.82, 0.9)
+	env.fog_density = 0.0025
+	env.fog_sky_affect = 0.0
+
 
 func _build_pitch() -> void:
 	var root := Node3D.new()
 	root.name = "Pitch"
 	add_child(root)
 	# surrounding grass
-	Util.box(root, Vector3(320, 0.1, 240), Vector3(0, -0.06, 0), Color(0.3, 0.4, 0.2), false)
+	var surround := Color(0.3, 0.4, 0.2) if light_mode == "old" else Color(0.3, 0.4, 0.21)
+	Util.box(root, Vector3(320, 0.1, 240), Vector3(0, -0.06, 0), surround, false)
 	# striped pitch (+ a few metres of run-off)
 	var stripes := 14
 	var w := (HALF_L * 2.0 + 8.0) / stripes
 	for i in stripes:
 		var c := Color(0.22, 0.5, 0.2) if i % 2 == 0 else Color(0.19, 0.44, 0.17)
+		if light_mode != "old":
+			c = Color(0.25, 0.48, 0.2) if i % 2 == 0 else Color(0.21, 0.42, 0.17)  # 4. less neon
 		Util.box(root, Vector3(w, 0.02, HALF_W * 2.0 + 8.0), Vector3(-HALF_L - 4.0 + w * (i + 0.5), 0.0, 0), c, false)
 	var white := Color(0.95, 0.95, 0.95)
 	var ly := 0.015

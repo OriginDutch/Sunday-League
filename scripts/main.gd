@@ -183,6 +183,11 @@ func _ready() -> void:
 				hub_yaw = deg_to_rad(float(v[3]))
 			hub.root.visible = false
 			_hub_camera()
+	if "--shed" in args:
+		# dev: preview the first 3D asset (The Shed, one 11.5 m section) on the north side
+		var shed: Node3D = load("res://assets/models/the_shed.glb").instantiate()
+		shed.position = Vector3(0, 0, -(HALF_W + 3.0))
+		add_child(shed)
 	if "--quick-friendly" in args:
 		# dev: play a 2x3s friendly with nobody at the controls, then show the summary
 		start_friendly()

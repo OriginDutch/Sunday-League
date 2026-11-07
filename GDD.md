@@ -171,6 +171,33 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Next: a new ChatGPT round with three directions — A) real photographed chalkboard, B) illustrated/stylised, C) flat panels with chalk details only (outlines, corner marks, doodles). Prompt is ready; waiting for Marcel's ChatGPT limit to reset.
 
 
+## 10f. 3D assets — first test: The Shed (2026-11-07)
+**Why:** test whether Claude can build good 3D models (see §13 "3D assets").
+
+**Brief (Marcel):**
+- Asset: *The Shed*, the first covered stand.
+- Style: "High quality Low Poly" — references were 7 screenshots: low-poly stadium renders, a red-seat stand, a cable-stayed stand, a real non-league ground, and Halifax-style grounds with containers, bleachers and wooden terraces.
+- A first stand has **3 rows**. One section is **11.5 m wide** (full side = 9 sections = 103.5 m, without corners).
+- Generic colours for now; club colours must be usable later.
+- More detail is better: "het moet als een echt stadion voelen, niet een betonnen bak".
+- Construction: **steel frame + corrugated roof**. Seating: **roof + plastic seats**.
+
+**What Claude built** (numbers are Claude's picks, tunable):
+- 11.5 m wide, ~5.2 m deep, roof 4.55 m at the front sloping to 4.05 m at the back.
+- Raised front walkway (0.45 m), 3 concrete steps (0.85 m deep, 0.42 m rise) with yellow nosings, central gangway with half-steps and a handrail.
+- 57 tip-up seats (0.5 m pitch) on pedestals.
+- Brick front wall with 4 blank advert boards and a white crush rail.
+- 4 front + 4 back steel columns with knee braces, rafters, purlins, eaves beam.
+- Corrugated roof (ribbed), corrugated back wall with a door, corrugated side screens on the back half, gutter + downpipes, fascia band (room for the club name later).
+- ~2,350 faces, 17 meshes (joined per material → few draw calls).
+- Recolourable materials by name: `Club_Primary_Seats`, `Club_Primary_Trim`, `Club_Secondary_Fascia`, `Advert_1..3`.
+
+**Pipeline:** Blender 5.2 (`bpy`) build script, no hand modelling: `tools/blender/build_shed.py` → `assets/models/the_shed.glb` (+ previews with `--render`). In-game preview: `godot -- --shed` puts it on the north side (dev only, no gameplay effect).
+
+**Seen in the first renders and fixed:** roof sheet tilted the wrong way; front wall hid the front row (walkway and steps raised).
+
+**Known limits:** colours in Godot look flatter than in Blender (game lighting, not the model); no textures yet (flat colours, matches low-poly).
+
 ## 10b. Economy
 
 ### Income
@@ -351,6 +378,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Working agreement: everything discussed/planned/decided goes into the GDD |
 | 2026-11-07 | UI: ChatGPT designs, Claude builds; chosen style = Chalkboard style in Clubhouse Canteen colours, Barlow + Caveat (Caveat also for headings for now), slim floating bottom strip, both crests in Next Match |
 | 2026-11-07 | Panel texture: ChatGPT grain and Claude's procedural versions rejected; new ChatGPT round with 3 directions pending |
+| 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Menus/UI: style, English with i18n in mind, live build preview, rotatable camera, 9×5×9×5 sections, pro-rata demolish refund (75%→10% over ~3 seasons), instant build for now, settings list |
 | 2026-11-07 | Playtest round 3: layered defensive block, step-out, attacking runs (in behind / come short / hold) |
 | 2026-11-07 | Playtest round 2: Q nearest+cycle, 4 auto-switch rules, receiver comes to the ball, active defending, real dead balls, stackable chairs, save after purchases, sound, minimap + edge arrows, chants |
@@ -364,7 +392,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 
 **Tech**
 - GDScript (as in the PoC) or C#? Switching later means a rewrite.
-- Art style: not decided.
+- Art style: UI decided (§10e). 3D direction from Marcel: "High quality Low Poly" (§10f); final verdict waits on The Shed test.
 
 **Pyramid**
 - League names.
@@ -387,8 +415,8 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 - Stamina / sprint bar.
 
 **3D assets (raised 2026-11-07)**
-- Marcel will pay for a month of ChatGPT only if Claude or ChatGPT can build a good set of 3D models (stadium parts, shops, other assets). Under discussion: what Claude needs to build a first test asset.
-- Art style for 3D is still undecided (see Tech).
+- Marcel will pay for a month of ChatGPT only if Claude or ChatGPT can build a good set of 3D models (stadium parts, shops, other assets). First test: Claude builds **The Shed** (see §10f). Verdict pending — Marcel judges the renders + in-game shot.
+- Not decided: whether stands are bought per 11.5 m section, how sections replace the current chair/bench slots, how club colours get applied (UI or automatic), corners, bigger stands (more rows, second tier).
 
 **Not discussed yet** (here so they don't get lost)
 - Economy: safety net (see §10b), exact expense list, performance bonuses.

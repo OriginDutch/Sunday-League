@@ -169,6 +169,12 @@ func rebuild_furniture() -> void:
 				_bleachers(sec, int(state.sections[key]["rows"]))
 		for b in state.builds:
 			_construction(int(b["sec"]), int(b["rows"]), state.ready_label(b))
+		# stairs where two finished bleacher sections meet (Marcel, 2026-11-07)
+		for key in state.sections:
+			var a := int(key)
+			var nb := _next_in_side(a)
+			if nb >= 0 and state.sections.has(str(nb)) and not state.is_building(a) and not state.is_building(nb):
+				_bleacher_stairs(a, nb, int(state.sections[key]["rows"]), int(state.sections[str(nb)]["rows"]))
 	for key in active_slots:
 		var i := int(key)
 		var item: String = active_slots[key]
@@ -267,6 +273,54 @@ func _bleachers(sec: int, rows: int) -> void:
 		Util.box(root, Vector3(0.06, 1.0, 0.06), Vector3(fx, top_h + 0.5, -back_d), frame)
 	Util.box(root, Vector3(w, 0.05, 0.05), Vector3(0, top_h + 1.0, -back_d), alu)       # back rail
 	Util.box(root, Vector3(w, 0.05, 0.05), Vector3(0, top_h + 0.55, -back_d), alu)
+
+
+## The next section along the same side, or -1 at the end of a side.
+static func _next_in_side(sec: int) -> int:
+	var L := ClubState.SECTIONS_LONG
+	var S := ClubState.SECTIONS_SHORT
+	var ends := [L, 2 * L, 2 * L + S, 2 * L + 2 * S]
+	return -1 if (sec + 1) in ends else sec + 1
+
+
+## Stair aisle in the gap between two bleacher sections, up to the lower of the two;
+## the taller one gets a side rail above that.
+func _bleacher_stairs(a: int, b: int, rows_a: int, rows_b: int) -> void:
+	var root := Node3D.new()
+	var f := section_frame(a)
+	root.position = f["line"]
+	root.rotation.y = f["yaw"]
+	furniture_root.add_child(root)
+	var x_axis := Vector3(1, 0, 0).rotated(Vector3.UP, f["yaw"])
+	var side := signf(x_axis.dot(section_frame(b)["line"] - f["line"]))
+	var cx := side * ClubState.SECTION_W * 0.5      # middle of the gap
+	var alu := Color(0.72, 0.74, 0.76)
+	var frame := Color(0.42, 0.44, 0.47)
+	var low := mini(rows_a, rows_b)
+	# two steps per row, from footboard level up to the top seat row of the lower section
+	var steps := low * 2
+	for i in steps:
+		var h := (BL_FIRST_H - 0.42) + (i + 1) * (BL_RISE * 0.5)
+		var d := BL_FIRST_D + 0.3 - 0.5 + i * (BL_TREAD * 0.5)
+		Util.box(root, Vector3(1.2, 0.05, BL_TREAD * 0.5), Vector3(cx, h, -d), alu)
+		Util.box(root, Vector3(0.05, h, 0.05), Vector3(cx - 0.6, h * 0.5, -d), frame)
+		Util.box(root, Vector3(0.05, h, 0.05), Vector3(cx + 0.6, h * 0.5, -d), frame)
+	# side rail on the taller section's edge above the shared height
+	if rows_a != rows_b:
+		var tall_x := cx - side * 0.65 if rows_a > rows_b else cx + side * 0.65
+		var hi := maxi(rows_a, rows_b)
+		for r in range(low, hi):
+			var h := BL_FIRST_H + r * BL_RISE
+			Util.box(root, Vector3(0.05, 0.9, 0.05), Vector3(tall_x, h + 0.45, -(BL_FIRST_D + r * BL_TREAD)), frame)
+		var r0 := BL_FIRST_D + low * BL_TREAD
+		var r1 := BL_FIRST_D + (hi - 1) * BL_TREAD
+		var h0 := BL_FIRST_H + low * BL_RISE + 0.9
+		var h1 := BL_FIRST_H + (hi - 1) * BL_RISE + 0.9
+		var mid := Vector3(tall_x, (h0 + h1) * 0.5, -(r0 + r1) * 0.5)
+		var len := Vector2(r1 - r0, h1 - h0).length() + 0.1
+		var rail := Util.box(root, Vector3(0.05, 0.05, len), mid, alu)
+		if rail is Node3D:
+			(rail as Node3D).rotation.x = atan2(h1 - h0, r1 - r0)
 
 
 ## Construction site: fence around the footprint, a crane-ish mast and a sign with the ready date.

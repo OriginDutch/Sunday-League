@@ -488,6 +488,9 @@ func _hub_test() -> void:
 						club.place("chair", spot)
 		club.sections["7"] = {"stage": "bleachers", "rows": 3}
 		club.sections["13"] = {"stage": "bleachers", "rows": 7}
+		club.sections["14"] = {"stage": "bleachers", "rows": 7}
+		club.sections["15"] = {"stage": "bleachers", "rows": 3}
+		club.sections["6"] = {"stage": "bleachers", "rows": 5}
 		club.place("bleachers", 1)
 		grounds.rebuild_furniture()
 		print("FILL seats ", club.seats())

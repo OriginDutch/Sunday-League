@@ -180,6 +180,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   - Hub: BUILD (per section) shop with costs/times, UNDER CONSTRUCTION list. Fans can sit on the bleachers.
   - Noticed: the model's Stand prices tab still lists older build times for modern tier / 2nd / 3rd tier (8/12/16 wk) vs the accepted 6/8/12 in §10a — to align later.
   - Screens: `design/hub/bleachers_*.png`, `design/hub/construction.png`. Dev: `--hub-test` runs a build test.
+- **Bleachers connect (Marcel, 2026-11-07):** the ~1.3 m aisle between sections looked like loose stands. Decided: **a stair in the gap only where two bleacher sections meet** ("trap aan de zijden waar ze connecten"). Built: two steps per row up to the lower of the two sections; the taller one gets a sloped side rail above that. A lone section has no side stair. Screens: `design/hub/bleachers_connected*.png`.
 - **Dev cheats (Marcel asked, 2026-11-07):** more fans, more money, instant building, finish match early. Built: **F1 in the hub** toggles a DEV CHEATS panel at the top (+£10,000, +100 fans, finish all construction now); **F2 in a match** ends it now with the current score. `--cheats` opens the panel at start. Marcel asked for more ideas — Claude's list in chat, nothing extra built.
 - **Saves (Marcel, 2026-11-07):** saves don't matter yet — old saves may simply reset. **Marcel says when a save starts to matter.**
 - **Currency:** stays **£** in-game; the sign is just a sign (Marcel). Model numbers in € are used as-is.

@@ -1,5 +1,6 @@
 class_name ClubState
 extends RefCounted
+const LeagueScript = preload("res://scripts/league.gd")
 ## Everything about your club that persists between matches. Saved as JSON to user://save.json.
 
 const SAVE_PATH := "user://save.json"
@@ -21,7 +22,8 @@ const SECTION_W := 11.5
 const SECTIONS_LONG := 9
 const SECTIONS_SHORT := 5
 const SPOTS_PER_SECTION := 5        # 5 bench-wide spots of 4 seats = 20 seats in a row
-const SAVE_VERSION := 2             # v2 = sections; older saves start a new game
+const SAVE_VERSION := 3             # v2 = sections, v3 = league; older saves start a new game
+const CLUB_NAME := "Your club"     # placeholder until the player can name the club
 
 # fan growth per match (multiplied by an approval factor)
 const GROWTH_WIN := 6.0
@@ -44,6 +46,7 @@ var slots: Dictionary = {}          # spot index (String) -> "bench" | "chairs:N
 var record := {"w": 0, "d": 0, "l": 0}
 var matches_played := 0
 var fans_carry := 0.0               # fractional fan growth carried over
+var league: LeagueScript                  # your division: fixtures, results, table
 
 
 static func new_game() -> ClubState:
@@ -51,6 +54,7 @@ static func new_game() -> ClubState:
 	for i in START_SQUAD:
 		s.squad.append(Names.person())
 	s.refill_candidates()
+	s.league = LeagueScript.create(CLUB_NAME)
 	return s
 
 
@@ -117,9 +121,10 @@ func place(item: String, slot: int) -> bool:
 	return true
 
 
-## Applies a finished friendly. Returns a summary dictionary for the post-match screen.
-func apply_match(goals_for: int, goals_against: int, entertainment_events: int) -> Dictionary:
-	var attendance := fans
+## Applies a finished match. Home: your fans come, seated ones pay. Away (block 2 placeholder until
+## away grounds exist): no ticket income and no seating effect, only the result counts.
+func apply_match(goals_for: int, goals_against: int, entertainment_events: int, home: bool = true) -> Dictionary:
+	var attendance := fans if home else 0
 	var seated := mini(attendance, seats())
 	var standing := attendance - seated
 	var revenue := seated * TICKET_PRICE
@@ -140,7 +145,7 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int) 
 	elif result == "L":
 		d_app = APPROVAL_LOSS
 	var ent := minf(entertainment_events * 0.6, APPROVAL_ENTERTAINMENT_MAX)
-	var no_seat := APPROVAL_NO_SEAT_MAX * (float(standing) / maxf(attendance, 1.0))
+	var no_seat := APPROVAL_NO_SEAT_MAX * (float(standing) / maxf(attendance, 1.0)) if home else 0.0
 	var approval_before := approval
 	approval = clampf(approval + d_app + ent + no_seat, 0.0, 100.0)
 
@@ -150,7 +155,8 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int) 
 		base = GROWTH_WIN
 	elif result == "L":
 		base = GROWTH_LOSS
-	base += seats() * GROWTH_PER_SEAT
+	if home:
+		base += seats() * GROWTH_PER_SEAT
 	var factor := lerpf(-0.3, 1.5, approval / 100.0)
 	fans_carry += base * factor
 	var gained := int(floor(fans_carry))
@@ -171,6 +177,7 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int) 
 		"fans_before": fans_before, "fans_after": fans,
 		"approval_before": approval_before, "approval_after": approval,
 		"approval_parts": {"result": d_app, "entertainment": ent, "seating": no_seat},
+		"home": home,
 	}
 
 
@@ -181,6 +188,7 @@ func to_dict() -> Dictionary:
 		"version": SAVE_VERSION, "money": money, "fans": fans, "approval": approval, "squad": squad,
 		"candidates": candidates, "slots": slots, "record": record,
 		"matches_played": matches_played, "fans_carry": fans_carry,
+		"league": league.to_dict(),
 	}
 
 
@@ -198,6 +206,7 @@ static func from_dict(d: Dictionary) -> ClubState:
 	s.record = {"w": int(r.get("w", 0)), "d": int(r.get("d", 0)), "l": int(r.get("l", 0))}
 	s.matches_played = int(d.get("matches_played", 0))
 	s.fans_carry = float(d.get("fans_carry", 0.0))
+	s.league = LeagueScript.from_dict(d.get("league", {}))
 	s.refill_candidates()
 	return s
 

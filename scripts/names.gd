@@ -14,7 +14,9 @@ const ORIGINS := ["Regular at the pub", "Neighbour across the road", "Your cousi
 	"Bloke from the chippy", "Window cleaner", "Your mate's flatmate", "Dog walker from the park",
 	"Retired PE teacher", "Builder next door", "Says he had a trial at Stoke"]
 const OPP_A := ["Red Lion", "Dog & Duck", "Station Road", "St. Barnaby's", "Kings Arms", "Mill Lane",
-	"Railway Tavern", "Crown & Anchor", "Elm Park", "Gasworks", "Bridge Street", "Old Bell"]
+	"Railway Tavern", "Crown & Anchor", "Elm Park", "Gasworks", "Bridge Street", "Old Bell",
+	"White Hart", "Plough Inn", "Canal Side", "Royal Oak", "Hollybush", "Brewery Lane", "Coach & Horses",
+	"Chapel End", "Rose & Crown", "Fox & Hounds", "Park View", "Quarry Road"]
 const OPP_B := ["XI", "FC", "Athletic", "Old Boys", "Rovers", "United", "Wanderers", "Casuals"]
 
 
@@ -24,6 +26,14 @@ static func person() -> Dictionary:
 	if randf() < 0.18:
 		name = "%s %s" % [NICK.pick_random(), first]
 	return {"name": name, "origin": ORIGINS.pick_random()}
+
+
+## A league opponent whose first part isn't taken yet (keeps 19 teams distinguishable).
+static func opponent_unique(used: Dictionary) -> String:
+	var free: Array = OPP_A.filter(func(a): return not used.has(a))
+	var a: String = free.pick_random() if not free.is_empty() else OPP_A.pick_random()
+	used[a] = true
+	return "%s %s" % [a, OPP_B.pick_random()]
 
 
 static func opponent() -> String:

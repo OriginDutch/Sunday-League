@@ -1,5 +1,6 @@
 class_name Hub
 extends CanvasLayer
+const LeagueScript = preload("res://scripts/league.gd")
 ## Between-match screen: shop, "Who can play for you", squad, play a friendly, post-match summary.
 
 const POSITIONS := ["GK", "LB", "CB", "CB", "RB", "CM", "CDM", "CM", "LW", "ST", "RW"]
@@ -41,7 +42,7 @@ func build(m: Main) -> void:
 	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
 	panel.offset_top = 60
-	panel.offset_right = 430
+	panel.offset_right = 490
 	panel.offset_bottom = -10
 	panel.offset_left = 10
 	root.add_child(panel)
@@ -61,7 +62,11 @@ func build(m: Main) -> void:
 	play_btn.offset_right = -20
 	play_btn.offset_bottom = -20
 	play_btn.add_theme_font_size_override("font_size", 22)
-	play_btn.pressed.connect(func() -> void: main.start_friendly())
+	play_btn.pressed.connect(func() -> void:
+		if club.league.season_over():
+			main.next_season()
+		else:
+			main.start_friendly())
 	root.add_child(play_btn)
 
 	# placement / help hint
@@ -91,8 +96,8 @@ func build(m: Main) -> void:
 	summary_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	summary_panel.offset_left = -300
 	summary_panel.offset_right = 300
-	summary_panel.offset_top = -230
-	summary_panel.offset_bottom = 230
+	summary_panel.offset_top = -330
+	summary_panel.offset_bottom = 330
 	summary_panel.visible = false
 	add_child(summary_panel)
 	var sv := VBoxContainer.new()
@@ -118,12 +123,15 @@ func set_club(c: ClubState) -> void:
 func refresh() -> void:
 	if club == null:
 		return
-	top_label.text = "£%d   ·   Fans %d   ·   Approval %d%%   ·   Seats %d   ·   Squad %d/%d   ·   W%d D%d L%d   ·   Goal: %d/%d paying supporters" % [
-		club.money, club.fans, int(round(club.approval)), club.seats(), club.squad.size(), ClubState.SQUAD_SIZE,
-		club.record["w"], club.record["d"], club.record["l"], last_seated, GOAL_SUPPORTERS]
+	var lg: LeagueScript = club.league
+	top_label.text = "Season %d · Week %d/%d   ·   £%d   ·   Fans %d   ·   Approval %d%%   ·   Seats %d   ·   Squad %d/%d   ·   League: %s" % [
+		lg.season, lg.current_week(), LeagueScript.SEASON_WEEKS, club.money, club.fans, int(round(club.approval)), club.seats(),
+		club.squad.size(), ClubState.SQUAD_SIZE, _ordinal(lg.position_of(0))]
 
 	for c in list_box.get_children():
 		c.queue_free()
+
+	_league_block(lg)
 
 	_header("SHOP")
 	_shop_button("chair", "Chair — £%d  (1 seat, up to %d per spot, 5 spots per section)" % [ClubState.CHAIR_PRICE, ClubState.MAX_CHAIRS_PER_SLOT])
@@ -161,13 +169,63 @@ func refresh() -> void:
 			l.modulate = Color(1, 1, 1, 0.45)
 		list_box.add_child(l)
 
-	if full:
+	if lg.season_over():
 		play_btn.disabled = false
-		play_btn.text = "PLAY FRIENDLY  ▶"
+		play_btn.text = "START SEASON %d  ▶\n(skips the %d-week off-season)" % [lg.season + 1, LeagueScript.OFFSEASON_WEEKS]
+	elif full:
+		var fx: Dictionary = lg.next_fixture()
+		play_btn.disabled = false
+		play_btn.text = "PLAY  ▶  vs %s (%s)" % [lg.teams[fx["opponent"]]["name"], "H" if fx["home"] else "A"]
 	else:
 		play_btn.disabled = true
 		play_btn.text = "Need %d players (%d/%d)" % [ClubState.SQUAD_SIZE, club.squad.size(), ClubState.SQUAD_SIZE]
 	_update_hint()
+
+
+func _league_block(lg: LeagueScript) -> void:
+	if lg.season_over():
+		_header("SEASON %d OVER — you finished %s" % [lg.season, _ordinal(lg.position_of(0))])
+	else:
+		var fx: Dictionary = lg.next_fixture()
+		_header("NEXT MATCH")
+		_small("Week %d · round %d/%d · %s vs %s" % [fx["week"], fx["round"], lg.rounds.size(),
+			"HOME" if fx["home"] else "AWAY", lg.teams[fx["opponent"]]["name"]])
+		if not fx["home"]:
+			_small("Away: no ticket income (away grounds come later).")
+	if lg.last_finish > 0:
+		_small("Last season: %s" % _ordinal(lg.last_finish))
+	_header("TABLE")
+	var grid := GridContainer.new()
+	grid.columns = 8
+	grid.add_theme_constant_override("h_separation", 10)
+	for h in ["#", "Team", "P", "W", "D", "L", "GD", "Pts"]:
+		var l := Label.new()
+		l.text = h
+		l.modulate = Color(1, 1, 1, 0.6)
+		grid.add_child(l)
+	var t: Array = lg.table()
+	for i in t.size():
+		var r: Dictionary = t[i]
+		var cells := [str(i + 1), r["name"], str(r["p"]), str(r["w"]), str(r["d"]), str(r["l"]), "%+d" % r["gd"], str(r["pts"])]
+		for c in cells.size():
+			var l := Label.new()
+			l.text = cells[c]
+			if c == 1:
+				l.clip_text = true
+				l.custom_minimum_size = Vector2(215, 0)
+			if r["team"] == 0:
+				l.modulate = Color(1.0, 0.85, 0.3)
+			grid.add_child(l)
+	list_box.add_child(grid)
+
+
+static func _ordinal(n: int) -> String:
+	if n <= 0:
+		return "—"
+	var suf := "th"
+	if n % 100 < 11 or n % 100 > 13:
+		suf = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+	return "%d%s" % [n, suf]
 
 
 func _update_hint() -> void:
@@ -198,7 +256,7 @@ func _small(text: String) -> void:
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(380, 0)
+	l.custom_minimum_size = Vector2(440, 0)
 	l.modulate = Color(1, 1, 1, 0.7)
 	list_box.add_child(l)
 
@@ -229,6 +287,14 @@ func show_summary(s: Dictionary, opponent: String) -> void:
 		s["attendance"], s["seated"], ClubState.TICKET_PRICE, s["standing"], s["revenue"],
 		s["fans_before"], s["fans_after"], int(round(s["approval_before"])), int(round(s["approval_after"])),
 		parts["result"], parts["entertainment"], parts["seating"]]
+	if s.has("position"):
+		var where := "home" if s.get("home", true) else "away"
+		summary_label.text += "\n\nLeague (%s match): now %s" % [where, _ordinal(s["position"])]
+		if s.get("season_over", false):
+			summary_label.text += "  —  SEASON OVER"
+		var others: Array = s.get("round_results", [])
+		if not others.is_empty():
+			summary_label.text += "\nOther results:\n" + "\n".join(others.slice(0, 10))
 	if s["seated"] >= GOAL_SUPPORTERS:
 		summary_label.text += "\n\n★ v0.1 GOAL REACHED: %d paying supporters! ★" % s["seated"]
 	summary_panel.visible = true

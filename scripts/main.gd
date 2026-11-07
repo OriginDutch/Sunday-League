@@ -1,5 +1,6 @@
 class_name Main
 extends Node3D
+const LeagueScript = preload("res://scripts/league.gd")
 ## Football PoC — builds the pitch, spawns teams, handles input, possession, match flow and HUD.
 ## 11v11 on a full-size pitch: two halves (switching sides), throw-ins, corners, goal kicks, offside.
 
@@ -101,6 +102,8 @@ var grounds: Grounds
 var hub: Hub
 var hud_layer: CanvasLayer
 var opponent_name := "AWAY"
+var match_home := true                 # league: are we at home this match
+var match_opp_strength := 1.0          # league: opponent strength (speed multiplier)
 var placing_item := ""
 var hover_slot := -1
 var name_label: Label3D
@@ -267,8 +270,15 @@ func _enter_hub() -> void:
 	_hub_camera()
 
 
+## The next league match (GDD calendar). Kept under the old name: dev flags call it too.
 func start_friendly() -> void:
-	opponent_name = Names.opponent()
+	var fx: Dictionary = club.league.next_fixture()
+	if fx.is_empty():
+		return   # season over: the hub offers the next season instead
+	var opp: Dictionary = club.league.teams[fx["opponent"]]
+	opponent_name = opp["name"]
+	match_home = fx["home"]
+	match_opp_strength = float(opp["str"])
 	placing_item = ""
 	grounds.show_markers(false)
 	_spawn_teams()
@@ -278,8 +288,11 @@ func start_friendly() -> void:
 	time_left = HALF_SECONDS
 	for k in stats:
 		stats[k] = [0, 0]
-	grounds.spawn_crowd(club.fans)
-	sfx.crowd_level = clampf(club.fans / 100.0, 0.05, 1.0)
+	if match_home:
+		grounds.spawn_crowd(club.fans)
+	else:
+		grounds.clear_crowd()   # away grounds come in block 3; until then nobody shows up
+	sfx.crowd_level = clampf(club.fans / 100.0, 0.05, 1.0) if match_home else 0.05
 	sfx.set_murmur(true)
 	mode = "match"
 	hub.show_hub(false)
@@ -290,6 +303,12 @@ func start_friendly() -> void:
 
 func back_to_hub() -> void:
 	_enter_hub()
+
+
+func next_season() -> void:
+	club.league.start_new_season()
+	club.save()
+	hub.refresh()
 
 
 func new_game() -> void:
@@ -388,6 +407,18 @@ func _hub_test() -> void:
 	var back := ClubState.from_dict(JSON.parse_string(JSON.stringify(d)))
 	print("ROUNDTRIP money %d fans %d slots %s squad %d" % [back.money, back.fans, str(back.slots), back.squad.size()])
 	grounds.spawn_crowd(maxi(club.fans + 10, club.seats() + 30))
+	_league_test()
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--sim-rounds="):
+			# dev: play N league rounds with random scores (to see the table / season end in the hub)
+			for i in int(arg.trim_prefix("--sim-rounds=")):
+				if club.league.season_over():
+					break
+				var fx: Dictionary = club.league.next_fixture()
+				var res := club.apply_match(randi_range(0, 3), randi_range(0, 2), 3, fx["home"])
+				club.league.play_round(res["goals_for"], res["goals_against"])
+			hub.refresh()
+			print("SIM week %d round %d pos %d" % [club.league.current_week(), club.league.round_idx, club.league.position_of(0)])
 	print("CROWD fans spawned: %d (seats %d)" % [grounds.fans.size(), club.seats()])
 
 
@@ -757,7 +788,10 @@ func _full_time() -> void:
 		return
 	# friendly done: pay, grow, autosave, show summary
 	var ent: int = score[0] + score[1] + stats["saves"][0] + stats["saves"][1] + stats["steals"][0] + stats["steals"][1]
-	var summary := club.apply_match(score[0], score[1], ent)
+	var summary := club.apply_match(score[0], score[1], ent, match_home)
+	summary["round_results"] = club.league.play_round(score[0], score[1])
+	summary["position"] = club.league.position_of(0)
+	summary["season_over"] = club.league.season_over()
 	club.save()
 	print("FRIENDLY DONE -> summary ", summary, " saved to ", ProjectSettings.globalize_path(ClubState.SAVE_PATH))
 	mode = "summary"
@@ -1384,7 +1418,7 @@ func _spawn_teams() -> void:
 	home.clear()
 	away.clear()
 	controlled = null
-	var opp_strength := randf_range(0.92, 1.08)   # friendlies: some opponents are a bit quicker
+	var opp_strength := match_opp_strength   # league team strength (0.92–1.08)
 	var slots: Array = FORMATION_433
 	for t in 2:
 		var mirror := 1.0 if t == 0 else -1.0
@@ -1553,6 +1587,44 @@ func _build_goals() -> void:
 		Util.box(root, Vector3(GOAL_DEPTH, 0.03, GOAL_W), Vector3(gx + sx * GOAL_DEPTH * 0.5, GOAL_H, 0), net, false)
 		Util.box(root, Vector3(GOAL_DEPTH, GOAL_H, 0.03), Vector3(gx + sx * GOAL_DEPTH * 0.5, GOAL_H * 0.5, -half), net, false)
 		Util.box(root, Vector3(GOAL_DEPTH, GOAL_H, 0.03), Vector3(gx + sx * GOAL_DEPTH * 0.5, GOAL_H * 0.5, half), net, false)
+
+
+func _league_test() -> void:
+	# dev: check fixtures (balance, returns, weeks) and play a whole season with random scores
+	var lg = LeagueScript.create("Test FC")
+	var homes := {}
+	var first_half_pairs := {}
+	var ok_pairs := true
+	for r in lg.rounds.size():
+		for m in lg.rounds[r]["matches"]:
+			var key := "%d-%d" % [mini(m[0], m[1]), maxi(m[0], m[1])]
+			if r < 19:
+				if first_half_pairs.has(key):
+					ok_pairs = false
+				first_half_pairs[key] = m
+				homes[m[0]] = homes.get(m[0], 0) + 1
+			else:
+				var f: Array = first_half_pairs.get(key, [])
+				if f.is_empty() or f[0] != m[1]:
+					ok_pairs = false
+	var weeks: Array = lg.rounds.map(func(rd): return rd["week"])
+	var per_week := {}
+	for w in weeks:
+		per_week[w] = per_week.get(w, 0) + 1
+	var doubles := per_week.values().filter(func(c): return c == 2).size()
+	print("LEAGUE rounds %d pairs-ok %s first-half homes %s..%s last week %d doubles %d empty weeks %d" % [
+		lg.rounds.size(), ok_pairs, homes.values().min(), homes.values().max(), weeks[-1], doubles, LeagueScript.SEASON_WEEKS - per_week.size()])
+	var you_home := 0
+	while not lg.season_over():
+		var fx: Dictionary = lg.next_fixture()
+		if fx["home"]:
+			you_home += 1
+		lg.play_round(randi_range(0, 3), randi_range(0, 3))
+	var t: Array = lg.table()
+	print("LEAGUE season done: you played %d home; champion %s %d pts; you %d" % [you_home, t[0]["name"], t[0]["pts"], lg.position_of(0)])
+	lg.start_new_season()
+	var back = LeagueScript.from_dict(JSON.parse_string(JSON.stringify(lg.to_dict())))
+	print("LEAGUE season %d round %d next %s last finish %d" % [back.season, back.round_idx, str(back.next_fixture()), back.last_finish])
 
 
 func _build_scenery() -> void:
@@ -1765,7 +1837,7 @@ func _font(size: int) -> LabelSettings:
 
 
 func _update_hud() -> void:
-	score_label.text = "HOME  %d - %d  %s     %s" % [score[0], score[1], opponent_name.to_upper(), _clock_text()]
+	score_label.text = "YOU%s  %d - %d  %s     %s" % ["" if match_home else " (A)", score[0], score[1], opponent_name.to_upper(), _clock_text()]
 	toast_label.visible = toast_timer > 0.0
 	power_bg.visible = charging
 	power_fill.size = Vector2(294.0 * charge, 14)

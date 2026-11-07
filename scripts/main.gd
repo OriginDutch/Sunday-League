@@ -120,8 +120,8 @@ var power_bg: ColorRect
 var power_fill: ColorRect
 
 
-# dev: lighting test (GDD §10g). "old" = current default, "new" = options 1-4, "fancy" = 1-5
-var light_mode := "old"
+# lighting (GDD §10g): "fancy" = default (options 1-5), "new" = 1-4 (--new-light), "old" = original (--old-light)
+var light_mode := "fancy"
 
 
 func _ready() -> void:
@@ -129,8 +129,8 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autoplay = "--autoplay" in args or "--shot-test" in args
 	_ui_demo = "--ui-demo" in args
-	if "--fancy-light" in args:
-		light_mode = "fancy"
+	if "--old-light" in args:
+		light_mode = "old"
 	elif "--new-light" in args:
 		light_mode = "new"
 	_build_environment()

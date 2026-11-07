@@ -18,11 +18,12 @@ var _cheer_tween: Tween
 const BIG_KICK_SPEED := 20.0    # m/s; harder kicks use the heavier "goalie kick" sounds (tunable)
 const CHEER_HOLD := 8.0         # seconds at full volume before the goal cheer fades (tunable)
 const CHEER_FADE := 4.0
+const CHEER_MIN_LEVEL := 0.35   # cheer is never quieter than this, even with a handful of fans (tunable, -9 dB)
 
 
 func _ready() -> void:
 	_kick = _make_kick()
-	# licensed recordings are not in git (GDD §10h); missing files are skipped
+	# missing files are skipped (falls back to the procedural kick)
 	_kicks = _load_all("res://assets/audio/kicks/kick_%d.wav", 7)
 	_kicks_big = _load_all("res://assets/audio/kicks/kick_big_%d.wav", 4)
 	_cheers = _load_all("res://assets/audio/crowd/cheer_%d.ogg", 6)
@@ -80,7 +81,7 @@ func crowd(kind: String) -> void:
 	if _cheer_tween:
 		_cheer_tween.kill()
 	_cheer_player.stream = _cheers.pick_random()
-	var vol := linear_to_db(clampf(crowd_level, 0.05, 1.0)) - 2.0
+	var vol := linear_to_db(clampf(crowd_level, CHEER_MIN_LEVEL, 1.0)) - 2.0
 	_cheer_player.volume_db = vol
 	_cheer_player.play()
 	_cheer_tween = create_tween()

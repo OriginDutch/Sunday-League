@@ -2,5 +2,3 @@
 .godot/
 /android/
 
-# licensed recordings (Motion Array) — not in the public repo, see GDD §10h
-assets/audio/

@@ -213,7 +213,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   3. Lower, warmer sun (-40°, warm white, energy 1.7), softer shadows (blur 1.6, soft-medium filter), shadow distance 80 → 140 m
   4. Less neon grass (stripes 0.25/0.48/0.20 and 0.21/0.42/0.17)
 - `--fancy-light` = 1–4 + option 5: SDFGI global illumination, light glow, faint distance haze.
-- Default stays the old lighting until Marcel decides.
+- **Decided (Marcel, 2026-11-07): fancy is the default** (runs smooth on his RX 9070 XT). `--new-light` and `--old-light` stay as dev flags.
 - All numbers are Claude's picks (tunable). Before/after shots in `design/lighting/`.
 - Option 5 could not be screenshotted here (software renderer too slow for SDFGI); runs without errors, Marcel judges it on his GPU.
 - First `--new-light` attempt was too dark/muddy (ambient 0.38, sun 1.35); brightened.
@@ -224,9 +224,11 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Tried: Suno with crowd-ambience prompts → **didn't work**.
 - Murmur loop **removed** (Marcel, 2026-11-07: "moet er nu uit"). Then **all** procedural crowd sounds removed too (cheer/groan/ooh; Marcel: "alle ruis geluiden mogen eruit"). Kick + whistle stay (tonal, not noise) unless Marcel says otherwise.
 - **First recordings in (2026-11-07):** Marcel supplied Motion Array files. Kept: goal cheers #1 (1, 2, last) and #2 (1–3) → `assets/audio/crowd/cheer_1..6.ogg`; all ball kicks → `kicks/kick_1..7.ogg` (normal) and `kick_big_1..4.ogg` ("goalie kicks").
-- How they play (Claude's picks, tunable): kicks at ≥20 m/s use the big set; random pick, slight pitch variation. Goal cheer only on a home goal, random of 6, full volume for 8 s then 4 s fade. Volume still scales with attendance (fans/100, floor 0.05).
+- How they play (Claude's picks, tunable): kicks at ≥20 m/s use the big set; random pick, slight pitch variation. Goal cheer only on a home goal, random of 6, full volume for 8 s then 4 s fade. Volume scales with attendance (fans/100), with a minimum (see below).
 - Kicks re-cut (Marcel: "trappen moet een instant geluid geven"): some clips had 0.2–0.25 s silence in front and the 50 ms fade-in softened the hit. Now cut 2 ms before the transient, 1 ms fade-in, peak-normalised, stored as **.wav** (no decode delay). Cheers stay .ogg.
-- Licence: repo is public, so the recordings are **not committed** (`assets/audio/` gitignored); Claude places them in Marcel's folder directly. Code skips missing files (falls back to the procedural kick). Open: make the repo private, or keep audio out of git.
+- Licence: Marcel: the files are royalty free, **repo stays public and the audio goes into git** (2026-11-07). Code still skips missing files.
+- Cheers re-cut to Marcel's timings (relative to the first cut): #1 4–10 s soft end, #2 7–13 s, #3 7.25–13.25 s (build-up, no sharp hit, so 7.25), #4 4.5–10.5 s, #5 5–8 s (short); hard start (5 ms), ~1 s fade-out (1.5 s on #1). #6 unchanged (no instruction yet).
+- Minimum cheer volume (Marcel: "zeker, moeten we finetunen"): floor 0.35 of full (≈ -9 dB), Claude's pick.
 - Next: real recordings from free/CC0 libraries (Marcel downloads, Claude cuts + loops + builds in). Open: keep the procedural sounds as fallback or remove them.
 
 
@@ -413,6 +415,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
+| 2026-11-07 | Fancy lighting is the default; audio goes into the public repo (royalty free); minimum cheer volume |
 | 2026-11-07 | Lighting: options 1–4 behind `--new-light`, option 5 behind `--fancy-light`; old lighting stays default until Marcel compares (§10g) |
 | 2026-11-07 | Menus/UI: style, English with i18n in mind, live build preview, rotatable camera, 9×5×9×5 sections, pro-rata demolish refund (75%→10% over ~3 seasons), instant build for now, settings list |
 | 2026-11-07 | Playtest round 3: layered defensive block, step-out, attacking runs (in behind / come short / hold) |

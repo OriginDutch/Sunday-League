@@ -51,5 +51,5 @@ Set-piece test: `-- --autoplay --restart-test` forces corners, throw-ins, goal k
 Club flow test: `-- --hub-test` (prints state, placement, match summary, save round-trip).
 Quick friendly (2x3 s, then summary + autosave): `-- --quick-friendly`.
 3D test asset The Shed on the north side: `-- --shed` (combine with `--hub-view=0,-30,0.55,25` for a close look). Rebuild the model: `python3 tools/blender/build_shed.py [--render]` (needs `pip install bpy`).
-Lighting test (GDD §10g): `-- --new-light` (AgX, SSAO, softer sun, calmer grass) or `-- --fancy-light` (+ global illumination, glow, haze). Default is the old lighting.
+Lighting (GDD §10g): default is fancy (AgX, SSAO, softer sun, calmer grass, global illumination, glow, haze). Lighter: `-- --new-light` (no GI/glow/haze). Original: `-- --old-light`.
 Shot test (90 shots at their keeper): `godot --headless --path . --fixed-fps 60 -- --shot-test`

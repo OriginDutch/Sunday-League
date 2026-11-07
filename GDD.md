@@ -342,6 +342,8 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - Game (Claude's proposal): costs as % of the reference club's income — wages, staff, ground running, travel/match costs — leaving a **surplus to build with: 55% at the bottom → 20% at the top**.
   - **Pace finding (open):** surplus ÷ cost per section of the stage you'd build there → ~0.4–1.5 sections per season up to League 5, but 5–40 per season from League 3 up (top income is TV/sponsors, stand prices are priced on tickets). Options discussed with Marcel, nothing decided.
   - Marcel (2026-11-07): transfer fees are not in the model yet and will drain money at the top ("70 miljoen voor een verdediger"). → Transfers as the big money sink higher up; still to be worked out.
+  - **Decided (Marcel, 2026-11-07):** the surplus is a **free choice: build the stadium or strengthen the squad**. In the end you need both to some degree — too little capacity squeezes income or blocks promotion (requirements); players not good enough means never getting promoted.
+  - **Decided (Marcel, 2026-11-07): player ratings on a 1–99 scale**; 99 is almost unreachable — "a Messi, but even better".
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
@@ -502,6 +504,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
+| 2026-11-07 | Surplus = free choice between stadium and squad (both needed); player ratings 1–99, 99 near-impossible |
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch (first tier only, no all-seater rule, standing = atmosphere vs seats = revenue); stage jump = 1 week demolition then build |
 | 2026-11-07 | Stands: stages + upgrades within stages; one stadium shape + per-corner on/off; shape changeable later; career ≥14 seasons, likely 20–25+ |

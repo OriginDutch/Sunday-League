@@ -219,6 +219,12 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - First `--new-light` attempt was too dark/muddy (ambient 0.38, sun 1.35); brightened.
 - Marcel tested both (2026-11-07): leans towards **fancy** — "iets meer helder en voelt wat zonniger". Not yet made the default.
 
+## 10h. Audio — crowd sound (2026-11-07)
+- Marcel heard "wind": that was Claude's procedural crowd murmur (looping filtered noise). Verdict: **not usable**.
+- Tried: Suno with crowd-ambience prompts → **didn't work**.
+- Next: real recordings from free/CC0 libraries (Marcel downloads, Claude cuts + loops + builds in). Open: keep the procedural sounds as fallback or remove them.
+
+
 ## 10b. Economy
 
 ### Income

@@ -286,6 +286,8 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   2. Shape: one shape for the whole stadium (Claude's reading of "dat lijkt me het beste" — to confirm), plus switching individual corners on/off as customisation.
   3. The shape can be changed later (rebuild), from a gameplay point of view.
   4. Career length: **at least 14 seasons, probably 20–25+**.
+  - Addition on shapes (Marcel): define a set of **common shapes/setups (presets)** the player chooses from.
+- Next topic (Marcel's pick): **rows and jumps per stage**.
 
 **Seen and fixed during the build:** fans too wide (letters unreadable) → slimmer; open gap between back wall and roof → clad up to the roof, glazed end screens; two stacked rows of colourful boards → front wall now concrete + club band; facade sign was mirrored and hidden behind the centre core/columns → mirrored, moved up, narrower.
 

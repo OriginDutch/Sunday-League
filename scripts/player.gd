@@ -17,6 +17,8 @@ var is_human := false        # set every frame by Main
 var display_name := ""
 var speed_mult := 1.0
 var mark_target: Player = null  # who to mark when defending, assigned by Main
+var run_mode := "hold"        # in possession: "hold" | "deep" | "show"
+var run_timer := 0.0
 var restart_kind := ""        # "throw-in" / "corner" / "goal kick" / "free kick" while taking a set piece
 
 var vel := Vector3.ZERO
@@ -322,9 +324,10 @@ func _ai_outfield(delta: float) -> void:
 
 	var holder := b.owner_player
 	if holder != null and holder.team == team:
-		var spot := _support_spot()
+		_update_run(delta, holder)
+		var spot := _attack_spot(holder)
 		desired_move = _seek(spot, 1.0)
-		wants_sprint = Util.flat_dist(position, spot) > 6.0
+		wants_sprint = run_mode != "hold" or Util.flat_dist(position, spot) > 6.0
 		return
 
 	if b.pass_target == self and b.pass_meet != Vector3.INF and Util.flat_dist(position, b.position) > 6.0:
@@ -336,10 +339,11 @@ func _ai_outfield(delta: float) -> void:
 	if b.pass_target == self or main.is_chaser(self):
 		var target := Util.flat(b.position + b.vel * 0.25)
 		var d := Util.flat_dist(position, target)
-		if holder != null and holder.team != team and holder.is_human:
-			# jockey: stay goal-side at a little distance instead of running into you
+		if holder != null and holder.team != team:
+			# jockey: stay goal-side at a little distance instead of running into the carrier
 			var own_goal := Vector3(-Main.HALF_L * attack_dir, 0, 0)
-			target = holder.position + Util.flat(own_goal - holder.position).normalized() * Main.AI_JOCKEY_DISTANCE
+			var gap := Main.AI_JOCKEY_DISTANCE if holder.is_human else Main.AI_JOCKEY_DISTANCE_AI
+			target = holder.position + Util.flat(own_goal - holder.position).normalized() * gap
 		desired_move = _seek(target, 1.0)
 		wants_sprint = d > 3.0
 		if holder != null and holder.team != team and d < Main.AI_TACKLE_START_RANGE:
@@ -476,13 +480,50 @@ func _ai_bail_out() -> void:
 		pass_towards(Vector3(0, 0, 0))
 
 
-func _support_spot() -> Vector3:
-	var b := main.ball.position
-	var x := home_pos.x + attack_dir * Main.SUPPORT_PUSH + b.x * 0.45
-	var z := home_pos.z * 1.15
-	var spot := Vector3(x, 0, z) + jitter
-	# stay onside
+## How far this player's formation spot is from his own goal line (GK ~1, CB ~12, ST ~50).
+func form_depth() -> float:
+	return (home_pos.x + Main.HALF_L * attack_dir) * attack_dir
+
+
+# ---------------------------------------------------------------- in possession
+
+## Every few seconds an attacker picks what to do: go in behind, come short, or hold position.
+func _update_run(delta: float, holder: Player) -> void:
+	run_timer -= delta
+	if run_timer > 0.0:
+		return
+	run_timer = randf_range(2.5, 5.0)
+	var d := form_depth()
+	var deep := 0.5 if d > 40.0 else (0.25 if d > 22.0 else 0.0)
+	var show := 0.25 if d > 40.0 else (0.35 if d > 22.0 else 0.2)
+	var r := randf()
+	if r < deep:
+		run_mode = "deep"
+	elif r < deep + show:
+		run_mode = "show"
+	else:
+		run_mode = "hold"
+	if holder == self:
+		run_mode = "hold"
+
+
+func _attack_spot(holder: Player) -> Vector3:
 	var line := main.offside_line(team)
+	var spot: Vector3
+	match run_mode:
+		"deep":
+			# run along the last line, drifting inside, ready to go in behind
+			var lane_z := home_pos.z * 0.6
+			spot = Vector3(line - attack_dir * 0.8, 0, lane_z)
+		"show":
+			# come short: get free about 9 m from the ball carrier
+			var away := Util.flat(position - holder.position)
+			if away.length() < 0.1:
+				away = Vector3(0, 0, 1)
+			spot = holder.position + away.normalized() * 9.0 - Vector3(attack_dir * 2.0, 0, 0)
+		_:
+			spot = _support_spot()
+	# never stand offside
 	if spot.x * attack_dir > 0.0 and (spot.x - line) * attack_dir > -0.8:
 		spot.x = line - attack_dir * 1.0
 	spot.x = clampf(spot.x, -Main.HALF_L + 2.0, Main.HALF_L - 2.0)
@@ -490,22 +531,43 @@ func _support_spot() -> Vector3:
 	return spot
 
 
-func _defend_spot() -> Vector3:
-	# mark the most dangerous attacker that isn't on the ball: stand goal-side of him
-	var own_goal := Vector3(-Main.HALF_L * attack_dir, 0, 0)
+func _support_spot() -> Vector3:
 	var b := main.ball.position
-	# zone: formation spot shifted with the ball
-	var spot := Vector3(home_pos.x + b.x * 0.55, 0, home_pos.z * 0.85 + b.z * 0.25)
-	# don't drop into your own box unless the ball is in or near it
-	var ball_depth := (b.x - own_goal.x) * attack_dir
-	var min_depth := Main.BOX_DEPTH + 1.0 if ball_depth > Main.BOX_DEPTH + 6.0 else 6.0
-	if (spot.x - own_goal.x) * attack_dir < min_depth:
-		spot.x = own_goal.x + attack_dir * min_depth
-	# pick up an attacker who wanders into the zone
-	var mark := mark_target
-	if mark != null and Util.flat_dist(mark.position, spot) < Main.MARK_RADIUS:
-		var to_goal := Util.flat(own_goal - mark.position).normalized()
-		spot = mark.position + to_goal * Main.MARK_DISTANCE
+	var x := home_pos.x + attack_dir * Main.SUPPORT_PUSH + b.x * 0.45
+	var z := home_pos.z * 1.15
+	var spot := Vector3(x, 0, z) + jitter
+	spot.x = clampf(spot.x, -Main.HALF_L + 2.0, Main.HALF_L - 2.0)
+	spot.z = clampf(spot.z, -Main.HALF_W + 1.5, Main.HALF_W - 1.5)
+	return spot
+
+
+# ---------------------------------------------------------------- out of possession
+
+## Layered block: the back line drops with the ball, midfield and attack keep their distance
+## behind it (compressing when the ball is deep), so the team never collapses into one line.
+func zone_spot() -> Vector3:
+	var own_goal_x := -Main.HALF_L * attack_dir
+	var b := main.ball.position
+	var ball_depth := (b.x - own_goal_x) * attack_dir
+	var back_line := clampf(ball_depth * Main.BLOCK_LINE_FACTOR, Main.BLOCK_MIN_DEPTH, Main.BLOCK_MAX_DEPTH)
+	var spacing := clampf(0.55 + ball_depth / 150.0, 0.6, 1.0)
+	var depth := back_line + (form_depth() - Main.BLOCK_FORM_BACK) * spacing
+	return Vector3(own_goal_x + attack_dir * depth, 0, home_pos.z * 0.85 + b.z * 0.3)
+
+
+func _defend_spot() -> Vector3:
+	var own_goal := Vector3(-Main.HALF_L * attack_dir, 0, 0)
+	var spot := zone_spot()
+	var holder := main.ball.owner_player
+	# step out to the ball carrier when he comes into your zone
+	if holder != null and holder.team != team and main.zone_owner(team) == self:
+		spot = holder.position + Util.flat(own_goal - holder.position).normalized() * Main.STEP_OUT_DISTANCE
+	else:
+		# pick up an attacker who wanders into the zone
+		var mark := mark_target
+		if mark != null and Util.flat_dist(mark.position, spot) < Main.MARK_RADIUS:
+			var to_goal := Util.flat(own_goal - mark.position).normalized()
+			spot = mark.position + to_goal * Main.MARK_DISTANCE
 	spot.x = clampf(spot.x, -Main.HALF_L + 1.5, Main.HALF_L - 1.5)
 	spot.z = clampf(spot.z, -Main.HALF_W + 1.0, Main.HALF_W - 1.0)
 	return spot

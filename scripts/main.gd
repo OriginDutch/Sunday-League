@@ -36,8 +36,15 @@ const AI_TACKLE_START_RANGE := 1.4     # AI only lunges when this close to the b
 const AI_TACKLE_LUNGE := 7.0           # lunge speed (m/s) for 0.35 s
 const HUMAN_TACKLE_LUNGE := 10.0
 const AI_JOCKEY_DISTANCE := 1.6        # AI presser keeps this gap when you have the ball
+const AI_JOCKEY_DISTANCE_AI := 1.1     # ...and this gap against an AI carrier
 const MARK_DISTANCE := 2.2             # markers stand this far goal-side of their man
 const COVER_DISTANCE := 4.5            # second defender covers this far goal-side of the ball carrier
+const BLOCK_LINE_FACTOR := 0.5         # back line depth = ball depth from own goal x this
+const BLOCK_MIN_DEPTH := 8.0           # back line never deeper than this (m from own goal line)
+const BLOCK_MAX_DEPTH := 36.0          # ...nor higher than this
+const BLOCK_FORM_BACK := 14.5          # formation depth of the back four
+const STEP_OUT_DISTANCE := 2.5         # zone owner steps out to this distance from the ball carrier
+const STEP_OUT_RADIUS := 10.0          # ...when the carrier is within this distance of his zone
 const INTERCEPT_RANGE := 5.0           # AI goes for a pass passing within this distance
 const PASS_LEAD := 0.7                 # how much of the receiver's run the pass leads
 const LOB_PASS_DISTANCE := 30.0        # passes longer than this go through the air
@@ -1164,6 +1171,24 @@ func is_chaser(p: Player) -> bool:
 
 
 ## The second-nearest outfielder to the ball covers when the opponent has it close by.
+## The defender whose zone the ball carrier is in (not the chaser / second man), or null.
+func zone_owner(t: int) -> Player:
+	var holder := ball.owner_player
+	if holder == null or holder.team == t:
+		return null
+	var first := _nearest_to_ball(team_list(t), true)
+	var best: Player = null
+	var best_d := STEP_OUT_RADIUS
+	for p in team_list(t):
+		if p.role == "GK" or p == first or p.is_human or is_second_presser(p):
+			continue
+		var d := Util.flat_dist(p.zone_spot(), holder.position)
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
+
+
 func is_second_presser(p: Player) -> bool:
 	var first := _nearest_to_ball(team_list(p.team), true)
 	var best: Player = null

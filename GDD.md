@@ -272,6 +272,11 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 **Marcel's feedback round 2 (2026-11-07):** the two tunnels at x = ±5.75 sat close together in the middle (11.5 m apart vs 23 m to the next). Options offered: 2 tunnels at ±17.25, 3 with an extra centre stair, or 4 at ±17.25/±40.25. **Marcel chose 4 at ±17.25 and ±40.25** (spacing 23 / 34.5 / 23 m).
 
+**Modular stands (discussed 2026-11-07):** the POC is one model for the full side; the script is built per 11.5 m section, so it can be split. Marcel:
+- The club name only needs to be in **one place**; the player may enter a different text in an input field with a **max number of characters**.
+- Tiers are upgradable **per section** (a second tier, maybe a third one day), so sections with different tier counts stand side by side.
+- Open: where the one text goes and how big; how the upper tier is reached in a modular build (see below); whether sections replace the chair/bench slots.
+
 **Seen and fixed during the build:** fans too wide (letters unreadable) → slimmer; open gap between back wall and roof → clad up to the roof, glazed end screens; two stacked rows of colourful boards → front wall now concrete + club band; facade sign was mirrored and hidden behind the centre core/columns → mirrored, moved up, narrower.
 
 **Known limits:** the seat text is only partly readable when 30% full (fans in white shirts look like letter pixels, aisles break letters); the rear back-stays cross the facade sign in 3/4 views; Godot shots here use `--new-light` (fancy/SDFGI too slow on the software renderer); stands are not yet in the hub/economy (sections vs slots still open).

@@ -1,6 +1,6 @@
 class_name Sfx
 extends Node
-## Procedurally generated sounds (no audio files): kick, whistle, crowd cheer/groan/ooh, crowd murmur.
+## Procedurally generated sounds (no audio files): kick, whistle, crowd cheer/groan/ooh.
 
 const RATE := 22050
 
@@ -10,9 +10,7 @@ var _whistle_long: AudioStreamWAV
 var _cheer: AudioStreamWAV
 var _groan: AudioStreamWAV
 var _ooh: AudioStreamWAV
-var _murmur: AudioStreamWAV
 var _pool: Array[AudioStreamPlayer] = []
-var _murmur_player: AudioStreamPlayer
 var crowd_level := 0.1     # 0..1, scales crowd sounds with attendance
 
 
@@ -23,14 +21,10 @@ func _ready() -> void:
 	_cheer = _make_crowd(2.6, 0.35, 1.0, 0.25)
 	_groan = _make_crowd(1.6, 0.12, 0.6, 0.9)
 	_ooh = _make_crowd(0.9, 0.2, 0.7, 0.5)
-	_murmur = _make_crowd(4.0, 0.08, 0.5, 0.5, true)
 	for i in 8:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
 		_pool.append(p)
-	_murmur_player = AudioStreamPlayer.new()
-	_murmur_player.stream = _murmur
-	add_child(_murmur_player)
 
 
 func _play(stream: AudioStream, volume_db: float, pitch: float = 1.0) -> void:
@@ -69,13 +63,9 @@ func crowd(kind: String) -> void:
 			_play(_cheer, vol - 12.0, 1.3)
 
 
-func set_murmur(on: bool) -> void:
-	if on:
-		_murmur_player.volume_db = linear_to_db(clampf(crowd_level, 0.03, 1.0)) - 14.0
-		if not _murmur_player.playing:
-			_murmur_player.play()
-	else:
-		_murmur_player.stop()
+func set_murmur(_on: bool) -> void:
+	# crowd murmur removed (sounded like wind, GDD §10h); comes back with real recordings
+	pass
 
 
 # ------------------------------------------------------------------ synthesis

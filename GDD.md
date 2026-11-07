@@ -222,6 +222,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 ## 10h. Audio — crowd sound (2026-11-07)
 - Marcel heard "wind": that was Claude's procedural crowd murmur (looping filtered noise). Verdict: **not usable**.
 - Tried: Suno with crowd-ambience prompts → **didn't work**.
+- Murmur loop **removed** (Marcel, 2026-11-07: "moet er nu uit"). Cheer/groan/ooh are still procedural.
 - Next: real recordings from free/CC0 libraries (Marcel downloads, Claude cuts + loops + builds in). Open: keep the procedural sounds as fallback or remove them.
 
 

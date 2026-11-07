@@ -336,7 +336,7 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
 - All values are Claude's first guesses; nothing decided. Known gap: salaries/expenses are not modelled yet, so top clubs look very rich.
 - **v2 (2026-11-07, Marcel: "onderbouwen, dan een middenweg die de gameplay smooth laat lijken"):** every division now has a **real-world column** (English football 2024/25, £, with 20 sources on a *Sources* tab) next to the **game column** (€, middle ground). Proposed mapping: Premier Division = Premier League, League 1 = Championship, League 2 = League One, League 3 = League Two, League 4 = National League, League 5 = NL North/South, League 6–10 = Steps 3–7, Non-League 1–3 = below the official pyramid (estimates only).
   - Middle ground: follows reality where it's smooth; flattens the two real cliffs (National League → League Two central money ~25×, Championship → Premier League ~10–15×). Result: season income grows ~1.9–2.7× per division, 3.6× into the Premier Division.
-  - Mapping, game values and the cliff flattening are Claude's proposal — nothing decided.
+  - **Accepted for now (Marcel, 2026-11-07):** mapping, game values and the cliff flattening — "voor nu goed, open voor tweaking". Next: expenses (salaries etc.) are still missing.
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
@@ -497,6 +497,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
+| 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch (first tier only, no all-seater rule, standing = atmosphere vs seats = revenue); stage jump = 1 week demolition then build |
 | 2026-11-07 | Stands: stages + upgrades within stages; one stadium shape + per-corner on/off; shape changeable later; career ≥14 seasons, likely 20–25+ |
 | 2026-11-07 | Big stand POC: full side, cantilever, skyboxes, floodlight bar + masts, 20/15 rows, ~30% fans in club colours, club name in seats, simple facade (§10i) |

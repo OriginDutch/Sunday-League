@@ -152,7 +152,12 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Calendar decisions (Marcel, 2026-11-07):**
   - A week is **not** one match: cup, European and pre-season matches can fall in the same week, and fixture spacing can put **two league matches in one week**.
   - Straight to a **full season: 19 home, 19 away**, always a return match. Roughly half of your home matches fall in the first half of the season, the other half in the second half; same for away matches.
-- **Sections vs slots (Marcel, 2026-11-07):** move from the 40 small slots to the **~11.5 m sections** of the stand POC (benches/chairs look odd otherwise) — work out what fits in 11.5 m. Also think about the **edges: ad boards, fences/rails, facilities, player dugouts** and similar. Details open (Claude proposal in chat).
+  - **Fixtures (decided 2026-11-07):** you never play the same opponent home *and* away in the first half of the season; the second half has the return matches, but **not** as a literal reversed copy of the first-half order.
+  - **Away matches: you play them yourself, in a seeded away ground per club** (decided).
+  - Season: 42 weeks + 10 weeks off-season; other league matches simulated so there's a real table (Claude's proposal, not objected).
+- **Currency:** stays **£** in-game; the sign is just a sign (Marcel). Model numbers in € are used as-is.
+- **Sections vs slots (Marcel, 2026-11-07):** move from the 40 small slots to the **~11.5 m sections** of the stand POC (benches/chairs look odd otherwise) — work out what fits in 11.5 m. Also think about the **edges: ad boards, fences/rails, facilities, player dugouts** and similar. Proposal (Claude): 9 sections per long side, 5 per short side; per section 10 m seating + 1.2 m aisle = 5 benches or 20 chairs in a row (20 seats); pitchside layer with ad board + barrier (rope → fence → rail); dugouts fixed in front of the middle section of the main side.
+  - **Facilities (decided, Marcel 2026-11-07):** with no stands yet they **take space from chairs**; once your stands are high and big enough they go **under or into the stand**.
 - **Build times (Marcel, 2026-11-07: "voelt best goed"), per section, tunable:** chairs/benches instant · bleachers 1 wk · The Shed 2 · main stand 4 · modern tier 6 · 2nd tier 8 · 3rd tier 12 weeks. Extra rows within a stage = half the stage time; corner section ×1.2; +1 week demolition on a stage jump. A section under construction is **closed** (no income from those places).
   - **No limit** on how many sections you build at once (money is the limit) — decided.
   - **Rush build** — decided in principle: pay **+50% cost for 75% of the build time** (Marcel's numbers, tunable).
@@ -555,6 +560,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
 | 2026-11-07 | Player value depends on age too: old stars cheap but short-lived (§10b) |
 | 2026-11-07 | Off-season = 10 weeks (starting point) |
+| 2026-11-07 | Calendar: weeks can hold several matches; 19 home/19 away, no home+away vs same opponent in one half; away matches played in seeded away grounds; facilities take chair space until stands can hold them; currency stays £ |
 | 2026-11-07 | Build times per section per stage, sections closed while building, no parallel limit, rush build +50% cost → 75% time (§10a) |
 | 2026-11-07 | Refusing a retirement = light 'unhappy' flag (form ×0.8 till contract end), no full morale system yet (§10b) |
 | 2026-11-07 | Retirement chance accepted to try: age base + drop from highest rating ever + playing time/contract/injury; announced mid-season, can stop during contract by mutual agreement (§10b) |

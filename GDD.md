@@ -380,6 +380,8 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 **Wiring (Claude's picks, tunable):** `_grass_mat()` in `main.gd` — world-space triplanar UVs (texture runs on across the separate stripe boxes), `GRASS_TILE_M = 5.0` m per repeat, anisotropic filtering, normal map on. Height map not used in-game yet (parallax would cost performance; only needed if the normal map is not enough).
 
+- **Fix (2026-11-08):** Marcel saw noise when zoomed out. Cause: the textures were imported **without mipmaps**, so far away the GPU sampled random texels. Albedo + normal now import with mipmaps and VRAM compression (normal map as normal map).
+
 **Open:** which tint mode wins; tile size; whether the height map gets used.
 
 ## 10b. Economy

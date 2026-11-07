@@ -202,18 +202,31 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Round 2: ground visible, one icon style, consistent numbers; still premium colours. Feedback sent: three colour variants on a frozen layout.
 - Round 3: three themes delivered with tokens (`design/ui-handoff/sunday_league_ui_tokens.json` + `README_FOR_CLAUDE.md`): Clubhouse Canteen, Chalkboard, Club Colours (red & white).
 
-### Chosen UI style (Marcel, 2026-11-07)
-- **Chalkboard style in Clubhouse Canteen colours:** panel #20372A (93% opacity), border #526D57, text #F5F0DF, muted #C0C9B9, accent #E8D9A8, success #79C68B, warning #E5AE54, danger #D66B61. Full values in the tokens JSON.
-- **Fonts:** Barlow Semi Condensed (400–700) for all functional UI; **Caveat** (500–600) for the ticker, taglines **and headings** (club name, "Our Goal", "Next Match") — for now. Stats, buttons and instructions stay in Barlow.
-- **Layout:** top stats bar; "Our Goal" card left; "Next Match" card right with **both crests** (so you see home vs away); **slim floating bottom strip** (ticker + navigation on one line, a little above the bottom edge so you still glimpse the ground); centre of the ground kept clear.
-- Chalk underlines under headings, chalky progress-bar fill, homemade single-colour crests (SVG, recolourable later) — in `design/ui-handoff/`.
-- Mock-up of this style: "Hub · Canteen colours, chalkboard style" on the [Hub mockups canvas](https://claude.ai/artifact/89eq9cBSogTe6xLhRZL9EZ) (has a texture switch).
+### Chosen UI style (Marcel, 2026-11-07, revised same day)
+- **Clubhouse Noticeboard with club colours.** Panels are paper on a noticeboard: paper strips (top bar, bottom strip), a yellow sticky note ("Our Goal"), a ruled index card with a pin ("Next Match"), small stat tags, tape and pins, each slightly rotated. Marcel: "Clean en toch licht goofy".
+- **Club colours drive the accents only:** tape, pins, Play button, selected nav tab, index-card stripe, pen accents ("vs", "Friendly", stat icons) and the own crest. Paper and the sticky note stay as they are. Works for any colour pair (tested red/white and blue/yellow): a light secondary colour falls back to the primary where it would vanish on paper.
+- **Light mode is the default. Dark mode is an option:** white/cream surfaces become dark (#25292D / #2C3135), text on them inverts to cream; sticky note, tape, pins, button and selected tab stay unchanged. Club colours used as *text* get a lighter tint in dark mode (e.g. #FF7A83, #8FAEF2) so they stay readable.
+- **Fonts:** Kalam (headings, club name, notes, ticker, flavour) + Work Sans (everything functional: stats, buttons, labels).
+- **Layout (unchanged):** top bar with stats; "Our Goal" left; "Next Match" right with **both crests**; slim floating bottom strip (ticker + navigation); centre of the ground kept clear.
+- **Spec:** [UI Spec v2 (Clubhouse Noticeboard)](https://claude.ai/artifact/JbPtKYncdTQhGp42vJkJR3) — tokens, club-colour rules, component specs, layout and motion notes. Mock-ups: [UI style round canvas](https://claude.ai/artifact/DVUtGedEbLXL7v6A2fPP2m), page "Round 3".
+- Claude took over the designer role from ChatGPT for this round (same brief).
 
-### Panel texture — still open
-- ChatGPT's 512 px texture: even fine grain, reads as felt/noise. **Rejected.**
-- Claude's procedural textures (subtle / medium / bold; eraser wipes, haze, ghost strokes; `design/textures/`): **rejected** ("buiten smaak").
-- Next: a new ChatGPT round with three directions — A) real photographed chalkboard, B) illustrated/stylised, C) flat panels with chalk details only (outlines, corner marks, doodles). Prompt is ready; waiting for Marcel's ChatGPT limit to reset.
+### How we got there (2026-11-07)
+- First pick was *Chalkboard style in Clubhouse Canteen colours* (Barlow + Caveat). Panel textures for it were tried and rejected: ChatGPT's 512 px grain ("felt/noise"), Claude's procedural textures ("buiten smaak"), then Claude's Flat / A photographic board / B illustrated / C flat + chalk details. Conclusion (Marcel): chalkboard doesn't really work; a full board texture fights "fairly modern".
+- Four concepts with free colours/fonts on the same Hub: Matchday Programme, **Clubhouse Noticeboard** (picked), Scoreboard, Sticker Album.
+- Dark mode: "dark paper" and "evening (dimmed paper)" takes didn't work; the simple invert version did.
 
+### UI decisions (Marcel, 2026-11-07)
+- **Navigation:** 5 items in the bottom strip — **Club** (the hub, selected when you're there), Stadium, Recruitment, Squad, Finances.
+- **Build mode:** the preview card (cost, refund, what it adds, Build it / Cancel) **floats beside the 3D ghost**; the **catalogue and the bottom strip stay visible** while building; removals are marked red with "£x back"; Esc stops building.
+- **Camera in hub/build:** **Q/E rotate + hold right mouse**, as already built in the hub camera.
+- **All "Now" screens mocked up** in noticeboard style, club colours red/white, light: main menu, hub, hub with Play disabled (squad 9/11), recruitment, squad, settings (as a modal over the hub, incl. Light/Dark), post-match summary (+ one dark check), in-match HUD, build preview, build replace, component sheet — canvas page "Round 4". The in-match controls hint uses the real bindings from `main.gd` (dev keys left out).
+
+### UI open points
+- UI-scale setting (100/125/150%): at 1280×720 uniform scaling makes 14 px text ~9 px.
+- Dark base colour (neutral #25292D, warmer, or club-tinted); club-colour swatches next to the club name.
+- Flavour copy on the mock-ups (chairman notes, "Signed!" stamp, man of the match etc.): proposal, keep / rewrite / cut.
+- **Gameplay idea (Marcel): an in-game "evening mode"** (evening/floodlit matches or hub), with the UI switching to dark mode alongside it. Not decided.
 
 ## 10f. 3D assets — first test: The Shed (2026-11-07)
 **Why:** test whether Claude can build good 3D models (see §13 "3D assets").
@@ -602,6 +615,9 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Working agreement: everything discussed/planned/decided goes into the GDD |
 | 2026-11-07 | UI: ChatGPT designs, Claude builds; chosen style = Chalkboard style in Clubhouse Canteen colours, Barlow + Caveat (Caveat also for headings for now), slim floating bottom strip, both crests in Next Match |
 | 2026-11-07 | Panel texture: ChatGPT grain and Claude's procedural versions rejected; new ChatGPT round with 3 directions pending |
+| 2026-11-07 | UI style revised: chalkboard dropped (all textures rejected); **Clubhouse Noticeboard** with club colours on the accents, Kalam + Work Sans; light default, simple dark mode (surfaces dark, text inverted, accents unchanged) as an option (§10e) |
+| 2026-11-07 | UI design round done by Claude instead of ChatGPT (same brief) |
+| 2026-11-07 | UI: 5th nav item "Club"; build preview floats beside the ghost; catalogue + bottom strip stay visible in build mode; camera Q/E + right mouse; all "Now" screens mocked up (canvas "Round 4") |
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
@@ -635,7 +651,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 
 **Tech**
 - GDScript (as in the PoC) or C#? Switching later means a rewrite.
-- Art style: UI decided (§10e). 3D direction from Marcel: "High quality Low Poly" (§10f); final verdict waits on The Shed test.
+- Art style: UI decided (§10e, Clubhouse Noticeboard). 3D direction from Marcel: "High quality Low Poly" (§10f); final verdict waits on The Shed test.
 
 **Pyramid**
 - League names.

@@ -199,7 +199,7 @@ What's in it now (v4):
 
 | Feature | v0.1 |
 |---|---|
-| Money | **In** (which sources: open) |
+| Money | **In**: ticket sales only (concessions later) |
 | Visible micro-upgrades (chair, bench, ball bag, lawnmower, …) | **In** |
 | "Who can play for you" list | **In** |
 | Player names | **In** |
@@ -214,6 +214,14 @@ What's in it now (v4):
 | Weather | Later |
 | Promotion | Later |
 | Cups | Later |
+
+**Matches in v0.1:** random friendlies.
+
+**Fans in v0.1:**
+- Fans **actually sit on the chairs and benches** you've placed.
+- Fans still come when there's no seat for them, but then **they don't pay**. They only pay for a seat (or a standing place on a stand).
+- **Later:** charging "real" entry for regular standing places too.
+- Fans cheer, jump, some wander around a little, gather in groups, and react to tackles and saves.
 
 ## 12. Decisions log
 
@@ -237,7 +245,7 @@ What's in it now (v4):
 | 2026-11-07 | Pace: fast through non-league, 2–3 seasons per division higher up (§10d) |
 | 2026-11-07 | Stadium: tiny upgrades first, grows in place in a residential area, build time, low promotion requirements (§10a) |
 | 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
-| 2026-11-07 | v0.1 scope and done-criterion (§11b) |
+| 2026-11-07 | v0.1 scope and done-criterion (§11b); random friendlies, ticket sales only, fans pay only for a seat |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
 ## 13. Open questions
@@ -274,4 +282,3 @@ What's in it now (v4):
 - Training, staff roles, youth.
 - Season calendar (pre-season, cups, Europe).
 - Save system.
-- v0.1: which matches you play without a league (see §11b open points).

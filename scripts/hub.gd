@@ -126,7 +126,7 @@ func refresh() -> void:
 		c.queue_free()
 
 	_header("SHOP")
-	_shop_button("chair", "Chair — £%d  (1 seat, up to %d per section)" % [ClubState.CHAIR_PRICE, ClubState.MAX_CHAIRS_PER_SLOT])
+	_shop_button("chair", "Chair — £%d  (1 seat, up to %d per spot, 5 spots per section)" % [ClubState.CHAIR_PRICE, ClubState.MAX_CHAIRS_PER_SLOT])
 	_shop_button("bench", "Bench — £%d  (%d seats)" % [ClubState.BENCH_PRICE, ClubState.BENCH_SEATS])
 	_small("Fans only pay (£%d) if they have a seat. Everyone else watches for free." % ClubState.TICKET_PRICE)
 

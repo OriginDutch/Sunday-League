@@ -2,16 +2,25 @@ class_name Grounds
 extends Node3D
 ## Seating slots around the pitch, the furniture you bought, and the crowd.
 
-const SLOT_SPACING := 4.0
-const SLOT_OFFSET := 4.0          # metres behind the touchline
-const STAND_OFFSET := 1.8         # standing (non-paying) fans, between line and seats
+## Layout (GDD §10a): 28 sections of 11.5 m (9 per touchline, 5 behind each goal).
+## Each section = 5 spots of 2 m (a bench or up to 4 chairs) = 20 seats in a row + 1.5 m aisle.
+## In front of each section: an ad board and a rope. Dugouts in front of the middle far section.
+const SPOT_SPACING := 2.0
+const SEAT_OFFSET := 4.0          # metres behind the line to the seat row
+const BOARD_OFFSET := 1.4         # ad boards, closest to the pitch
+const ROPE_OFFSET := 2.2          # rope barrier
+const STAND_OFFSET := 3.0         # standing (non-paying) fans, between rope and seats
 const MAX_VISIBLE_FANS := 220
-const CHAIR_OFFSETS := [-0.82, -0.27, 0.27, 0.82]   # seat positions within a section (bench or up to 4 chairs)
+const CHAIR_OFFSETS := [-0.75, -0.25, 0.25, 0.75]   # seat positions within a spot
+const END_EXTRA := 2.5          # sections behind the goals sit further back (clear of the nets)
+const DUGOUT_SECTION := 4         # middle section of the far (main) side
+const DUGOUT_CLEAR_X := 7.5       # no standing fans in front of the dugouts
 
 var state: ClubState
 var furniture_root: Node3D
 var marker_root: Node3D
 var crowd_root: Node3D
+var pitchside_root: Node3D
 var markers: Array[MeshInstance3D] = []
 var fans: Array[Fan] = []
 var free_mat: StandardMaterial3D
@@ -26,15 +35,19 @@ func setup(s: ClubState) -> void:
 	add_child(marker_root)
 	crowd_root = Node3D.new()
 	add_child(crowd_root)
+	pitchside_root = Node3D.new()
+	add_child(pitchside_root)
+	_build_pitchside()
 	free_mat = Util.mat(Color(1, 1, 1, 0.35), true)
 	hover_mat = Util.mat(Color(1.0, 0.85, 0.1, 0.9), true)
 	for i in slot_count():
 		var m := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(2.6, 0.04, 0.9)
+		bm.size = Vector3(1.8, 0.04, 0.9)
 		m.mesh = bm
 		m.material_override = free_mat
 		m.position = slot_position(i) + Vector3(0, 0.03, 0)
+		m.rotation.y = slot_yaw(i)
 		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		marker_root.add_child(m)
 		markers.append(m)
@@ -42,21 +55,47 @@ func setup(s: ClubState) -> void:
 	rebuild_furniture()
 
 
+static func section_count() -> int:
+	return ClubState.SECTIONS_LONG * 2 + ClubState.SECTIONS_SHORT * 2
+
+
 static func slot_count() -> int:
-	return ClubState.SLOTS_PER_SIDE * 2
+	return section_count() * ClubState.SPOTS_PER_SECTION
 
 
-## Slots 0..19 along the far touchline, 20..39 along the near one.
+## Sections 0..8 far touchline (west→east), 9..17 near touchline, 18..22 west end, 23..27 east end.
+## Returns the point on the line in front of the section's middle, plus the yaw that faces the pitch.
+static func section_frame(sec: int) -> Dictionary:
+	var L := ClubState.SECTIONS_LONG
+	var S := ClubState.SECTIONS_SHORT
+	var w := ClubState.SECTION_W
+	if sec < L:
+		return {"line": Vector3((sec - (L - 1) * 0.5) * w, 0, -Main.HALF_W), "yaw": 0.0}
+	if sec < 2 * L:
+		var k := sec - L
+		return {"line": Vector3((k - (L - 1) * 0.5) * w, 0, Main.HALF_W), "yaw": PI}
+	if sec < 2 * L + S:
+		var k := sec - 2 * L
+		return {"line": Vector3(-Main.HALF_L - END_EXTRA, 0, (k - (S - 1) * 0.5) * w), "yaw": PI * 0.5}
+	var k := sec - 2 * L - S
+	return {"line": Vector3(Main.HALF_L + END_EXTRA, 0, (k - (S - 1) * 0.5) * w), "yaw": -PI * 0.5}
+
+
+## A point in a section's local frame (x along the line, d metres back from it) in world space.
+static func section_point(sec: int, x: float, d: float) -> Vector3:
+	var f := section_frame(sec)
+	return f["line"] + Vector3(x, 0, -d).rotated(Vector3.UP, f["yaw"])
+
+
 static func slot_position(i: int) -> Vector3:
-	var per := ClubState.SLOTS_PER_SIDE
-	var side := -1.0 if i < per else 1.0
-	var k := i % per
-	var x := (k - (per - 1) * 0.5) * SLOT_SPACING
-	return Vector3(x, 0, side * (Main.HALF_W + SLOT_OFFSET))
+	var sec := i / ClubState.SPOTS_PER_SECTION
+	var k := i % ClubState.SPOTS_PER_SECTION
+	var x := (k - (ClubState.SPOTS_PER_SECTION - 1) * 0.5) * SPOT_SPACING
+	return section_point(sec, x, SEAT_OFFSET)
 
 
 static func slot_yaw(i: int) -> float:
-	return 0.0 if i < ClubState.SLOTS_PER_SIDE else PI   # face the pitch
+	return section_frame(i / ClubState.SPOTS_PER_SECTION)["yaw"]   # face the pitch
 
 
 func nearest_free_slot(p: Vector3, item: String, max_dist: float = 3.0) -> int:
@@ -93,19 +132,64 @@ func rebuild_furniture() -> void:
 		var wood := Color(0.6, 0.42, 0.22)
 		var metal := Color(0.3, 0.3, 0.32)
 		if item == "bench":
-			Util.box(root, Vector3(2.2, 0.08, 0.45), Vector3(0, 0.45, 0), wood)
-			Util.box(root, Vector3(0.08, 0.45, 0.4), Vector3(-0.95, 0.22, 0), metal)
-			Util.box(root, Vector3(0.08, 0.45, 0.4), Vector3(0.95, 0.22, 0), metal)
+			Util.box(root, Vector3(1.9, 0.08, 0.45), Vector3(0, 0.45, 0), wood)
+			Util.box(root, Vector3(0.08, 0.45, 0.4), Vector3(-0.85, 0.22, 0), metal)
+			Util.box(root, Vector3(0.08, 0.45, 0.4), Vector3(0.85, 0.22, 0), metal)
 		else:
 			for c in n_chairs:
 				var cx: float = CHAIR_OFFSETS[c]
-				Util.box(root, Vector3(0.5, 0.06, 0.5), Vector3(cx, 0.45, 0), Color(0.15, 0.45, 0.25))
-				Util.box(root, Vector3(0.5, 0.5, 0.06), Vector3(cx, 0.72, -0.22), Color(0.15, 0.45, 0.25))
-				for lx in [-0.2, 0.2]:
+				Util.box(root, Vector3(0.44, 0.06, 0.46), Vector3(cx, 0.45, 0), Color(0.15, 0.45, 0.25))
+				Util.box(root, Vector3(0.44, 0.5, 0.06), Vector3(cx, 0.72, -0.22), Color(0.15, 0.45, 0.25))
+				for lx in [-0.18, 0.18]:
 					for lz in [-0.2, 0.2]:
 						var fx: float = lx
 						var fz: float = lz
 						Util.box(root, Vector3(0.04, 0.45, 0.04), Vector3(cx + fx, 0.22, fz), metal)
+
+
+## Ad boards, rope and dugouts — fixed for now (sponsors and barrier upgrades come later).
+func _build_pitchside() -> void:
+	var half := ClubState.SECTION_W * 0.5
+	var post := Color(0.85, 0.85, 0.82)
+	var rope := Color(0.9, 0.75, 0.15)
+	for sec in section_count():
+		var root := Node3D.new()
+		var f := section_frame(sec)
+		root.position = f["line"]
+		root.rotation.y = f["yaw"]
+		pitchside_root.add_child(root)
+		# rope on posts along the whole section front
+		for px in [-half + 0.3, -half * 0.33, half * 0.33, half - 0.3]:
+			var x: float = px
+			Util.box(root, Vector3(0.06, 1.0, 0.06), Vector3(x, 0.5, -ROPE_OFFSET), post)
+		Util.box(root, Vector3(ClubState.SECTION_W - 0.6, 0.03, 0.03), Vector3(0, 0.9, -ROPE_OFFSET), rope)
+		if sec == DUGOUT_SECTION:
+			for side in [-1.0, 1.0]:
+				_dugout(root, side * 3.2)
+			continue
+		# ad board: blank club board until sponsors exist
+		Util.box(root, Vector3(8.0, 0.8, 0.08), Vector3(0, 0.45, -BOARD_OFFSET), Color(0.95, 0.95, 0.93))
+		Util.box(root, Vector3(0.06, 0.45, 0.4), Vector3(-3.8, 0.22, -BOARD_OFFSET - 0.2), Color(0.3, 0.3, 0.32))
+		Util.box(root, Vector3(0.06, 0.45, 0.4), Vector3(3.8, 0.22, -BOARD_OFFSET - 0.2), Color(0.3, 0.3, 0.32))
+		var l := Label3D.new()
+		l.text = "YOUR AD HERE"
+		l.font_size = 64
+		l.pixel_size = 0.009
+		l.modulate = Color(0.55, 0.55, 0.55)
+		l.outline_size = 0
+		l.position = Vector3(0, 0.45, -BOARD_OFFSET + 0.05)
+		root.add_child(l)
+
+
+func _dugout(root: Node3D, x: float) -> void:
+	var shell := Color(0.2, 0.25, 0.3)
+	var roof := Color(0.55, 0.7, 0.8)
+	var d := 1.7   # centre, metres back from the line
+	Util.box(root, Vector3(2.8, 1.7, 0.08), Vector3(x, 0.85, -d - 0.6), shell)            # back
+	Util.box(root, Vector3(0.08, 1.7, 1.2), Vector3(x - 1.4, 0.85, -d), shell)            # sides
+	Util.box(root, Vector3(0.08, 1.7, 1.2), Vector3(x + 1.4, 0.85, -d), shell)
+	Util.box(root, Vector3(2.9, 0.06, 1.3), Vector3(x, 1.72, -d), roof)                   # roof
+	Util.box(root, Vector3(2.5, 0.08, 0.4), Vector3(x, 0.45, -d - 0.3), Color(0.6, 0.42, 0.22))  # bench
 
 
 ## World positions (and facing) of every seat you own.
@@ -137,8 +221,10 @@ func spawn_crowd(attendance: int) -> void:
 	var groups := maxi(1, int(ceil(standing / 5.0)))
 	var placed := 0
 	for g in groups:
-		var gx := randf_range(-35.0, 35.0)
 		var side := -1.0 if (g % 3 != 2) else 1.0
+		var gx := randf_range(-45.0, 45.0)
+		if side < 0.0 and absf(gx) < DUGOUT_CLEAR_X:
+			gx = signf(gx + 0.01) * randf_range(DUGOUT_CLEAR_X, 45.0)
 		var center := Vector3(gx, 0, side * (Main.HALF_W + STAND_OFFSET))
 		var size := mini(randi_range(2, 6), standing - placed)
 		for k in size:

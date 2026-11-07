@@ -15,8 +15,13 @@ const TICKET_PRICE := 2             # £ per seated fan (fixed in v0.1)
 const CHAIR_PRICE := 12
 const BENCH_PRICE := 40
 const BENCH_SEATS := 4
-const MAX_CHAIRS_PER_SLOT := 4     # chairs stack up one by one in a section
-const SLOTS_PER_SIDE := 20          # seating slots along each touchline
+const MAX_CHAIRS_PER_SLOT := 4     # chairs stack up one by one in a spot (a bench's width)
+# ground layout (GDD §10a): sections of 11.5 m, 9 per long side, 5 per short side
+const SECTION_W := 11.5
+const SECTIONS_LONG := 9
+const SECTIONS_SHORT := 5
+const SPOTS_PER_SECTION := 5        # 5 bench-wide spots of 4 seats = 20 seats in a row
+const SAVE_VERSION := 2             # v2 = sections; older saves start a new game
 
 # fan growth per match (multiplied by an approval factor)
 const GROWTH_WIN := 6.0
@@ -35,7 +40,7 @@ var fans := START_FANS
 var approval := START_APPROVAL
 var squad: Array = []               # [{name, origin}] in recruitment order
 var candidates: Array = []          # "Who can play for you"
-var slots: Dictionary = {}          # slot index (String) -> "bench" | "chairs:N"
+var slots: Dictionary = {}          # spot index (String) -> "bench" | "chairs:N"; spot = section * 5 + k
 var record := {"w": 0, "d": 0, "l": 0}
 var matches_played := 0
 var fans_carry := 0.0               # fractional fan growth carried over
@@ -173,13 +178,15 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int) 
 
 func to_dict() -> Dictionary:
 	return {
-		"version": 1, "money": money, "fans": fans, "approval": approval, "squad": squad,
+		"version": SAVE_VERSION, "money": money, "fans": fans, "approval": approval, "squad": squad,
 		"candidates": candidates, "slots": slots, "record": record,
 		"matches_played": matches_played, "fans_carry": fans_carry,
 	}
 
 
 static func from_dict(d: Dictionary) -> ClubState:
+	if int(d.get("version", 1)) < SAVE_VERSION:
+		return new_game()   # saves don't matter yet (Marcel, 2026-11-07): old layout -> fresh start
 	var s := ClubState.new()
 	s.money = int(d.get("money", START_MONEY))
 	s.fans = int(d.get("fans", START_FANS))
@@ -187,9 +194,6 @@ static func from_dict(d: Dictionary) -> ClubState:
 	s.squad = d.get("squad", [])
 	s.candidates = d.get("candidates", [])
 	s.slots = d.get("slots", {})
-	for k in s.slots.keys():
-		if s.slots[k] == "chair":   # saves from before stacking
-			s.slots[k] = "chairs:1"
 	var r: Dictionary = d.get("record", {"w": 0, "d": 0, "l": 0})
 	s.record = {"w": int(r.get("w", 0)), "d": int(r.get("d", 0)), "l": int(r.get("l", 0))}
 	s.matches_played = int(d.get("matches_played", 0))

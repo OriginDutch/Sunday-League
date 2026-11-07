@@ -340,8 +340,8 @@ func _hub_process(delta: float) -> void:
 		pan.x += 1.0
 	if pan != Vector3.ZERO:
 		hub_focus += pan.normalized() * 30.0 * hub_zoom * delta
-		hub_focus.x = clampf(hub_focus.x, -HALF_L, HALF_L)
-		hub_focus.z = clampf(hub_focus.z, -HALF_W - 6.0, HALF_W + 6.0)
+		hub_focus.x = clampf(hub_focus.x, -HALF_L - 8.0, HALF_L + 8.0)
+		hub_focus.z = clampf(hub_focus.z, -HALF_W - 8.0, HALF_W + 8.0)
 	_hub_camera()
 	if placing_item == "":
 		return
@@ -365,16 +365,29 @@ func _hub_test() -> void:
 	while club.squad.size() < ClubState.SQUAD_SIZE:
 		club.recruit(0)
 	club.money = 200
-	print("placed bench: ", club.place("bench", 3), " chairs x5 on slot 25: ", [club.place("chair", 25), club.place("chair", 25), club.place("chair", 25), club.place("chair", 25), club.place("chair", 25)], " bench on chairs: ", club.place("bench", 25), " seats ", club.seats(), " slots ", club.slots)
-	var legacy := ClubState.from_dict({"slots": {"7": "chair"}})
-	print("legacy chair -> ", legacy.slots, " seats ", legacy.seats())
+	print("placed bench: ", club.place("bench", 3), " chairs x5 on spot 25: ", [club.place("chair", 25), club.place("chair", 25), club.place("chair", 25), club.place("chair", 25), club.place("chair", 25)], " bench on chairs: ", club.place("bench", 25), " seats ", club.seats(), " slots ", club.slots)
+	print("spots %d sections %d" % [Grounds.slot_count(), Grounds.section_count()])
+	if "--fill-test" in OS.get_cmdline_user_args():
+		# dev: fill a mix of sections so the layout can be screenshotted
+		club.money = 99999
+		for sec in [2, 3, 5, 6, 12, 20, 25]:
+			for k in ClubState.SPOTS_PER_SECTION:
+				var spot: int = sec * ClubState.SPOTS_PER_SECTION + k
+				if (sec + k) % 2 == 0:
+					club.place("bench", spot)
+				else:
+					for c in 4:
+						club.place("chair", spot)
+		print("FILL seats ", club.seats())
+	var legacy := ClubState.from_dict({"version": 1, "money": 999, "slots": {"7": "chair"}})
+	print("v1 save -> new game: money ", legacy.money, " slots ", legacy.slots)
 	grounds.rebuild_furniture()
 	var summary := club.apply_match(2, 1, 5)
 	print("SUMMARY ", summary)
 	var d := club.to_dict()
 	var back := ClubState.from_dict(JSON.parse_string(JSON.stringify(d)))
 	print("ROUNDTRIP money %d fans %d slots %s squad %d" % [back.money, back.fans, str(back.slots), back.squad.size()])
-	grounds.spawn_crowd(club.fans + 10)
+	grounds.spawn_crowd(maxi(club.fans + 10, club.seats() + 30))
 	print("CROWD fans spawned: %d (seats %d)" % [grounds.fans.size(), club.seats()])
 
 

@@ -76,6 +76,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - WASD to move, mouse to aim passes/shots.
 - **Player ratings affect the matches you play yourself.**
 - Long term: real rules, with referees and linesmen.
+- **Weather is a real system you feel in matches.** Example: in a rain match the ball rolls more sluggishly, so it becomes more of a battle for possession. Wind also exists (better balls are less affected by weather and wind).
 
 ### Play or autoplay
 
@@ -87,7 +88,8 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 - Players have **stats, names, positions and personalities**.
 - Personality affects: atmosphere, attracting fans, stats, expectations about playing time, team chemistry ("that kind of thing").
-- **Recruitment early on:** randoms from the street, the pub, the supermarket — anywhere you can get them from.
+- **Recruitment early on:** a **"Who can play for you" list** of random people: someone from the pub, from the street, a family member, the neighbour across the road, all kinds of random stuff.
+- **Around the first League tier** you gradually move over to professional players on small contracts.
 - **Recruitment later:** transfers from other clubs in the divisions, with money and contracts.
 
 ## 9. Your club
@@ -113,6 +115,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 ### Building takes time
 - Construction takes time, so you may choose to build during the **off-season**.
+- During construction you **lose capacity**, and you see the build progress in phases: **25% → 50% → 75% → 100%**.
 - The off-season is an auto-skip of x weeks.
 
 ### Location
@@ -209,6 +212,7 @@ What's in it now (v4):
 | 2026-11-07 | Fan approval as a core resource, separate from fan count (§10c) |
 | 2026-11-07 | Pace: fast through non-league, 2–3 seasons per division higher up (§10d) |
 | 2026-11-07 | Stadium: tiny upgrades first, grows in place in a residential area, build time, low promotion requirements (§10a) |
+| 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
 ## 13. Open questions
@@ -228,16 +232,18 @@ What's in it now (v4):
 - In which tiers there are 2 cups instead of 1.
 
 **Matches**
-- Weather and wind: the upgrades imply they affect matches (ball behaviour, pitch condition). Scope to confirm.
 - Which player stats you feel when playing yourself (speed, shooting, passing, keeping, stamina, …).
 - Camera height / zoom on the full-size pitch.
 - Fouls, free kicks for fouls, penalties, cards.
 
+**Players**
+- Which stats exist (open for now).
+- How personalities work in detail (open for now; the effects are listed in §8).
+- Growth, ageing, retirement.
+
 **Not discussed yet** (here so they don't get lost)
 - Economy: safety net (see §10b), exact expense list, performance bonuses.
-- Player ageing/retirement over a long save (starting squad likely retires before the top).
 - Stadium upgrade list: full categories, costs and effects (§10a has the direction).
-- Does construction temporarily reduce capacity?
 - Off-season length (x weeks).
 - How fans are counted and what they do for you.
 - Training, staff roles, youth.

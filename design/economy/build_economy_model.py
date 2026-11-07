@@ -130,9 +130,9 @@ stages = [
  ("Standing terrace (first tier only)", "Non-League 1", 0.5, 2, 6, 25),
  ("The Shed (covered)", "League 10", 1.0, 2, 3, 20),
  ("Main stand, roof on columns", "League 8", 1.5, 4, 10, 20),
- ("Modern tier, cantilever", "League 5", 2.0, 8, 15, 20),
- ("+ Second tier", "League 3", 2.5, 12, 10, 20),
- ("+ Third tier", "Premier Division", 3.0, 16, 10, 20),
+ ("Modern tier, cantilever", "League 5", 2.0, 6, 15, 20),
+ ("+ Second tier", "League 3", 2.5, 8, 10, 20),
+ ("+ Third tier", "Premier Division", 3.0, 12, 10, 20),
 ]
 dv = DataValidation(type="list", formula1="='Reference club'!$A$4:$A$17", allow_blank=False)
 sp.add_data_validation(dv)

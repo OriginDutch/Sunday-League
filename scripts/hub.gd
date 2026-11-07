@@ -18,6 +18,7 @@ var summary_panel: PanelContainer
 var summary_label: Label
 var wipe_armed := false
 var cheats_open := false          # dev cheats (F1 in the hub)
+var away_viewing := ""            # dev cheat: away ground on show in the hub
 var last_seated := 0
 
 
@@ -64,6 +65,9 @@ func build(m: Main) -> void:
 	play_btn.offset_bottom = -20
 	play_btn.add_theme_font_size_override("font_size", 22)
 	play_btn.pressed.connect(func() -> void:
+		if away_viewing != "":
+			away_viewing = ""
+			main.cheat_view_home()
 		if club.league.season_over():
 			main.next_season()
 		else:
@@ -153,7 +157,51 @@ func refresh() -> void:
 				b["finish"] = club.now()
 			club.complete_builds()
 			main.grounds.rebuild_furniture())
-		_small("In a match: F2 ends the match now (current score counts).")
+		_cheat("Squad full (11)", func() -> void:
+			while club.squad.size() < ClubState.SQUAD_SIZE:
+				club.recruit(0))
+		_cheat("Approval 100%", func() -> void: club.approval = 100.0)
+		_cheat("Approval 0%", func() -> void: club.approval = 0.0)
+		_cheat("Construction +1 week", func() -> void:
+			for b in club.builds:
+				b["finish"] = float(b["finish"]) - 1.0
+			club.complete_builds()
+			main.grounds.rebuild_furniture())
+		if not club.league.season_over():
+			var row := HBoxContainer.new()
+			for r in [["Win 3-0", 3, 0], ["Draw 1-1", 1, 1], ["Lose 0-3", 0, 3]]:
+				var b := Button.new()
+				b.text = r[0]
+				b.focus_mode = Control.FOCUS_NONE
+				b.modulate = Color(1.0, 0.8, 0.5)
+				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				var gf: int = r[1]
+				var ga: int = r[2]
+				b.pressed.connect(func() -> void: main.cheat_result(gf, ga))
+				row.add_child(b)
+			list_box.add_child(row)
+		var row2 := HBoxContainer.new()
+		var va := Button.new()
+		va.text = "View next away ground" if away_viewing == "" else "Next: (%s)" % away_viewing
+		va.focus_mode = Control.FOCUS_NONE
+		va.modulate = Color(1.0, 0.8, 0.5)
+		va.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		va.pressed.connect(func() -> void:
+			away_viewing = main.cheat_view_away()
+			refresh())
+		row2.add_child(va)
+		if away_viewing != "":
+			var vh := Button.new()
+			vh.text = "My ground"
+			vh.focus_mode = Control.FOCUS_NONE
+			vh.modulate = Color(1.0, 0.8, 0.5)
+			vh.pressed.connect(func() -> void:
+				away_viewing = ""
+				main.cheat_view_home()
+				refresh())
+			row2.add_child(vh)
+		list_box.add_child(row2)
+		_small("In a match: F2 ends it now, F3 goal for you, F4 goal for them, F5 free camera (pauses).")
 
 	_league_block(lg)
 

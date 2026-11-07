@@ -360,6 +360,40 @@ func back_to_hub() -> void:
 	_enter_hub()
 
 
+## Dev cheat: the next league match ends with this score without playing it.
+func cheat_result(gf: int, ga: int) -> void:
+	var fx: Dictionary = club.league.next_fixture()
+	if fx.is_empty():
+		return
+	var opp: Dictionary = club.league.teams[fx["opponent"]]
+	var summary := club.apply_match(gf, ga, 3, fx["home"])
+	summary["round_results"] = club.league.play_round(gf, ga)
+	summary["position"] = club.league.position_of(0)
+	summary["season_over"] = club.league.season_over()
+	club.save()
+	mode = "summary"
+	hub.show_hub(false)
+	hub.show_summary(summary, opp["name"])
+
+
+var _cheat_away_idx := 0
+
+
+## Dev cheat: show the next club's away ground in the hub (cycles through the league).
+func cheat_view_away() -> String:
+	var teams: Array = club.league.teams
+	_cheat_away_idx = _cheat_away_idx % (teams.size() - 1) + 1
+	var t: Dictionary = teams[_cheat_away_idx]
+	var fans := grounds.use_away(t["name"], float(t["str"]))
+	grounds.spawn_crowd(fans)
+	return t["name"]
+
+
+func cheat_view_home() -> void:
+	grounds.clear_crowd()
+	grounds.use_home()
+
+
 func next_season() -> void:
 	club.league.start_new_season()
 	club.complete_builds()   # the 10-week off-season passes
@@ -505,6 +539,12 @@ func _hub_test() -> void:
 	grounds.spawn_crowd(maxi(club.fans + 10, club.seats() + 30))
 	_league_test()
 	_build_test()
+	if "--cheats" in OS.get_cmdline_user_args():
+		print("CHEAT away: ", cheat_view_away(), " / ", cheat_view_away(), " spots ", grounds.active_slots.size())
+		cheat_view_home()
+		var r0 := club.league.round_idx
+		cheat_result(3, 0)
+		print("CHEAT result: round %d -> %d, pos %d, mode %s" % [r0, club.league.round_idx, club.league.position_of(0), mode])
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--sim-rounds="):
 			# dev: play N league rounds with random scores (to see the table / season end in the hub)
@@ -523,7 +563,7 @@ func _hub_test() -> void:
 
 func _physics_process(delta: float) -> void:
 	if mode != "match":
-		if mode == "hub":
+		if mode == "hub" or mode == "freecam":
 			_hub_process(delta)
 		_debug_screenshot(delta)
 		return
@@ -910,7 +950,11 @@ func _restart() -> void:
 # ================================================================== human input
 
 func _unhandled_input(event: InputEvent) -> void:
-	if mode == "hub":
+	if mode == "freecam" and event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_F5:
+		mode = "match"   # dev cheat: back to the match
+		msg_label.text = ""
+		return
+	if mode == "hub" or mode == "freecam":
 		if event is InputEventMouseMotion and _hub_drag:
 			var mm := event as InputEventMouseMotion
 			hub_yaw -= mm.relative.x * HUB_DRAG_SENS
@@ -965,6 +1009,17 @@ func _unhandled_input(event: InputEvent) -> void:
 				# dev cheat: end the match now with the current score
 				if state != "fulltime":
 					_full_time()
+			KEY_F3, KEY_F4:
+				# dev cheat: goal for you (F3) or for them (F4)
+				if state == "play" or state == "restart" or state == "kickoff":
+					var t := 0 if k.keycode == KEY_F3 else 1
+					ball.last_touch = (home if t == 0 else away)[home.size() - 2]
+					_goal(t)
+			KEY_F5:
+				# dev cheat: pause and look around with the hub camera; F5 again to play on
+				hub_focus = Util.flat(ball.position)
+				mode = "freecam"
+				msg_label.text = "FREE CAMERA  (F5 to play on)"
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -1966,7 +2021,7 @@ func _build_hud() -> void:
 	layer.add_child(msg_label)
 
 	var hint := Label.new()
-	hint.text = "WASD move (sprint by default) · Shift walk · LMB pass (white ring = receiver, red = offside) · hold RMB shoot (aim at the goal) · Space tackle · Q switch · R restart · Esc quit"
+	hint.text = "WASD move (sprint by default) · Shift walk · LMB pass (white ring = receiver, red = offside) · hold RMB shoot (aim at the goal) · Space tackle · Q switch · R restart · Esc quit · dev: F2 end, F3/F4 goal us/them, F5 free cam"
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	hint.offset_left = 14
 	hint.offset_top = -34

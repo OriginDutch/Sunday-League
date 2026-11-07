@@ -375,7 +375,7 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
         - examples: 33y 86 (peak 88) regular, 1 y contract → 0%; 34y 82 (peak 85) regular, expiring, long injury → 35%; 35y 76 (peak 88) bench, expiring → ~66%; 37y 70 (peak 90) bench, expiring → 95%
         - **Timing (decided):** the player **announces it somewhere halfway through the season** ("this is my last season"), giving you time to find a replacement. He **can stop during a contract by mutual agreement**.
         - **Decided (Marcel, 2026-11-07):** he always **announces it as soon as it's decided**, then **plays the season out, unless he gets injured** (then he stops right away).
-        - **Decided:** you **can refuse** his request to stop, but then **he plays worse (morale)**. How morale works (small one-off penalty vs a full morale system) is still open.
+        - **Decided:** you **can refuse** his request to stop, but then **he plays worse (morale)**. **Light version (decided, Marcel 2026-11-07):** refusing gives him one flag, **"unhappy"**: form ×0.8 (tunable) until his contract ends, and his retirement chance stays high. No morale meters or talks. A full morale system can come later if morale shows up elsewhere (e.g. complaints about playing time).
       - **Injuries (decided, Marcel 2026-11-07): no direct rating/potential hit.** Injured time counts as **not playing**: growth stalls for young players (already a big punishment), veterans decline faster (as if benched).
     - **Decided:** **playing well = faster growth**, with a bit of **RNG**.
     - A player **stops growing around his peak**, which differs per player (one at 27, another at 32).
@@ -545,6 +545,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
 | 2026-11-07 | Player value depends on age too: old stars cheap but short-lived (§10b) |
+| 2026-11-07 | Refusing a retirement = light 'unhappy' flag (form ×0.8 till contract end), no full morale system yet (§10b) |
 | 2026-11-07 | Retirement chance accepted to try: age base + drop from highest rating ever + playing time/contract/injury; announced mid-season, can stop during contract by mutual agreement (§10b) |
 | 2026-11-07 | Growth & decline formulas accepted for now (% based, cap/floor, form + RNG); injuries only via lost playing time (§10b) |
 | 2026-11-07 | FIFA-style potentials: visible with light obfuscation, can change, growth from playing time/ratings/training complex/injuries, per-player peak 27–32, retirement chance rises with age (§10b) |

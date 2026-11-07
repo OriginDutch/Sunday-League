@@ -1,0 +1,258 @@
+{
+  "meta": {
+    "name": "Sunday League UI",
+    "version": "2.0",
+    "style": "clubhouse_noticeboard",
+    "design_resolution": [
+      1920,
+      1080
+    ],
+    "min_resolution": [
+      1280,
+      720
+    ],
+    "units": "px at 1920x1080",
+    "spec": "https://claude.ai/artifact/JbPtKYncdTQhGp42vJkJR3"
+  },
+  "mode": {
+    "light": {
+      "ink": "#24313A",
+      "muted": "#5E6A72",
+      "paper": "#F3EFE6",
+      "card": "#FBF8F1",
+      "tag": "#FFFFFF",
+      "tag_border": "#D9D3C3",
+      "button_border": "#C9C2B0",
+      "card_lines": {
+        "hex": "club.pen",
+        "opacity": 0.1
+      },
+      "success": "#1F7A3E",
+      "danger": "#B8322A",
+      "shadow": {
+        "offset": [
+          0,
+          8
+        ],
+        "size": 16,
+        "color": "#000000",
+        "opacity": 0.28
+      }
+    },
+    "dark": {
+      "ink": "#F1ECDF",
+      "muted": "#B4B8B4",
+      "paper": "#25292D",
+      "card": "#2C3135",
+      "tag": "#33383D",
+      "tag_border": "#4A5056",
+      "button_border": "#5A6168",
+      "card_lines": {
+        "hex": "#FFFFFF",
+        "opacity": 0.06
+      },
+      "success": "#7FD39A",
+      "danger": "#FF8A7A",
+      "shadow": {
+        "offset": [
+          0,
+          8
+        ],
+        "size": 18,
+        "color": "#000000",
+        "opacity": 0.45
+      }
+    }
+  },
+  "fixed": {
+    "note": "#FFE58A",
+    "note_ink": "#24313A",
+    "note_muted": "#4A4A3A",
+    "note_bar_track": "#FFF6C9",
+    "tape_neutral": {
+      "hex": "#F0E8C8",
+      "opacity": 0.82
+    }
+  },
+  "club_examples": {
+    "red_white": {
+      "primary": "#D0202E",
+      "secondary": "#FFFFFF",
+      "pen_light": "#C21B2A",
+      "pen_dark": "#FF7A83",
+      "button_text": "#FFFFFF",
+      "button_shadow": "#8E1520",
+      "highlight": "#D0202E",
+      "highlight_text": "#FFFFFF",
+      "tape": {
+        "hex": "#D0202E",
+        "opacity": 0.78
+      }
+    },
+    "blue_yellow": {
+      "primary": "#1F4AA8",
+      "secondary": "#F5C518",
+      "pen_light": "#1F4AA8",
+      "pen_dark": "#8FAEF2",
+      "button_text": "#FFFFFF",
+      "button_shadow": "#132F6E",
+      "highlight": "#F5C518",
+      "highlight_text": "#1B2440",
+      "tape": {
+        "hex": "#F5C518",
+        "opacity": 0.88
+      }
+    }
+  },
+  "club_rules": {
+    "primary": "pins, Play button, progress hatch, own crest",
+    "highlight": "tape, selected nav tab, card stripe; = secondary if contrast >= 1.5 vs #F3EFE6, else primary",
+    "highlight_text/button_text": "white or ink, whichever contrasts more",
+    "pen": "text accents; primary darkened to >= 4.5:1 on card (light) or lightened to >= 4.5:1 on #2C3135 (dark)"
+  },
+  "font": {
+    "ui": {
+      "family": "Work Sans",
+      "weights": [
+        500,
+        600,
+        700
+      ]
+    },
+    "hand": {
+      "family": "Kalam",
+      "weights": [
+        400,
+        700
+      ],
+      "use": "headings, club name, notes, ticker, flavour only"
+    }
+  },
+  "type": {
+    "hand_heading": [
+      38,
+      40,
+      700
+    ],
+    "hand_club": [
+      30,
+      32,
+      700
+    ],
+    "hand_ticker": [
+      20,
+      24,
+      700
+    ],
+    "hand_note": [
+      19,
+      24,
+      400
+    ],
+    "hand_tagline": [
+      16,
+      18,
+      400
+    ],
+    "lead": [
+      20,
+      26,
+      600
+    ],
+    "stat_value": [
+      20,
+      22,
+      700
+    ],
+    "button_lg": [
+      20,
+      24,
+      700
+    ],
+    "team": [
+      18,
+      22,
+      700
+    ],
+    "nav": [
+      17,
+      20,
+      600
+    ],
+    "button": [
+      16,
+      20,
+      600
+    ],
+    "body": [
+      16,
+      22,
+      500
+    ],
+    "label_caps": [
+      14,
+      18,
+      700
+    ],
+    "caption": [
+      14,
+      16,
+      500
+    ]
+  },
+  "type_format": "[size, lineHeight, weight]",
+  "radius": {
+    "paper": 3,
+    "note": 2,
+    "tag": 3,
+    "icon_button": 6,
+    "link_button": 6,
+    "primary_button": 8,
+    "nav_item": 4,
+    "bar": 7,
+    "pin": 10
+  },
+  "rotation_deg": {
+    "goal_note": -1.4,
+    "match_card": 0.9,
+    "stat_tags": [
+      -1,
+      0.8,
+      -0.4,
+      1,
+      -0.8,
+      0.5
+    ]
+  },
+  "tape": {
+    "size": [
+      96,
+      28
+    ]
+  },
+  "pin": {
+    "size": 20,
+    "top": -9
+  },
+  "card_stripe": 6,
+  "size": {
+    "click_min": 44,
+    "button_lg_h": 56,
+    "button_h": 44,
+    "nav_item_h": 52,
+    "strip_h": 72,
+    "top_bar_h": 84,
+    "stat_tag_h": 52,
+    "icon": 24,
+    "icon_sm": 20,
+    "crest_bar": 44,
+    "crest_match": 64
+  },
+  "nav": [
+    "Club",
+    "Stadium",
+    "Recruitment",
+    "Squad",
+    "Finances"
+  ]
+}

@@ -350,6 +350,8 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - **Avg squad rating per division (Claude's estimate):** NL3 15 → NL1 28 → L10 33 … L5 53 → L4 57 → L3 62 → L2 65 → L1 70 → Premier 80.
   - **Transfer share of surplus (proposal):** 0% at the bottom → 50% League 4 → 80–85% League 1/Premier. Signing = avg + 2 rating.
   - **Result:** pace after transfers ~0.3–1.1 sections per season up to League 4, ~2–6 from League 3 up (was 5–40). Premier: ~2.5 signings of ~82 per season, ~6 sections.
+  - Real reference (Transfermarkt, July 2026): young 90+ players are worth €200–220m (Haaland, Yamal, Mbappé); older 90s (Salah, Van Dijk, 30+) far less; Messi ~$17m. Market value ≠ actual fee.
+  - **Decided (Marcel, 2026-11-07): age counts in player value** — you can pick up an old star fairly cheaply, but you get less time out of him. Shape and strength of the age factor still open.
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
@@ -513,6 +515,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Surplus = free choice between stadium and squad (both needed); player ratings 1–99, 99 near-impossible |
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
+| 2026-11-07 | Player value depends on age too: old stars cheap but short-lived (§10b) |
 | 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch (first tier only, no all-seater rule, standing = atmosphere vs seats = revenue); stage jump = 1 week demolition then build |
 | 2026-11-07 | Stands: stages + upgrades within stages; one stadium shape + per-corner on/off; shape changeable later; career ≥14 seasons, likely 20–25+ |
 | 2026-11-07 | Big stand POC: full side, cantilever, skyboxes, floodlight bar + masts, 20/15 rows, ~30% fans in club colours, club name in seats, simple facade (§10i) |

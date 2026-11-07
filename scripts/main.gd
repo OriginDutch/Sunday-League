@@ -173,6 +173,16 @@ func _ready() -> void:
 		_pass_test()
 	if "--hub-test" in args:
 		_hub_test()
+	for arg in args:
+		if arg.begins_with("--hub-view="):
+			# dev: --hub-view=x,z,zoom  (and hide the hub UI for clean screenshots)
+			var v := arg.substr(11).split(",")
+			hub_focus = Vector3(float(v[0]), 0, float(v[1]))
+			hub_zoom = float(v[2])
+			if v.size() > 3:
+				hub_yaw = deg_to_rad(float(v[3]))
+			hub.root.visible = false
+			_hub_camera()
 	if "--quick-friendly" in args:
 		# dev: play a 2x3s friendly with nobody at the controls, then show the summary
 		start_friendly()
@@ -278,8 +288,11 @@ var hub_focus := Vector3(8.0, 0, -HALF_W - 2.0)
 var hub_zoom := 1.0
 
 
+var hub_yaw := 0.0   # orbit angle around the focus point
+
+
 func _hub_camera() -> void:
-	camera.position = hub_focus + Vector3(0, 26.0, 26.0) * hub_zoom
+	camera.position = hub_focus + (Vector3(0, 26.0, 26.0) * hub_zoom).rotated(Vector3.UP, hub_yaw)
 	camera.look_at(hub_focus, Vector3.UP)
 
 

@@ -138,6 +138,18 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Some tiers require certain stadium upgrades before you can be promoted, so you have something to work towards.
 - **Requirements are kept low**: a pretty crappy ground should still be able to play at the highest level.
 
+## 10e. Menus & UI (2026-11-07, in design)
+
+- **Style:** fairly modern, **10–15% goofy**, UX/UI friendly, a clear and logical structure.
+- **Language:** everything English for now, **built with other languages in mind** (no hard-coded strings in the long run).
+- **Building:** you see directly what you're doing. Hovering e.g. a stand over 20 benches shows how it would look, what it costs and what it adds, before you confirm. Same for buildings like a chip shop.
+- **Camera:** can rotate (also while building) so you can see every side of the ground.
+- **Sections:** the ground is divided into **9 × 5 × 9 × 5 sections** around the pitch (corners stay open for now). Stands are built **section by section**. Where there's no stand you can still put a standing rail or chairs/benches. **Building zones on top of that** for buildings.
+- **Demolishing / replacing:** you get money back **pro rata**. Upgrades **depreciate from 75% to 10% over ~3 seasons**.
+- **Build time:** depends on the size of the upgrade (TBD). **Instant for now**; build phases come in a later round.
+- **Settings (for now):** volume (separate for music / effects / crowd), match length, camera speed.
+- **Navigation:** three mockups made (bottom dock, left sidebar, top tabs) — choice open.
+
 ## 10b. Economy
 
 ### Income
@@ -315,6 +327,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
 | 2026-11-07 | v0.1 scope and done-criterion (§11b); random friendlies, ticket sales only, fans pay only for a seat |
 | 2026-11-07 | v0.1 build: chair + bench, pick a slot, growth from winning + facilities, fixed ticket price, recruit to 11 (free, can't play short), approval from results/entertainment/seating, autosave after match |
+| 2026-11-07 | Menus/UI: style, English with i18n in mind, live build preview, rotatable camera, 9×5×9×5 sections, pro-rata demolish refund (75%→10% over ~3 seasons), instant build for now, settings list |
 | 2026-11-07 | Playtest round 3: layered defensive block, step-out, attacking runs (in behind / come short / hold) |
 | 2026-11-07 | Playtest round 2: Q nearest+cycle, 4 auto-switch rules, receiver comes to the ball, active defending, real dead balls, stackable chairs, save after purchases, sound, minimap + edge arrows, chants |
 | 2026-11-07 | Playtest fixes: auto-switch only on your passes, Q = nearest to mouse, passes into the run, camera further out + wheel zoom |

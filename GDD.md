@@ -3,7 +3,7 @@
 > Living document. Only contains what Marcel has decided. Anything not decided is listed under **Open questions**.
 > Rule for this project: Claude decides nothing unless Marcel explicitly says Claude may decide.
 
-Last updated: 2026-11-07
+Last updated: 2026-11-07 (design session 1: economy)
 
 ---
 
@@ -101,6 +101,54 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Long-term stadium includes **trainers, staff, referees, linesmen** and above all **fans**.
 - The number of fans grows with your club status, eventually perhaps **thousands, with simple animations**.
 
+## 10b. Economy
+
+### Income
+Every income source exists in every tier, but in the lowest tiers the amounts are genuinely tiny (think €1.70 TV money for a whole season: one beer).
+
+| Source | Notes |
+|---|---|
+| Ticket sales | |
+| Concessions (food/drinks) | Choose a brand. More popular brands sell better but need a bigger base investment |
+| Merchandise | Choose a brand. More popular brands sell better but need a bigger base investment |
+| Sponsors | Some are received better by fans. Longer contracts and contract renewals automatically raise approval |
+| Advertising boards | |
+| Prize money | |
+| TV money | |
+| Investors | Cost you a hit to fan approval |
+| Transfers | Selling and loaning out players |
+
+- Brand, sponsor and similar choices are **contracts per season (or several seasons)**, not something you manage per match.
+
+### Expenses
+- Salaries, stadium building, maintenance, transfers, staff, travel, fines.
+- Player performance bonuses.
+- Exact list partly open.
+
+### Playing vs autoplay
+- One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
+
+### Amateur players (non-league)
+- In non-league you have no money, so players sometimes get nothing at all: **amateur contract, free to leave**.
+- If you think a player is worth it, you can pay a **small fee per match** so he's more likely to stay.
+
+### Running out of money
+- You **can't go bankrupt** and lose nothing for now.
+- Without money, **players play worse and maintenance gets worse**.
+- **Safety net against a death spiral: TBD.** Ideas from Marcel: community intervention, a rich butcher, the municipality, random events that save you.
+
+## 10c. Fan approval
+
+- Fan approval is a core resource, **separate from the number of fans**.
+- **Higher approval → more fans and faster growth. Lower approval → slower growth, down to slightly negative.**
+- Affected by (so far): investors (negative), sponsors (well-received ones, long contracts and renewals raise it), brand choices.
+
+## 10d. Progression pace
+
+- **Faster at the bottom, slower at the top.**
+- Non-league can be an almost free promotion each season, as long as you don't mess up.
+- Higher up, the guideline is **2–3 seasons per division**. If you know what you're doing, you can go up every season.
+
 ## 11. Proof of concept — status
 
 Built in Godot 4.7.2 / GDScript, all visuals from primitives in code (no assets).
@@ -134,6 +182,10 @@ What's in it now (v4):
 | 2026-11-07 | 20 teams / 38 matches in every tier |
 | 2026-11-07 | Own club: name, logo, colours, shirt & pattern, sponsors |
 | 2026-11-07 | Game title: **Sunday League**; project folder `Desktop\Projects\Sunday League` |
+| 2026-11-07 | Economy: income/expense sources, contracts per season, no bankruptcy (see §10b) |
+| 2026-11-07 | Play 100% / autoplay 75% as the single baseline |
+| 2026-11-07 | Fan approval as a core resource, separate from fan count (§10c) |
+| 2026-11-07 | Pace: fast through non-league, 2–3 seasons per division higher up (§10d) |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
 ## 13. Open questions
@@ -158,7 +210,8 @@ What's in it now (v4):
 - Fouls, free kicks for fouls, penalties, cards.
 
 **Not discussed yet** (here so they don't get lost)
-- Economy: income/costs, how sponsors and advertising work.
+- Economy: safety net (see §10b), exact expense list, performance bonuses.
+- Player ageing/retirement over a long save (starting squad likely retires before the top).
 - Stadium upgrade list: categories and contents.
 - How fans are counted and what they do for you.
 - Training, staff roles, youth.

@@ -288,6 +288,8 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   4. Career length: **at least 14 seasons, probably 20–25+**.
   - Addition on shapes (Marcel): define a set of **common shapes/setups (presets)** the player chooses from.
 - Next topic (Marcel's pick): **rows and jumps per stage**.
+- Claude's rows proposal per section (20 seats/row): bleachers 3→5→7, Shed 3→5→8, main stand 10→12→15, modern tier 15→20→25, 2nd tier +10→15→20, 3rd tier +10→15 (~1,200/section max, ~36k + corners). Open questions to Marcel: standing branch, all-seater rule, demolition on a stage jump, size of the jumps.
+- Real-world reference (Marcel asked, web research 2026-11-07): small non-league stands ~4 rows; League Two / National League stands ~12–19 rows; Emirates lower tier up to ~row 29, upper tier up to ~row 40; ~25 seats per row between stairs is common. Real ground rules: League Two entry needs >5,000 capacity and >1,000 seats. → Claude's upper tiers are on the low side.
 
 **Seen and fixed during the build:** fans too wide (letters unreadable) → slimmer; open gap between back wall and roof → clad up to the roof, glazed end screens; two stacked rows of colourful boards → front wall now concrete + club band; facade sign was mirrored and hidden behind the centre core/columns → mirrored, moved up, narrower.
 

@@ -30,8 +30,10 @@ BOUND = [-HW + i * SEC_W for i in range(SECTIONS + 1)]
 # lower tier (Marcel: 20 rows)
 L_ROWS, L_TREAD, L_RISE = 20, 0.80, 0.36
 L_Y0, L_Z0 = 1.6, 1.2                     # front walkway depth / height
-def lz(k): return L_Z0 + (k + 1) * L_RISE
-def ly(k): return L_Y0 + k * L_TREAD
+# cross-aisle (Marcel: tunnels on the stairs, a cross-aisle, the stair splits around the tunnel and merges again)
+CROSS_ROW, CROSS_G, CROSS_JUMP = 10, 1.6, 0.54   # flat walkway behind row 9; rows behind it start 0.54 m higher
+def lz(k): return L_Z0 + (k + 1) * L_RISE + (CROSS_JUMP if k >= CROSS_ROW else 0.0)
+def ly(k): return L_Y0 + k * L_TREAD + (CROSS_G if k >= CROSS_ROW else 0.0)
 L_BACK = ly(L_ROWS)                        # 17.6
 L_TOP = lz(L_ROWS - 1)                     # 8.4
 
@@ -57,8 +59,12 @@ COL_Y = FACADE_Y + 0.9
 TOP_BACK_Z, TOP_TIP_Z = U_TOP + 9.5, U_TOP + 5.0
 BOT_BACK_Z, BOT_TIP_Z = U_TOP + 2.6, U_TOP + 4.3
 
-# vomitories (lower tier only; upper tier is reached from the rear walkway)
-VOM_SECTIONS, VOM_ROWS, VOM_W = (1, 4, 7), range(4, 10), 3.0
+# vomitories (lower tier only; upper tier is reached from the rear walkway): on 4 stairs, opening onto the cross-aisle
+VOM_AISLES, VOM_ROWS, VOM_W = (2, 4, 5, 7), range(10, 14), 3.0
+VOM_WALL, SIDE_AISLE = 0.2, 0.9
+VOM_CLEAR = VOM_W / 2 + VOM_WALL + SIDE_AISLE    # 2.6 m each side of the stair centre
+LANDING_ROW = VOM_ROWS[-1] + 1                    # above the tunnel the two side stairs merge
+MAST_DIST = math.hypot(52.5 + 8.0, 34.0 + 8.0)    # corner mast (8 m diagonally out from the corner flag) to centre spot
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -122,20 +128,24 @@ mat("shirt_s", "Fan_Shirt_Secondary", SECONDARY, 0.8)
 RANDOM_SHIRTS = ["#2B2F3A", "#6B6F75", "#1E1E1E", "#A8322D", "#3E6B48", "#8A7F5C"]
 for i, h in enumerate(RANDOM_SHIRTS):
     mat(f"shirt_r{i}", f"Fan_Shirt_{i}", h, 0.8)
-mat("trousers", "Fan_Trousers", "#2E3440", 0.8)
+TROUSERS = ["#3B5B85", "#2E3440", "#1E1E1E", "#6E7378", "#B9A27A", "#6F8DB5"]   # jeans, dark, black, grey, beige, light jeans
+for i, h in enumerate(TROUSERS):
+    mat(f"trousers{i}", f"Fan_Trousers_{i}", h, 0.8)
 SKINS = ["#F1C9A5", "#C99A6E", "#7A5134"]
 for i, h in enumerate(SKINS):
     mat(f"skin{i}", f"Fan_Skin_{i}", h, 0.7)
 
 # ------------------------------------------------------------------ mesh accumulator (fast: one bmesh per group+material)
 PARTS = {}
+CUR = ["structure"]
 def _bm(group, mk):
+    group = group or CUR[0]
     if (group, mk) not in PARTS:
         PARTS[(group, mk)] = bmesh.new()
     return PARTS[(group, mk)]
 
 _FACES = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
-def box(mk, size, center, rot=None, group="structure"):
+def box(mk, size, center, rot=None, group=None):
     bm = _bm(group, mk)
     hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
     c = Vector(center)
@@ -146,16 +156,16 @@ def box(mk, size, center, rot=None, group="structure"):
     for f in _FACES:
         bm.faces.new([vs[i] for i in f])
 
-def span_box(mk, x0, x1, y0, y1, z0, z1, group="structure"):
+def span_box(mk, x0, x1, y0, y1, z0, z1, group=None):
     box(mk, (x1 - x0, y1 - y0, z1 - z0), ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), group=group)
 
-def beam(mk, a, b, w, h=None, group="structure"):
+def beam(mk, a, b, w, h=None, group=None):
     a, b = Vector(a), Vector(b)
     d = b - a
     rot = d.to_track_quat('X', 'Z').to_matrix()
     box(mk, (d.length, w, h if h else w), (a + b) / 2, rot, group)
 
-def prism_x(mk, pts_yz, x0, x1, group="structure"):
+def prism_x(mk, pts_yz, x0, x1, group=None):
     """Convex Y/Z polygon extruded along X."""
     bm = _bm(group, mk)
     v0 = [bm.verts.new((x0, y, z)) for y, z in pts_yz]
@@ -184,10 +194,25 @@ def block_span(i):
     x1 = BOUND[i + 1] - (AISLE_W / 2 if i < SECTIONS - 1 else 0.3)
     return x0, x1
 
-def vom_span(i):
-    x0, x1 = block_span(i)
-    c = (x0 + x1) / 2
-    return c - VOM_W / 2, c + VOM_W / 2
+VOM_X = [BOUND[a] for a in VOM_AISLES]
+
+def subtract(segs, cuts):
+    out = list(segs)
+    for c0, c1 in cuts:
+        nxt = []
+        for a, b in out:
+            if c1 <= a or c0 >= b:
+                nxt.append((a, b))
+                continue
+            if a < c0:
+                nxt.append((a, c0))
+            if c1 < b:
+                nxt.append((c1, b))
+        out = nxt
+    return [(a, b) for a, b in out if b - a > 0.01]
+
+def vom_cuts(k):
+    return [(x - VOM_CLEAR, x + VOM_CLEAR) for x in VOM_X] if (k in VOM_ROWS or k == LANDING_ROW) else []
 
 def seat_xs(i):
     x0, x1 = block_span(i)
@@ -204,50 +229,77 @@ for x in [-HW + 0.3 + k * (W - 0.6) / 40 for k in range(41)]:
     beam("rail", (x, -0.1, L_Z0 + 1.08), (x, -0.1, L_Z0 + 1.5), 0.04)
 beam("rail", (-HW + 0.3, -0.1, L_Z0 + 1.5), (HW - 0.3, -0.1, L_Z0 + 1.5), 0.05)
 
-# --- lower tier rows (split around vomitories)
-for i in range(SECTIONS):
-    bx0, bx1 = block_span(i)
-    v0, v1 = vom_span(i)
-    for k in range(L_ROWS):
-        y0, z = ly(k), lz(k)
-        segs = [(bx0, bx1)]
-        if i in VOM_SECTIONS and k in VOM_ROWS:
-            segs = [(bx0, v0), (v1, bx1)]
-        for a, b in segs:
-            span_box("concrete", a, b, y0, y0 + L_TREAD, 0.0, z)
-            span_box("step_edge", a, b, y0, y0 + 0.05, z, z + 0.01)
-    if i in VOM_SECTIONS:
-        f0, f1 = ly(VOM_ROWS[0]), ly(VOM_ROWS[-1] + 1)
-        floor = lz(VOM_ROWS[0] - 1)
-        span_box("concrete_dark", v0, v1, f0, f1, 0.0, floor)                       # tunnel floor
-        span_box("door", v0, v1, f1 - 0.05, f1, floor, lz(VOM_ROWS[-1] + 1))      # dark tunnel mouth
-        for s in (v0 - 0.2, v1):
-            # side walls follow the steps, with a rail on top
-            for k in VOM_ROWS:
-                span_box("concrete_dark", s, s + 0.2, ly(k), ly(k) + L_TREAD, 0.0, lz(k) + 0.9)
-            beam("rail", (s + 0.1, f0, lz(VOM_ROWS[0]) + 1.0), (s + 0.1, f1, lz(VOM_ROWS[-1]) + 1.0), 0.05)
-        beam("rail", (v0, f1 + 0.1, lz(VOM_ROWS[-1] + 1) + 1.0), (v1, f1 + 0.1, lz(VOM_ROWS[-1] + 1) + 1.0), 0.05)
-
-# --- aisles (two half-steps per row) with handrails
-def aisle_steps(xc, rows, yf, zf, tread, z_base_front, rail_h=0.95):
-    a, b = xc - AISLE_W / 2, xc + AISLE_W / 2
-    for k in range(rows):
+# --- stairs: steps of max ~0.3 m with yellow nosings, and handrails
+def stair(xc, width, k0, k1, yf, zf, tread, z_first_low, z_floor):
+    a, b = xc - width / 2, xc + width / 2
+    for k in range(k0, k1 + 1):
         y0, ztop = yf(k), zf(k)
-        zlow = zf(k - 1) if k > 0 else z_base_front
-        zmid = (zlow + ztop) / 2
-        span_box("concrete_dark", a, b, y0, y0 + tread / 2, 0.0 if z_base_front < 2 else z_base_front - 0.6, zmid)
-        span_box("concrete_dark", a, b, y0 + tread / 2, y0 + tread, 0.0 if z_base_front < 2 else z_base_front - 0.6, ztop)
-        span_box("step_edge", a, b, y0, y0 + 0.05, zmid, zmid + 0.01)
-        span_box("step_edge", a, b, y0 + tread / 2, y0 + tread / 2 + 0.05, ztop, ztop + 0.01)
-    p0 = Vector((xc, yf(0) + 0.1, zf(0) + rail_h - 0.2))
-    p1 = Vector((xc, yf(rows - 1) + tread - 0.1, zf(rows - 1) + rail_h))
+        zlow = zf(k - 1) if k > 0 else z_first_low
+        n = max(2, math.ceil((ztop - zlow) / 0.3 - 1e-6))
+        for j in range(n):
+            zs = zlow + (j + 1) * (ztop - zlow) / n
+            ys = y0 + j * tread / n
+            span_box("concrete_dark", a, b, ys, ys + tread / n, z_floor, zs)
+            span_box("step_edge", a, b, ys, ys + 0.05, zs, zs + 0.01)
+
+def stair_rail(xc, k0, k1, yf, zf, tread, rail_h=0.95):
+    p0 = Vector((xc, yf(k0) + 0.1, zf(k0) + rail_h - 0.2))
+    p1 = Vector((xc, yf(k1) + tread - 0.1, zf(k1) + rail_h))
     beam("rail", p0, p1, 0.05)
     for t in (0.0, 0.33, 0.66, 1.0):
         p = p0.lerp(p1, t)
         beam("rail", (xc, p.y, p.z - rail_h + 0.1), (xc, p.y, p.z), 0.045)
 
+# --- lower tier rows (cut out around the tunnels and their side stairs)
+for i in range(SECTIONS):
+    bx0, bx1 = block_span(i)
+    for k in range(L_ROWS):
+        y0, z = ly(k), lz(k)
+        for a, b in subtract([(bx0, bx1)], vom_cuts(k)):
+            span_box("concrete", a, b, y0, y0 + L_TREAD, 0.0, z)
+            span_box("step_edge", a, b, y0, y0 + 0.05, z, z + 0.01)
+
+# --- cross-aisle behind row 9, with a rail on the front edge of row 10 (open at every stair)
+GY0, GY1, GZ = ly(CROSS_ROW - 1) + L_TREAD, ly(CROSS_ROW), lz(CROSS_ROW - 1)
+span_box("concrete_dark", -HW, HW, GY0, GY1, 0.0, GZ)
+span_box("step_edge", -HW, HW, GY0, GY0 + 0.05, GZ, GZ + 0.01)
+gaps = [(BOUND[i] - AISLE_W / 2, BOUND[i] + AISLE_W / 2) for i in range(1, SECTIONS) if BOUND[i] not in VOM_X]
+gaps += [(x - VOM_CLEAR, x + VOM_CLEAR) for x in VOM_X]
+yr, zr = ly(CROSS_ROW) + 0.08, lz(CROSS_ROW) + 0.9
+for a, b in subtract([(-HW + 0.2, HW - 0.2)], gaps):
+    beam("rail", (a, yr, zr), (b, yr, zr), 0.05)
+    n = max(1, int((b - a) / 2.5))
+    for j in range(n + 1):
+        x = a + (b - a) * j / n
+        beam("rail", (x, yr, lz(CROSS_ROW)), (x, yr, zr), 0.04)
+
+# --- lower tier stairs; on 4 of them a tunnel opens onto the cross-aisle and the stair splits around it
 for i in range(1, SECTIONS):
-    aisle_steps(BOUND[i], L_ROWS, ly, lz, L_TREAD, L_Z0)
+    xc = BOUND[i]
+    if xc not in VOM_X:
+        stair(xc, AISLE_W, 0, L_ROWS - 1, ly, lz, L_TREAD, L_Z0, 0.0)
+        stair_rail(xc, 0, CROSS_ROW - 1, ly, lz, L_TREAD)
+        stair_rail(xc, CROSS_ROW, L_ROWS - 1, ly, lz, L_TREAD)
+        continue
+    stair(xc, AISLE_W, 0, CROSS_ROW - 1, ly, lz, L_TREAD, L_Z0, 0.0)          # front stair: cross-aisle down to the walkway
+    stair_rail(xc, 0, CROSS_ROW - 1, ly, lz, L_TREAD)
+    for sgn in (-1, 1):                                                         # two side stairs around the tunnel
+        sx = xc + sgn * (VOM_W / 2 + VOM_WALL + SIDE_AISLE / 2)
+        stair(sx, SIDE_AISLE, CROSS_ROW, VOM_ROWS[-1], ly, lz, L_TREAD, L_Z0, 0.0)
+    stair(xc, 2 * VOM_CLEAR, LANDING_ROW, LANDING_ROW, ly, lz, L_TREAD, L_Z0, 0.0)   # landing: they merge again
+    stair(xc, AISLE_W, LANDING_ROW + 1, L_ROWS - 1, ly, lz, L_TREAD, L_Z0, 0.0)
+    stair_rail(xc, LANDING_ROW + 1, L_ROWS - 1, ly, lz, L_TREAD)
+    # the tunnel: floor level with the cross-aisle, dark mouth under the landing, side walls with rails
+    x0, x1 = xc - VOM_W / 2, xc + VOM_W / 2
+    span_box("concrete_dark", x0, x1, ly(CROSS_ROW), ly(LANDING_ROW), 0.0, GZ)
+    span_box("door", x0, x1, ly(LANDING_ROW) - 0.04, ly(LANDING_ROW) - 0.01, GZ, lz(VOM_ROWS[-1]))
+    for sgn in (-1, 1):
+        w0, w1 = sorted((xc + sgn * VOM_W / 2, xc + sgn * (VOM_W / 2 + VOM_WALL)))
+        for k in VOM_ROWS:
+            span_box("concrete", w0, w1, ly(k), ly(k) + L_TREAD, 0.0, lz(k) + 0.9)
+        xr = (w0 + w1) / 2
+        beam("rail", (xr, ly(CROSS_ROW), lz(CROSS_ROW) + 0.95), (xr, ly(LANDING_ROW), lz(VOM_ROWS[-1]) + 0.95), 0.05)
+    beam("rail", (x0, ly(LANDING_ROW) + 0.05, lz(LANDING_ROW) + 0.9), (x1, ly(LANDING_ROW) + 0.05, lz(LANDING_ROW) + 0.9), 0.05)
 
 # --- block behind the lower tier (concourse inside), balcony + skyboxes
 span_box("concrete_dark", -HW, HW, L_BACK, FACADE_Y, 0.0, BAL_Z)
@@ -292,7 +344,8 @@ for i in range(SECTIONS):
         span_box("concrete", bx0, bx1, y0, y0 + U_TREAD, U_SOFFIT, z)
         span_box("step_edge", bx0, bx1, y0, y0 + 0.05, z, z + 0.01)
 for i in range(1, SECTIONS):
-    aisle_steps(BOUND[i], U_ROWS, uy, uz, U_TREAD, U_Z0, rail_h=1.0)
+    stair(BOUND[i], AISLE_W, 0, U_ROWS - 1, uy, uz, U_TREAD, U_Z0, U_SOFFIT)
+    stair_rail(BOUND[i], 0, U_ROWS - 1, uy, uz, U_TREAD, rail_h=1.0)
 # rear walkway + back wall
 span_box("concrete", -HW, HW, U_BACK, FACADE_Y, U_SOFFIT, U_TOP)
 span_box("concrete_dark", -HW, HW, FACADE_Y - 0.4, FACADE_Y, U_TOP, U_TOP + 1.6)
@@ -456,9 +509,11 @@ def mast(x0, y0, h=40.0):
     span_box("concrete_dark", x0 - 2.0, x0 + 2.0, y0 - 2.0, y0 + 2.0, 0.0, 0.5)
     span_box("steel", x0 - 1.3, x0 + 1.3, y0 - 1.3, y0 + 1.3, h - 0.1, h + 0.05)     # platform
     head = Vector((x0, y0, h + 2.4))
-    lamp_panel(head, PITCH_CENTRE, 6, 4)
-for s in (-1, 1):
-    mast(s * (HW + 9.0), -7.0)
+    lamp_panel(head, (x0, y0 - MAST_DIST, 0.0), 6, 4)
+# Marcel: masts in all 4 corners -> one separate model (floodlight_mast.glb), placed 4x by the game
+CUR[0] = "mast"
+mast(0.0, 0.0)
+CUR[0] = "structure"
 
 # ------------------------------------------------------------------ pitch-side: advert boards + dugouts
 for k in range(int(W / 6)):
@@ -477,7 +532,7 @@ for s in (-1, 1):
 
 # ================================================================== SEATS + FANS
 # Godot coordinates: gx = x, gy = z, gz = -y   (glTF Y-up conversion)
-layout = {"text": TEXT, "primary": PRIMARY, "secondary": SECONDARY, "seats": [], "fans": []}
+layout = {"text": TEXT, "primary": PRIMARY, "secondary": SECONDARY, "trousers": TROUSERS, "seats": [], "fans": []}
 
 def text_mask(x, k):
     """1 if this upper-tier seat is part of a letter."""
@@ -509,10 +564,11 @@ def add_fan(x, y, z, busy):
         n = random.randrange(len(RANDOM_SHIRTS))
         kind, shirt, col = 2, f"shirt_r{n}", RANDOM_SHIRTS[n]
     skin = random.choices(range(3), weights=(5, 3, 2))[0]
-    layout["fans"].append([round(x, 3), round(z, 3), round(-y, 3), kind, col, skin])
+    tr = random.choices(range(len(TROUSERS)), weights=(4, 3, 2, 2, 1, 2))[0]
+    layout["fans"].append([round(x, 3), round(z, 3), round(-y, 3), kind, col, skin, tr])
     g = "fans"
-    box("trousers", (0.32, 0.44, 0.15), (x, y - 0.16, z + 0.52), group=g)
-    box("trousers", (0.26, 0.13, 0.45), (x, y - 0.36, z + 0.24), group=g)
+    box(f"trousers{tr}", (0.32, 0.44, 0.15), (x, y - 0.16, z + 0.52), group=g)
+    box(f"trousers{tr}", (0.26, 0.13, 0.45), (x, y - 0.36, z + 0.24), group=g)
     box(shirt, (0.32, 0.22, 0.5), (x, y + 0.06, z + 0.82), group=g)
     for s in (-1, 1):
         box(shirt, (0.08, 0.12, 0.44), (x + s * 0.2, y, z + 0.81), group=g)
@@ -523,11 +579,10 @@ def busy_at(x):
     return BUSY * (1.3 - 0.6 * abs(x) / HW)  # fuller in the middle, avg ≈ 30%
 
 for i in range(SECTIONS):
-    v0, v1 = vom_span(i)
     for k in range(L_ROWS):
         y = ly(k) + L_TREAD * 0.55
         for x in seat_xs(i):
-            if i in VOM_SECTIONS and k in VOM_ROWS and v0 - 0.2 < x < v1 + 0.2:
+            if vom_cuts(k) and any(abs(x - vx) < VOM_CLEAR + 0.22 for vx in VOM_X):
                 continue
             add_seat(x, y, lz(k), 0)
             add_fan(x, y, lz(k), busy_at(x))
@@ -555,13 +610,18 @@ for (group, mk), bm in PARTS.items():
     me = bpy.data.meshes.new(f"{group}_{MATS[mk].name}")
     bm.to_mesh(me); bm.free()
     me.materials.append(MATS[mk])
-    ob = bpy.data.objects.new(f"BigStand_{MATS[mk].name}" if group == "structure" else f"{group}_{MATS[mk].name}", me)
+    prefix = {"structure": "BigStand", "mast": "Mast"}.get(group, group)
+    ob = bpy.data.objects.new(f"{prefix}_{MATS[mk].name}", me)
     scene.collection.objects.link(ob)
     groups.setdefault(group, []).append(ob)
 root = bpy.data.objects.new("BigStand", None)
 scene.collection.objects.link(root)
 for ob in groups["structure"]:
     ob.parent = root
+mast_root = bpy.data.objects.new("FloodlightMast", None)
+scene.collection.objects.link(mast_root)
+for ob in groups["mast"]:
+    ob.parent = mast_root
 
 def faces(obs): return sum(len(o.data.polygons) for o in obs)
 print(f"BIG STAND: structure {faces(groups['structure'])} faces, seats {len(layout['seats'])} "
@@ -576,7 +636,13 @@ for ob in groups["structure"]:
     ob.select_set(True)
 bpy.ops.export_scene.gltf(filepath=os.path.join(REPO, "assets", "models", "big_stand.glb"),
                           export_format='GLB', use_selection=True)
-print("EXPORTED")
+bpy.ops.object.select_all(action='DESELECT')
+mast_root.select_set(True)
+for ob in groups["mast"]:
+    ob.select_set(True)
+bpy.ops.export_scene.gltf(filepath=os.path.join(REPO, "assets", "models", "floodlight_mast.glb"),
+                          export_format='GLB', use_selection=True)
+print("EXPORTED", f"mast {faces(groups['mast'])} faces")
 
 # ------------------------------------------------------------------ preview renders
 if "--render" in sys.argv:
@@ -593,6 +659,19 @@ if "--render" in sys.argv:
         if group == "ground":
             me = bpy.data.meshes.new(mk); bm.to_mesh(me); bm.free(); me.materials.append(MATS[mk])
             scene.collection.objects.link(bpy.data.objects.new(mk, me))
+    centre = Vector((0.0, -40.0))
+    corners = [(sx * 60.5, y) for sx in (-1, 1) for y in (2.0, -82.0)]
+    for n, (mx, my) in enumerate(corners):
+        holder = mast_root if n == 0 else bpy.data.objects.new(f"MastHolder{n}", None)
+        if n > 0:
+            scene.collection.objects.link(holder)
+            for ob in groups["mast"]:
+                cp = ob.copy()
+                scene.collection.objects.link(cp)
+                cp.parent = holder
+        d = centre - Vector((mx, my))
+        holder.location = (mx, my, 0.0)
+        holder.rotation_euler = (0.0, 0.0, math.atan2(d.x, -d.y))
     sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
     sun.data.energy = 3.2; sun.data.angle = math.radians(3)
     sun.rotation_euler = (math.radians(50), math.radians(10), math.radians(-30))
@@ -609,6 +688,7 @@ if "--render" in sys.argv:
         "head_on": ((0.0, -95.0, 22.0), (0.0, 14.0, 12.0), 30),
         "lower_tier": ((14.0, -9.0, 2.5), (-4.0, 14.0, 12.0), 22),
         "outside_back": ((70.0, 95.0, 26.0), (0.0, 25.0, 12.0), 30),
+        "tunnel": ((-5.75, -7.0, 7.5), (-5.75, 12.0, 5.0), 30),
     }
     only = sys.argv[sys.argv.index("--views") + 1].split(",") if "--views" in sys.argv else list(views)
     for name in only:

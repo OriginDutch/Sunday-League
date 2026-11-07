@@ -21,6 +21,7 @@ var _layout: Dictionary
 var _seats: MultiMesh
 var _fans: MultiMesh
 var _structure: Node3D
+var _fan_material: ShaderMaterial
 
 
 func _ready() -> void:
@@ -38,6 +39,14 @@ func _ready() -> void:
 
 	_seats = _make_multimesh(_seat_mesh(), _layout["seats"], Color("4a4f52"), 0.45)
 	_fans = _make_multimesh(_fan_mesh(), _layout["fans"], Color("2e3440"), 0.8)
+	var palette := PackedVector3Array()
+	for h in _layout.get("trousers", []):
+		var l := Color(h).srgb_to_linear()
+		palette.append(Vector3(l.r, l.g, l.b))
+	if palette.size() == 6:
+		var fm := _fan_material
+		fm.set_shader_parameter("trousers_from_palette", true)
+		fm.set_shader_parameter("trousers_palette", palette)
 	_apply_colours()
 
 
@@ -59,7 +68,8 @@ func _apply_colours() -> void:
 	for i in fans.size():
 		var kind := int(fans[i][3])
 		var c: Color = primary if kind == 0 else (secondary if kind == 1 else Color(fans[i][4]))
-		_fans.set_instance_custom_data(i, _lin(c, int(fans[i][5]) * 0.5))
+		var trousers: int = int(fans[i][6]) if fans[i].size() > 6 else 1
+		_fans.set_instance_custom_data(i, _lin(c, (int(fans[i][5]) + 3 * trousers) / 32.0))
 
 
 ## Structure materials named Club_Primary_* / Club_Secondary_* (fascia, trim) follow the club colours.
@@ -100,6 +110,7 @@ func _make_multimesh(mesh: Mesh, items: Array, fixed: Color, rough: float) -> Mu
 	mmi.multimesh = mm
 	mmi.material_override = mat
 	add_child(mmi)
+	_fan_material = mat   # the last one made is the fans' material
 	return mm
 
 

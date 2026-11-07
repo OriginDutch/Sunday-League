@@ -201,6 +201,15 @@ func _ready() -> void:
 		var bs = load("res://scripts/big_stand.gd").new()  # by path: works before the editor rescans class names
 		bs.position = Vector3(0, 0, -(HALF_W + 6.0))
 		add_child(bs)
+		# floodlight masts in all 4 corners, 8 m diagonally out from the corner flags, aimed at the centre spot
+		var mast_scene := load("res://assets/models/floodlight_mast.glb") as PackedScene
+		if mast_scene:
+			for sx in [-1, 1]:
+				for sz in [-1, 1]:
+					var mast: Node3D = mast_scene.instantiate()
+					mast.position = Vector3(sx * (HALF_L + 8.0), 0, sz * (HALF_W + 8.0))
+					mast.rotation.y = atan2(-mast.position.x, -mast.position.z)
+					add_child(mast)
 		for arg in args:
 			if arg.begins_with("--club-colours="):
 				# dev: --club-colours=primaryhex,secondaryhex  (demo of the club colours upgrade)

@@ -18,7 +18,7 @@ thin = Side(style="thin", color="C0C9B9")
 wb = Workbook()
 rm = wb.active; rm.title = "Read me"
 lines = [
- ("Sunday League — economy reference model v2 (2026-11-07)", BOLD),
+ ("Sunday League — economy reference model v3 (2026-11-07): income, stand prices, expenses", BOLD),
  ("One 'reference club' per division (an average club at that level). Stand prices are derived from it and then stay FIXED in the game,", BLACK),
  ("so a player who does better than average can afford things sooner, and prices never punish good play.", BLACK),
  ("", BLACK),
@@ -36,7 +36,7 @@ lines = [
  ("(1) National League → League Two (central money jumps ~25x in reality) and (2) Championship → Premier League (central money ~15x, commercial ~10x).", BLACK),
  ("The bottom stays on v0.1's values (€2 ticket; GDD's '€1.70 TV money for a season: one beer'). Real figures are £, game figures €; Claude treats them roughly 1:1 for feel.", BLACK),
  ("", BLACK),
- ("Tabs: Reference club · Stand prices · Sources", BOLD),
+ ("Tabs: Reference club · Stand prices · Expenses · Sources", BOLD),
 ]
 for i, (t, f) in enumerate(lines, 1):
     rm.cell(i, 1, t).font = f
@@ -188,6 +188,13 @@ S = [
  ("S17", "PL solidarity to non-league: National League £58,333 per club; NL North/South £13,636 per club", "per club", "Kentish Football", "https://kentishfootball.co.uk/news/NationalLeague140420"),
  ("S18", "Commercial revenue: PL ~£2.3bn (2024/25 projection); Championship £273m (2024/25)", "÷20 / ÷24", "Deloitte; FC Business", "https://www.deloitte.com/uk/en/services/consulting-financial/research/annual-review-of-football-finance-premier-league-clubs.html ; https://fcbusiness.co.uk/news/premier-league-revenues-hit-6-8bn-but-faces-widening-financial-divide/"),
  ("S19", "Average total club revenue 2023/24: League One £9.1m, League Two £6.6m (sanity check)", "per club", "Deloitte via Sports Marketing", "https://www.sportsmarketing.com.ng/2025/06/european-football-clubs-report-record.html"),
+ ("S21", "Wages/revenue: Premier League 65% (2024/25, wages £4.4bn); Championship wages £903m vs revenue £942m (2024/25)", "65% / ~96%", "Deloitte Annual Review of Football Finance 2026; Inside World Football", "https://www.deloitte.com/uk/en/services/consulting/research/annual-review-of-football-finance-premier-league-clubs.html ; https://www.insideworldfootball.com/2026/07/08/big-5-european-league-revenue-breaks-e40bn-but-deloitte-warns-growth-will-slow/"),
+ ("S22", "Average weekly pay: National League £1,000–1,500, League Two ~£2,500, League One just under £5,000, Championship ~£12,600; Premier League ~£60,000", "per player per week", "90min; Football Park", "https://www.90min.com/posts/how-much-do-national-league-players-get-paid ; https://footballpark.com/football-blogs/how-much-do-footballers-make"),
+ ("S23", "Non-league pay: Step 3 ~£350–600/week; Step 4 ~£200–350/week; Step 5 £40–80 per game; Step 6 £20–40", "per player", "Bournemouth University (Buzz)", "https://buzz.bournemouth.ac.uk/?p=363074"),
+ ("S24", "Grassroots team running costs ~£2,000–5,000+ per season (fees, pitch hire, insurance)", "per season", "Avec Sport", "https://avecsport.com/blog/what-are-the-costs-of-running-a-football-club"),
+ ("S25", "Step 5/6 players often paid only small match fees or expenses", "-", "Football in Berkshire", "https://footballinberkshire.co.uk/features/opinion/36476/the-insider-on-player-wages-at-non-league-step-5-and-6/"),
+ ("S26", "Referees for adult grassroots games £20–45 per match", "per match", "The Soccer Store", "https://www.thesoccerstore.co.uk/blog/latest-news/how-much-does-it-cost-to-set-up-a-grassroots-football-team/"),
+ ("S27", "Average pre-tax result per club 2024/25: PL −£31.1m, Championship −£15.1m, League One −£5.0m, League Two −£2.6m", "per club", "FootballTransfers (Swiss Ramble)", "https://www.footballtransfers.com/us/transfer-news/uk-premier-league/2026/03/only-four-clubs-in-the-top-four-divisions-in-england-in-profit-for-202425"),
  ("S20", "Non-league sponsorship: 'five figure' shirt deal at NL North level; a 'six-figure' deal called among the biggest in non-league", "order of magnitude", "Pink Un; Erewash Sound", "https://www.pinkun.com/news/22711788.kings-lynn-town-secure-five-figure-sponsorship-deal/ ; https://www.erewashsound.com/node/51640"),
 ]
 for r, s_ in enumerate(S, 2):
@@ -195,6 +202,68 @@ for r, s_ in enumerate(S, 2):
         cell = so.cell(r, c, v); cell.font = BLACK; cell.alignment = Alignment(wrap_text=True, vertical="top")
 for col, w in zip("ABCDE", [6, 70, 26, 38, 90]):
     so.column_dimensions[col].width = w
+
+
+# ---------------------------------------------------------------- Expenses
+ex = wb.create_sheet("Expenses", 2)
+ex["A1"] = "Expenses per division: REAL (grey, English football, with sources) vs GAME (blue, % of the reference club's season income)"; ex["A1"].font = BOLD
+ex["A2"] = "Real clubs mostly LOSE money (wages alone are 65% of revenue in the PL and ~96% in the Championship). A tycoon game needs a surplus to build with, so the game deliberately keeps one: bigger at the bottom (fast start), smaller at the top (GDD §10d)."; ex["A2"].font = GREYI
+heads = ["Division (game)", "Real-world equivalent",
+ "Player pay REAL", "Wages / revenue REAL", "Avg pre-tax result per club REAL (£)",
+ "Wages GAME (% of income)", "Staff GAME (%)", "Ground running & maintenance GAME (%)", "Travel, referees & match costs GAME (%)",
+ "Total costs (%)", "Surplus (%)", "Season income (€)", "Surplus per season (€)",
+ "Stand stage you'd be building here", "Cost per section of that stage (€)", "Sections you can afford per season",
+ "Basis of the REAL numbers (see Sources tab)"]
+for c, h in enumerate(heads, 1):
+    cell = ex.cell(4, c, h); cell.font = HEAD; cell.fill = HFILL
+    cell.alignment = Alignment(wrap_text=True, vertical="center")
+ex.row_dimensions[4].height = 72
+E = [
+ ("Park football, players pay subs; a grassroots team costs ~£2–5k/season to run", "-", "-", 0, 0, 25, 20, "Loose chairs (have)", "Players unpaid [S25]; running costs [S24]"),
+ ("Unpaid (Sunday league)", "-", "-", 10, 0, 20, 18, "Open bleachers", "Est.; refs £20–45 per match [S26]"),
+ ("~£0–20 per game (est.)", "-", "-", 20, 2, 18, 15, "Standing terrace (first tier only)", "Est."),
+ ("~£0–20 per game (est.)", "-", "-", 28, 4, 15, 13, "The Shed (covered)", "Est."),
+ ("£20–40 per game", "-", "-", 35, 5, 14, 11, "The Shed (covered)", "Pay [S23]"),
+ ("£40–80 per game; some only expenses", "-", "-", 40, 6, 13, 10, "Main stand, roof on columns", "Pay [S23]"),
+ ("~£200–350 per week (club level, unclear if per player)", "-", "-", 45, 7, 12, 8, "Main stand, roof on columns", "Pay [S23]"),
+ ("£350–600 per week (some up to £700)", "-", "-", 48, 8, 11, 7, "Main stand, roof on columns", "Pay [S23]"),
+ ("~£500 per week (weak source)", "-", "-", 50, 9, 10, 6, "Modern tier, cantilever", "Pay est. ([S22] mentions it, weak)"),
+ ("£1,000–1,500 per week", "-", "-", 52, 9, 10, 5, "Modern tier, cantilever", "Pay [S22]"),
+ ("~£2,500 per week", "-", -2600000, 54, 10, 9, 4, "+ Second tier", "Pay [S22]; result [S27]"),
+ ("~£5,000 per week", "-", -5000000, 55, 10, 9, 4, "+ Second tier", "Pay [S22]; result [S27]"),
+ ("~£12,600 per week", 0.96, -15100000, 57, 10, 9, 3, "+ Second tier", "Pay [S22]; wages £903m vs revenue £942m [S21]; result [S27]"),
+ ("~£60,000 per week", 0.65, -31100000, 60, 10, 8, 2, "+ Third tier", "Pay [S22]; wages/revenue [S21]; result [S27]"),
+]
+dv2 = DataValidation(type="list", formula1="='Stand prices'!$A$5:$A$13", allow_blank=False)
+ex.add_data_validation(dv2)
+for i, row in enumerate(E):
+    r = 5 + i
+    rc_row = 4 + i
+    ex.cell(r, 1, f"='Reference club'!A{rc_row}").font = GREEN
+    ex.cell(r, 2, f"='Reference club'!B{rc_row}").font = GREEN
+    for c, v in zip((3, 4, 5), row[0:3]):
+        cell = ex.cell(r, c, v); cell.font = GREY; cell.fill = RFILL
+    ex.cell(r, 4).number_format = "0%"; ex.cell(r, 5).number_format = GBP
+    for c, v in zip((6, 7, 8, 9), row[3:7]):
+        cell = ex.cell(r, c, v / 100); cell.font = BLUE; cell.number_format = "0%"
+    ex.cell(r, 6).fill = YEL
+    ex.cell(r, 10, f"=SUM(F{r}:I{r})").number_format = "0%"
+    ex.cell(r, 11, f"=1-J{r}").number_format = "0%"
+    ex.cell(r, 12, f"='Reference club'!N{rc_row}").number_format = EUR; ex.cell(r, 12).font = GREEN
+    ex.cell(r, 13, f"=L{r}*K{r}").number_format = EUR
+    c14 = ex.cell(r, 14, row[7]); c14.font = BLUE; dv2.add(c14)
+    ex.cell(r, 15, f"=INDEX('Stand prices'!$J$5:$J$13,MATCH(N{r},'Stand prices'!$A$5:$A$13,0))").number_format = EUR
+    ex.cell(r, 15).font = GREEN
+    ex.cell(r, 16, f"=IFERROR(M{r}/O{r},0)").number_format = "0.0"
+    for c in (10, 11, 13, 16): ex.cell(r, c).font = BLACK
+    ex.cell(r, 17, row[8]).font = GREYI
+    for c in range(1, 18): ex.cell(r, c).border = Border(bottom=thin)
+ex["K4"].comment = Comment("What the reference club keeps each season to build with. Real clubs: mostly negative.", "Claude")
+ex["F4"].comment = Comment("Non-league in the game: amateur contracts are free; you may pay a small fee per match (GDD §10b).", "Claude")
+ex.cell(20, 1, "Game percentages are Claude's proposal (2026-11-07): surplus 55% at the bottom → 20% at the top. 'Sections per season' is a pace check against GDD §10d, to be verified with a simulation.").font = GREYI
+widths = [17, 28, 30, 11, 16, 11, 9, 13, 13, 9, 9, 15, 15, 30, 15, 12, 50]
+for i, w in enumerate(widths, 1): ex.column_dimensions[L(i)].width = w
+ex.freeze_panes = "C5"
 
 wb.active = 1
 wb.save("Sunday_League_economy_model.xlsx")

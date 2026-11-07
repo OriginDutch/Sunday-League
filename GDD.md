@@ -148,6 +148,10 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Sections:** the ground is divided into **9 × 5 × 9 × 5 sections** around the pitch (corners stay open for now). Stands are built **section by section**. Where there's no stand you can still put a standing rail or chairs/benches. **Building zones on top of that** for buildings.
 - **Demolishing / replacing:** you get money back **pro rata**. Upgrades **depreciate from 75% to 10% over ~3 seasons**.
 - **Build time:** depends on the size of the upgrade (TBD). **Instant for now**; build phases come in a later round.
+- **Build times (Marcel, 2026-11-07: "voelt best goed"), per section, tunable:** chairs/benches instant · bleachers 1 wk · The Shed 2 · main stand 4 · modern tier 6 · 2nd tier 8 · 3rd tier 12 weeks. Extra rows within a stage = half the stage time; corner section ×1.2; +1 week demolition on a stage jump. A section under construction is **closed** (no income from those places).
+  - **No limit** on how many sections you build at once (money is the limit) — decided.
+  - **Rush build** — decided in principle: pay **+50% cost for 75% of the build time** (Marcel's numbers, tunable).
+  - Off-season length still open (real reference discussed in chat).
 - **Settings (for now):** volume (separate for music / effects / crowd), match length, camera speed.
 - **Navigation:** three mockups made (bottom dock, left sidebar, top tabs) — superseded by the ChatGPT design direction below.
 
@@ -545,6 +549,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
 | 2026-11-07 | Player value depends on age too: old stars cheap but short-lived (§10b) |
+| 2026-11-07 | Build times per section per stage, sections closed while building, no parallel limit, rush build +50% cost → 75% time (§10a) |
 | 2026-11-07 | Refusing a retirement = light 'unhappy' flag (form ×0.8 till contract end), no full morale system yet (§10b) |
 | 2026-11-07 | Retirement chance accepted to try: age base + drop from highest rating ever + playing time/contract/injury; announced mid-season, can stop during contract by mutual agreement (§10b) |
 | 2026-11-07 | Growth & decline formulas accepted for now (% based, cap/floor, form + RNG); injuries only via lost playing time (§10b) |

@@ -352,6 +352,13 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - **Result:** pace after transfers ~0.3–1.1 sections per season up to League 4, ~2–6 from League 3 up (was 5–40). Premier: ~2.5 signings of ~82 per season, ~6 sections.
   - Real reference (Transfermarkt, July 2026): young 90+ players are worth €200–220m (Haaland, Yamal, Mbappé); older 90s (Salah, Van Dijk, 30+) far less; Messi ~$17m. Market value ≠ actual fee.
   - **Decided (Marcel, 2026-11-07): age counts in player value** — you can pick up an old star fairly cheaply, but you get less time out of him. Shape and strength of the age factor still open.
+  - **Decided (Marcel, 2026-11-07): FIFA-style potentials.** Every player has a current rating and a potential (ceiling).
+    - Potential is **visible with light obfuscation** (shown roughly, e.g. a range).
+    - Potential **can change**.
+    - Growth is driven by **playing time, ratings, training complex, injuries** (among others).
+    - A player **stops growing around his peak**, which differs per player (one at 27, another at 32).
+    - **Retirement:** the older the player, the higher the chance he stops, but it also depends on keeping his rating up, playing time, contract length and injuries.
+    - Value now = rating + potential + age (replaces the blunt age multiplier table Claude showed; exact formula in the model, tunable).
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
@@ -516,6 +523,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Economy reference model v2 (real vs game, cliffs flattened) accepted for now, open for tweaking (§10b) |
 | 2026-11-07 | Economy model v4: Transfers tab + 1–99 rating value curve (proposal, §10b) |
 | 2026-11-07 | Player value depends on age too: old stars cheap but short-lived (§10b) |
+| 2026-11-07 | FIFA-style potentials: visible with light obfuscation, can change, growth from playing time/ratings/training complex/injuries, per-player peak 27–32, retirement chance rises with age (§10b) |
 | 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch (first tier only, no all-seater rule, standing = atmosphere vs seats = revenue); stage jump = 1 week demolition then build |
 | 2026-11-07 | Stands: stages + upgrades within stages; one stadium shape + per-corner on/off; shape changeable later; career ≥14 seasons, likely 20–25+ |
 | 2026-11-07 | Big stand POC: full side, cantilever, skyboxes, floodlight bar + masts, 20/15 rows, ~30% fans in club colours, club name in seats, simple facade (§10i) |
@@ -551,7 +559,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 **Players**
 - Which stats exist (open for now).
 - How personalities work in detail (open for now; the effects are listed in §8).
-- Growth, ageing, retirement.
+- Growth, ageing, retirement: direction decided (potentials, §10b); exact numbers (growth speed, decline per year, retirement odds) still open.
 
 **Later (Marcel, 2026-11-07)**
 - Stamina / sprint bar.

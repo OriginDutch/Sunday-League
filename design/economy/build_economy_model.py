@@ -339,6 +339,34 @@ for i, row in enumerate(T):
     for c in range(1, 15): tr.cell(r, c).border = Border(bottom=thin)
 tr.cell(R0 + 16, 1, "Avg ratings below the Premier League are Claude's estimates on the 1–99 scale (EA FC only rates the top of the pyramid). Shares and the value curve are proposals, nothing decided.").font = GREYI
 tr.cell(R0 + 17, 1, "≈ Signings per season counts only fees; at the bottom players are free, so 0 there is expected.").font = GREYI
+
+# ---- value with potential + age (proposal)
+V0 = R0 + 20
+tr.cell(V0, 1, "Value with potential + age (proposal, all yellow cells tunable)").font = BOLD
+knobs = [("Potential weight for the youngest", 0.6, "0.00", "Share of the gap to potential that counts in the price at age ≤ 21"),
+         ("Age where potential stops counting", 27, "0", "Linear from age 21 (full weight) down to this age (zero)"),
+         ("Age where decline pricing starts", 30, "0", "From this age the price drops each year"),
+         ("Price factor per year past that age", 0.85, "0.00", "×0.85 per year: 33 ≈ ×0.61, 35 ≈ ×0.44")]
+for i, (lab, val, fmt, note) in enumerate(knobs):
+    r = V0 + 1 + i
+    tr.cell(r, 1, lab).font = BLACK
+    c = tr.cell(r, 2, val); c.font = BLUE; c.fill = YEL; c.number_format = fmt
+    tr.cell(r, 3, note).font = GREYI
+K = {k: f"$B${V0+1+i}" for i, k in enumerate(["w", "a1", "a2", "f"])}
+H0 = V0 + 6
+for c, h in enumerate(["Example player", "Age", "Rating", "Potential", "Rating used for price", "Value (€)"], 1):
+    cell = tr.cell(H0, c, h); cell.font = HEAD; cell.fill = HFILL
+ex = [("Wonderkid", 19, 68, 88), ("Young star", 22, 82, 90), ("Prime star", 28, 90, 90),
+      ("Old star", 33, 88, 88), ("Veteran", 35, 84, 84), ("Lower-league talent", 20, 55, 72), ("Journeyman", 29, 62, 63)]
+for i, (n, a, rt, pot) in enumerate(ex):
+    r = H0 + 1 + i
+    tr.cell(r, 1, n).font = BLACK
+    for c, v in ((2, a), (3, rt), (4, pot)):
+        cc = tr.cell(r, c, v); cc.font = BLUE
+    tr.cell(r, 5, f"=C{r}+{K['w']}*MAX(0,D{r}-C{r})*MAX(0,MIN(1,({K['a1']}-B{r})/({K['a1']}-21)))").number_format = "0.0"
+    tr.cell(r, 6, f"=$B$3*$B$4^(E{r}-80)*{K['f']}^MAX(0,B{r}-{K['a2']})").number_format = EUR
+tr.cell(H0 + 9, 1, "Price only. Growth, decline in rating and retirement odds are separate game rules (still open).").font = GREYI
+
 widths = [17, 28, 22, 10, 13, 15, 14, 15, 10, 15, 30, 14, 12, 55]
 for i, w in enumerate(widths, 1): tr.column_dimensions[L(i)].width = w
 tr.column_dimensions["C"].width = 22

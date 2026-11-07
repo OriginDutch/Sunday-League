@@ -277,6 +277,8 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Tiers are upgradable **per section** (a second tier, maybe a third one day), so sections with different tier counts stand side by side.
 - Open: where the one text goes and how big; how the upper tier is reached in a modular build (see below); whether sections replace the chair/bench slots.
 
+**POC verdict (Marcel, 2026-11-07):** "for a POC we now know enough that it is possible." Upper-tier access and the club-name size stay open for the real build. **Next step: design the series of stand stages** (between and above chairs/benches → Shed → big two-tier; how many tiers, how many styles, corners). Claude's proposal is in the chat; nothing decided yet.
+
 **Seen and fixed during the build:** fans too wide (letters unreadable) → slimmer; open gap between back wall and roof → clad up to the roof, glazed end screens; two stacked rows of colourful boards → front wall now concrete + club band; facade sign was mirrored and hidden behind the centre core/columns → mirrored, moved up, narrower.
 
 **Known limits:** the seat text is only partly readable when 30% full (fans in white shirts look like letter pixels, aisles break letters); the rear back-stays cross the facade sign in 3/4 views; Godot shots here use `--new-light` (fancy/SDFGI too slow on the software renderer); stands are not yet in the hub/economy (sections vs slots still open).

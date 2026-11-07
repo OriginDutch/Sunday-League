@@ -17,6 +17,7 @@ var wipe_btn: Button
 var summary_panel: PanelContainer
 var summary_label: Label
 var wipe_armed := false
+var cheats_open := false          # dev cheats (F1 in the hub)
 var last_seated := 0
 
 
@@ -143,6 +144,17 @@ func refresh() -> void:
 	for c in list_box.get_children():
 		c.queue_free()
 
+	if cheats_open:
+		_header("DEV CHEATS (F1 to hide)")
+		_cheat("+ £10,000", func() -> void: club.money += 10000)
+		_cheat("+ 100 fans", func() -> void: club.fans += 100)
+		_cheat("Finish all construction now", func() -> void:
+			for b in club.builds:
+				b["finish"] = club.now()
+			club.complete_builds()
+			main.grounds.rebuild_furniture())
+		_small("In a match: F2 ends the match now (current score counts).")
+
 	_league_block(lg)
 
 	_header("SHOP")
@@ -265,7 +277,7 @@ func _update_hint() -> void:
 		else:
 			hint_label.text = "Click a free spot for your %s  ·  right-click / Esc to cancel" % main.placing_item
 	else:
-		hint_label.text = "WASD move · wheel zoom · Q/E rotate · R/F tilt · right-drag look around · C reset"
+		hint_label.text = "WASD move · wheel zoom · Q/E rotate · R/F tilt · right-drag look around · C reset · F1 cheats"
 
 
 func _shop_button(item: String, text: String) -> void:
@@ -275,6 +287,18 @@ func _shop_button(item: String, text: String) -> void:
 	b.pressed.connect(func() -> void:
 		main.begin_placing(item)
 		_update_hint())
+	list_box.add_child(b)
+
+
+func _cheat(text: String, f: Callable) -> void:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.modulate = Color(1.0, 0.8, 0.5)
+	b.pressed.connect(func() -> void:
+		f.call()
+		club.save()
+		refresh())
 	list_box.add_child(b)
 
 

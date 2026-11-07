@@ -231,6 +231,9 @@ func _ready() -> void:
 				hub_pitch = float(v[4])   # degrees above the ground
 			hub.root.visible = false
 			_hub_camera()
+	if "--cheats" in args:
+		hub.cheats_open = true   # dev: open the cheat panel at start (F1 toggles it)
+		hub.refresh()
 	for arg in args:
 		if arg.begins_with("--away-view="):
 			# dev: show the seeded away ground of a club name with its crowd, e.g. --away-view="Red Lion FC"
@@ -934,6 +937,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cancel_placing()
 			elif hk == KEY_C:
 				reset_hub_camera()
+			elif hk == KEY_F1:
+				hub.cheats_open = not hub.cheats_open
+				hub.refresh()
 		return
 	if mode != "match":
 		return
@@ -952,6 +958,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Q:
 				if state == "play" or state == "restart":
 					_manual_switch()
+			KEY_F2:
+				# dev cheat: end the match now with the current score
+				if state != "fulltime":
+					_full_time()
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_UP:

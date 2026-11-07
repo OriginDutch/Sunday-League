@@ -3,7 +3,7 @@
 > Living document. Only contains what Marcel has decided. Anything not decided is listed under **Open questions**.
 > Rule for this project: Claude decides nothing unless Marcel explicitly says Claude may decide.
 
-Last updated: 2026-11-07 (design session 1: economy, stadium)
+Last updated: 2026-11-07 (design session 1: economy, stadium, v0.1 scope)
 
 ---
 
@@ -191,6 +191,30 @@ What's in it now (v4):
 - Camera follows ball/player with look-ahead.
 - Difficulty values approved by Marcel for now.
 
+## 11b. Milestone v0.1
+
+**Goal:** mainly to prove the club side is fun (a rough PoC #2), and a little bit of being the first real playable version.
+
+**Done when:** you can grow to **100 supporters on chairs and benches who actually show up, pay, cheer and react to what happens**.
+
+| Feature | v0.1 |
+|---|---|
+| Money | **In** (which sources: open) |
+| Visible micro-upgrades (chair, bench, ball bag, lawnmower, …) | **In** |
+| "Who can play for you" list | **In** |
+| Player names | **In** |
+| Fans + fan approval | **In** |
+| Save / load | **In** |
+| Stats that affect matches | Later |
+| Intro + scripted qualification match | Later |
+| Club creation (name / colours / logo) | Later |
+| Full league season (20 teams, table, fixtures) | Later |
+| Play or autoplay choice | Later |
+| Amateur contracts / players leaving | Later |
+| Weather | Later |
+| Promotion | Later |
+| Cups | Later |
+
 ## 12. Decisions log
 
 | Date | Decision |
@@ -213,6 +237,7 @@ What's in it now (v4):
 | 2026-11-07 | Pace: fast through non-league, 2–3 seasons per division higher up (§10d) |
 | 2026-11-07 | Stadium: tiny upgrades first, grows in place in a residential area, build time, low promotion requirements (§10a) |
 | 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
+| 2026-11-07 | v0.1 scope and done-criterion (§11b) |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
 ## 13. Open questions
@@ -249,4 +274,4 @@ What's in it now (v4):
 - Training, staff roles, youth.
 - Season calendar (pre-season, cups, Europe).
 - Save system.
-- Milestones / what goes into v0.1.
+- v0.1: which matches you play without a league (see §11b open points).

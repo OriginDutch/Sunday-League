@@ -8,10 +8,10 @@ Proof of fun for Sunday League. Godot 4.7, GDScript, no assets: everything is bu
 3. Press **F5** (or the ▶ button top right)
 
 ## Hub (between matches)
-- Shop: buy a chair or bench, then click a free (highlighted) slot along a touchline. Right-click / Esc cancels.
+- Shop: buy a chair or bench, then click a highlighted section along a touchline. Chairs stack up to 4 per section. Right-click / Esc cancels.
 - "Who can play for you": recruit people until you have 11, then press **Play friendly**.
 - WASD / arrows pan the view, mouse wheel zooms.
-- The game autosaves after each match. "New game" (click twice) wipes the save.
+- The game saves after each match and after every purchase/recruit. "New game" (click twice) wipes the save.
 
 ## Controls (match)
 | Key | Action |
@@ -22,12 +22,12 @@ Proof of fun for Sunday League. Godot 4.7, GDScript, no assets: everything is bu
 | Left click | pass (white ring = who gets it, else a pass into space) |
 | Hold right click | charge shot. aim the arrow at the goal: the yellow ring on the goal shows where it goes. more power = faster + higher but less accurate |
 | Space | sliding/lunge tackle (no ball) |
-| Q | switch to the teammate nearest your mouse |
+| Q | switch to the teammate nearest the ball (press again quickly to cycle) |
 | Mouse wheel | zoom the camera |
 | R | restart match |
 | Esc | quit |
 
-Control only switches automatically to the receiver of your pass; use Q for everything else.
+Control switches automatically when you pass, when a teammate wins the ball, on a loose ball a teammate is clearly closer to, and when you've been beaten.
 You also take your own set pieces (corner, throw-in, goal kick).
 When your keeper holds the ball, you control him: LMB pass, hold RMB for a long kick.
 If you don't press anything while a pass is coming to you, your player runs to meet it.

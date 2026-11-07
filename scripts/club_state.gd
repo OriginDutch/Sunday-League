@@ -15,6 +15,7 @@ const TICKET_PRICE := 2             # £ per seated fan (fixed in v0.1)
 const CHAIR_PRICE := 12
 const BENCH_PRICE := 40
 const BENCH_SEATS := 4
+const MAX_CHAIRS_PER_SLOT := 4     # chairs stack up one by one in a section
 const SLOTS_PER_SIDE := 20          # seating slots along each touchline
 
 # fan growth per match (multiplied by an approval factor)
@@ -34,7 +35,7 @@ var fans := START_FANS
 var approval := START_APPROVAL
 var squad: Array = []               # [{name, origin}] in recruitment order
 var candidates: Array = []          # "Who can play for you"
-var slots: Dictionary = {}          # slot index (String) -> "chair" | "bench"
+var slots: Dictionary = {}          # slot index (String) -> "bench" | "chairs:N"
 var record := {"w": 0, "d": 0, "l": 0}
 var matches_played := 0
 var fans_carry := 0.0               # fractional fan growth carried over
@@ -65,8 +66,34 @@ func recruit(index: int) -> bool:
 func seats() -> int:
 	var n := 0
 	for k in slots:
-		n += BENCH_SEATS if slots[k] == "bench" else 1
+		n += seats_in(str(k))
 	return n
+
+
+func seats_in(key: String) -> int:
+	if not slots.has(key):
+		return 0
+	var v: String = slots[key]
+	if v == "bench":
+		return BENCH_SEATS
+	return chairs_in(key)
+
+
+func chairs_in(key: String) -> int:
+	if not slots.has(key):
+		return 0
+	var v: String = slots[key]
+	if v.begins_with("chairs:"):
+		return int(v.substr(7))
+	return 0
+
+
+## Bench: only on an empty section. Chair: empty section, or one with fewer than 4 chairs.
+func can_place(item: String, slot: int) -> bool:
+	var key := str(slot)
+	if item == "bench":
+		return not slots.has(key)
+	return not slots.has(key) or (chairs_in(key) > 0 and chairs_in(key) < MAX_CHAIRS_PER_SLOT)
 
 
 func price_of(item: String) -> int:
@@ -75,10 +102,13 @@ func price_of(item: String) -> int:
 
 func place(item: String, slot: int) -> bool:
 	var key := str(slot)
-	if slots.has(key) or money < price_of(item):
+	if not can_place(item, slot) or money < price_of(item):
 		return false
 	money -= price_of(item)
-	slots[key] = item
+	if item == "bench":
+		slots[key] = "bench"
+	else:
+		slots[key] = "chairs:%d" % (chairs_in(key) + 1)
 	return true
 
 
@@ -157,6 +187,9 @@ static func from_dict(d: Dictionary) -> ClubState:
 	s.squad = d.get("squad", [])
 	s.candidates = d.get("candidates", [])
 	s.slots = d.get("slots", {})
+	for k in s.slots.keys():
+		if s.slots[k] == "chair":   # saves from before stacking
+			s.slots[k] = "chairs:1"
 	var r: Dictionary = d.get("record", {"w": 0, "d": 0, "l": 0})
 	s.record = {"w": int(r.get("w", 0)), "d": int(r.get("d", 0)), "l": int(r.get("l", 0))}
 	s.matches_played = int(d.get("matches_played", 0))

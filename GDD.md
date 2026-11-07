@@ -72,8 +72,16 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 - **Always 11v11 on a full-size pitch.**
 - Match length is adjustable. Default: **3 minutes per half**, teams switch sides at half-time → 6 minutes per match.
-- **Switching (2026-11-07):** control only switches automatically to the **receiver of your own pass**. **Q switches to the teammate nearest your mouse pointer.** You still control your keeper while he holds the ball, and you take your own set pieces. AI teammates know roughly where to go and which position they belong in.
-- **Passing (2026-11-07):** the passer plays the ball **into the run** of the receiver. Long passes (30 m+) go through the air.
+- **Switching (2026-11-07, revised):**
+  - **Q** = the teammate nearest the ball; pressing again quickly cycles to the next nearest.
+  - **Automatic switch** when: you pass (→ receiver), a teammate wins the ball, a loose ball is clearly closer (5 m+) to a teammate, or you've been beaten (→ nearest teammate goal-side of the ball carrier).
+  - You still control your keeper while he holds the ball, and you take your own set pieces.
+- **Passing (2026-11-07):** the passer plays the ball **into the run** of the receiver, and the **receiver comes towards the ball**. Long passes (30 m+) go through the air; the receiver gets under them.
+- **Defending (2026-11-07):** more active: a second man covers goal-side of the ball carrier, AI reads and intercepts passes, tighter marking.
+- **Dead balls (2026-11-07):** a set piece is a real dead ball. Opponents keep **9.15 m** (throw-in **3 m**) until it's taken.
+- Added by Claude (confirm or change): you can't win the ball from **straight behind** by just pressing (a tackle still works).
+- **Sound (2026-11-07):** generated in code, no audio files. Kicks, referee whistle (kick-off, goals, set pieces, 2× at half time, 3× at full time), crowd cheer/groan/"ooh", and a crowd murmur that scales with attendance.
+- **HUD (2026-11-07):** minimap bottom-right; arrows at the screen edge for teammates out of view.
 - **Camera (2026-11-07):** further out by default, and the mouse wheel zooms during a match.
 - WASD to move, mouse to aim passes/shots.
 - **Player ratings affect the matches you play yourself.**
@@ -233,6 +241,9 @@ What's in it now (v4):
 - Fans still come when there's no seat for them, but then **they don't pay**. They only pay for a seat (or a standing place on a stand).
 - **Later:** charging "real" entry for regular standing places too.
 - Fans cheer, jump, some wander around a little, gather in groups, and react to tackles and saves.
+- **Chants (2026-11-07):** speech bubbles above fans ("WHO ARE YA?!", "REF YOU'RE BLIND!", "Is the bar open at half time?"), both idle and reacting to goals, saves, tackles and offside calls.
+- **Chairs stack (2026-11-07):** up to **4 chairs per section**, bought one at a time. Per seat that's more expensive than a bench (4 × £12 = £48 vs £40), with the same number of seats.
+- **Saving (2026-11-07):** also saves right after buying seating, recruiting, or starting a new game.
 
 ## 11c. PoC #2 (v0.1 build) — status
 
@@ -276,7 +287,6 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 - Positions follow recruitment order (1st = GK, then LB, CB, …). Placeholder until positions are designed.
 
 **Side effects to be aware of:**
-- Purchases and recruits between matches are only saved by the autosave after the next match.
 - R (restart match) still works during a friendly, as in the PoC.
 
 
@@ -303,6 +313,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | Weather is a real match system; construction in visible phases with capacity loss; "Who can play for you" recruitment list |
 | 2026-11-07 | v0.1 scope and done-criterion (§11b); random friendlies, ticket sales only, fans pay only for a seat |
 | 2026-11-07 | v0.1 build: chair + bench, pick a slot, growth from winning + facilities, fixed ticket price, recruit to 11 (free, can't play short), approval from results/entertainment/seating, autosave after match |
+| 2026-11-07 | Playtest round 2: Q nearest+cycle, 4 auto-switch rules, receiver comes to the ball, active defending, real dead balls, stackable chairs, save after purchases, sound, minimap + edge arrows, chants |
 | 2026-11-07 | Playtest fixes: auto-switch only on your passes, Q = nearest to mouse, passes into the run, camera further out + wheel zoom |
 | 2026-11-07 | PoC: simple restarts (throw-in, corner, goal kick), 4-3-3, halves + switching sides, offside |
 
@@ -331,6 +342,9 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 - Which stats exist (open for now).
 - How personalities work in detail (open for now; the effects are listed in §8).
 - Growth, ageing, retirement.
+
+**Later (Marcel, 2026-11-07)**
+- Stamina / sprint bar.
 
 **Not discussed yet** (here so they don't get lost)
 - Economy: safety net (see §10b), exact expense list, performance bonuses.

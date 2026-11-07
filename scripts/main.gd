@@ -18,26 +18,34 @@ const HALF_SECONDS := 180.0      # 3 minutes per half
 const KEEPER_RUSH_DEPTH := 7.0   # keeper comes off his line for loose balls inside this zone
 const KEEPER_RUSH_HALF_W := 10.0
 const SUPPORT_PUSH := 20.0       # how far the team pushes up when in possession
-const MARK_RADIUS := 9.0        # defenders pick up attackers this close to their zone
+const MARK_RADIUS := 12.0        # defenders pick up attackers this close to their zone
 
 # ---- difficulty / feel knobs ------------------------------------------------
 const HUMAN_SPEED_BONUS := 1.1         # your player runs a bit faster than the AI
 const HUMAN_DRIBBLE_SPEED := 0.92      # speed multiplier while you have the ball
-const AI_DRIBBLE_SPEED := 0.8          # same for AI ball carriers
+const AI_DRIBBLE_SPEED := 0.88          # same for AI ball carriers
 const HUMAN_PROTECT := 0.9             # seconds you can't be robbed after receiving
-const AI_STEAL_TIME := 0.45            # AI vs AI: pressing time needed to nick the ball
+const AI_STEAL_TIME := 0.8            # AI vs AI: pressing time needed to nick the ball
 const AI_STEAL_TIME_VS_HUMAN := 1.2    # AI pressing YOU needs this long
 const HUMAN_STEAL_TIME := 0.3          # you pressing the AI carrier
 const HUMAN_TACKLE_SUCCESS := 0.85
 const AI_TACKLE_SUCCESS := 0.55
-const AI_TACKLE_RATE_VS_HUMAN := 0.45  # tackle attempts per second when close to you
+const AI_TACKLE_RATE_VS_HUMAN := 0.7   # tackle attempts per second when close to you
+const AI_TACKLE_RATE := 0.5            # AI vs AI tackle attempts per second when close
 const AI_TACKLE_START_RANGE := 1.4     # AI only lunges when this close to the ball
 const AI_TACKLE_LUNGE := 7.0           # lunge speed (m/s) for 0.35 s
 const HUMAN_TACKLE_LUNGE := 10.0
-const AI_JOCKEY_DISTANCE := 2.0        # AI presser keeps this gap when you have the ball
-const MARK_DISTANCE := 3.0             # markers stand this far goal-side of their man
+const AI_JOCKEY_DISTANCE := 1.6        # AI presser keeps this gap when you have the ball
+const MARK_DISTANCE := 2.2             # markers stand this far goal-side of their man
+const COVER_DISTANCE := 4.5            # second defender covers this far goal-side of the ball carrier
+const INTERCEPT_RANGE := 5.0           # AI goes for a pass passing within this distance
+const PASS_LEAD := 0.7                 # how much of the receiver's run the pass leads
 const LOB_PASS_DISTANCE := 30.0        # passes longer than this go through the air
-const AI_SHOOT_RANGE := 18.0
+const LOOSE_SWITCH_MARGIN := 5.0       # auto-switch on a loose ball only if a teammate is this much closer
+const BEATEN_MARGIN := 3.0             # ball carrier this far past you -> switch to a goal-side teammate
+const Q_CYCLE_WINDOW := 1.2            # press Q again within this time to cycle to the next nearest
+const THROW_IN_DISTANCE := 3.0         # opponents keep this distance at a throw-in (9.15 m otherwise)
+const AI_SHOOT_RANGE := 25.0
 const AI_SHOT_ERROR := 1.6             # 1.0 = as accurate as you
 const KEEPER_REACTION := [0.14, 0.28]  # seconds before the keeper reacts to a shot: [yours, theirs]
 const KEEPER_DIVE_SPEED := [8.5, 7.0]
@@ -70,7 +78,7 @@ var state := "kickoff"     # kickoff | play | restart | goal | halftime | fullti
 var state_timer := 0.0
 var autoplay := false      # `-- --autoplay`: AI vs AI, used for headless testing
 var _conceding_team := 0
-var stats := {"shots": [0, 0], "steals": [0, 0], "saves": [0, 0], "offside": [0, 0], "corners": [0, 0], "throw-ins": [0, 0], "goal kicks": [0, 0]}  # printed at full time (dev)
+var stats := {"shots": [0, 0], "steals": [0, 0], "saves": [0, 0], "offside": [0, 0], "corners": [0, 0], "throw-ins": [0, 0], "goal kicks": [0, 0], "passes": [0, 0], "intercepts": [0, 0], "bailouts": [0, 0]}  # printed at full time (dev)
 
 var camera: Camera3D
 var cam_target := Vector3.ZERO
@@ -89,6 +97,7 @@ var opponent_name := "AWAY"
 var placing_item := ""
 var hover_slot := -1
 var name_label: Label3D
+var sfx: Sfx
 
 var ring: MeshInstance3D
 var pass_ring: MeshInstance3D
@@ -134,6 +143,8 @@ func _ready() -> void:
 			club.recruit(0)
 	else:
 		club = ClubState.load_or_new()
+	sfx = Sfx.new()
+	add_child(sfx)
 	grounds = Grounds.new()
 	add_child(grounds)
 	grounds.setup(club)
@@ -202,6 +213,8 @@ func _enter_hub() -> void:
 	ball.visible = false
 	name_label.visible = false
 	grounds.clear_crowd()
+	if sfx != null:
+		sfx.set_murmur(false)
 	_hub_camera()
 
 
@@ -217,6 +230,8 @@ func start_friendly() -> void:
 	for k in stats:
 		stats[k] = [0, 0]
 	grounds.spawn_crowd(club.fans)
+	sfx.crowd_level = clampf(club.fans / 100.0, 0.05, 1.0)
+	sfx.set_murmur(true)
 	mode = "match"
 	hub.show_hub(false)
 	hub.hide_summary()
@@ -241,7 +256,7 @@ func begin_placing(item: String) -> void:
 	if club.money < club.price_of(item):
 		return
 	placing_item = item
-	grounds.show_markers(true)
+	grounds.show_markers(true, item)
 
 
 func _cancel_placing() -> void:
@@ -279,8 +294,8 @@ func _hub_process(delta: float) -> void:
 	if placing_item == "":
 		return
 	var p := _mouse_ground_point()
-	hover_slot = grounds.nearest_free_slot(p, 3.0)
-	grounds.show_markers(true, hover_slot)
+	hover_slot = grounds.nearest_free_slot(p, placing_item, 3.0)
+	grounds.show_markers(true, placing_item, hover_slot)
 
 
 func _hub_click() -> void:
@@ -288,6 +303,7 @@ func _hub_click() -> void:
 		return
 	if club.place(placing_item, hover_slot):
 		grounds.rebuild_furniture()
+		club.save()
 	_cancel_placing()
 
 
@@ -296,7 +312,10 @@ func _hub_test() -> void:
 	print("HUB TEST start: money %d fans %d squad %d" % [club.money, club.fans, club.squad.size()])
 	while club.squad.size() < ClubState.SQUAD_SIZE:
 		club.recruit(0)
-	print("placed bench: ", club.place("bench", 3), " chair: ", club.place("chair", 25), " seats ", club.seats())
+	club.money = 200
+	print("placed bench: ", club.place("bench", 3), " chairs x5 on slot 25: ", [club.place("chair", 25), club.place("chair", 25), club.place("chair", 25), club.place("chair", 25), club.place("chair", 25)], " bench on chairs: ", club.place("bench", 25), " seats ", club.seats(), " slots ", club.slots)
+	var legacy := ClubState.from_dict({"slots": {"7": "chair"}})
+	print("legacy chair -> ", legacy.slots, " seats ", legacy.seats())
 	grounds.rebuild_furniture()
 	var summary := club.apply_match(2, 1, 5)
 	print("SUMMARY ", summary)
@@ -321,6 +340,7 @@ func _physics_process(delta: float) -> void:
 			if state_timer <= 0.0:
 				state = "play"
 				msg_label.text = ""
+				sfx.whistle()
 		"goal":
 			state_timer -= delta
 			if state_timer <= 0.0:
@@ -361,6 +381,9 @@ func _physics_process(delta: float) -> void:
 		for p in players:
 			p.step(delta)
 		_separate_players()
+		var sp := _current_set_piece()
+		if sp != null:
+			_enforce_set_piece_distance(sp.position, sp.team, sp.restart_kind)
 		if state == "play":
 			_resolve_possession(delta)
 			ball.step(delta)
@@ -409,6 +432,13 @@ func _ui_demo_tick() -> void:
 		toast("SAVE!")
 	charging = true
 	charge = 0.65
+
+
+func _crowd(kind: String) -> void:
+	if grounds != null:
+		grounds.react(kind)
+	if sfx != null:
+		sfx.crowd(kind)
 
 
 func toast(text: String) -> void:
@@ -504,12 +534,7 @@ func _award_restart(kind: String, t: int, spot: Vector3) -> void:
 	for p in players:
 		p.restart_kind = ""
 		p.tackle_timer = 0.0
-		# opponents back off
-		if p.team != t and Util.flat_dist(p.position, spot) < 9.15:
-			var away_dir := Util.flat(p.position - spot)
-			if away_dir.length() < 0.1:
-				away_dir = Vector3(-p.attack_dir, 0, 0)
-			p.position = spot + away_dir.normalized() * 9.2
+	_enforce_set_piece_distance(spot, t, kind)
 	taker.position = spot
 	taker.vel = Vector3.ZERO
 	if t == 0 and not autoplay:
@@ -520,6 +545,24 @@ func _award_restart(kind: String, t: int, spot: Vector3) -> void:
 	taker.protect = 999.0
 	taker.has_ball_time = 0.0
 	toast(kind.to_upper())
+	sfx.whistle()
+
+
+## Dead ball: opponents stay back (9.15 m, or a few metres at a throw-in) until it's taken.
+func _enforce_set_piece_distance(spot: Vector3, taking_team: int, kind: String) -> void:
+	var r := THROW_IN_DISTANCE if kind == "throw-in" else 9.15
+	for p in team_list(1 - taking_team):
+		var away_dir := Util.flat(p.position - spot)
+		if away_dir.length() < r:
+			if away_dir.length() < 0.1:
+				away_dir = Vector3(-p.attack_dir, 0, 0)
+			p.position = spot + away_dir.normalized() * r
+			p.vel = Vector3.ZERO
+
+
+func _current_set_piece() -> Player:
+	var h := ball.owner_player
+	return h if h != null and h.restart_kind != "" else null
 
 
 func stats_add(kind: String, t: int) -> void:
@@ -591,11 +634,13 @@ func _call_offside(p: Player) -> void:
 	stats["offside"][p.team] += 1
 	_award_restart("free kick", 1 - p.team, Vector3(clampf(p.position.x, -HALF_L + 1, HALF_L - 1), 0, clampf(p.position.z, -HALF_W + 1, HALF_W - 1)))
 	toast("OFFSIDE!")
+	_crowd("offside")
 
 
 # ---- halves -------------------------------------------------------------------
 
 func _end_of_half() -> void:
+	sfx.whistle_times(2 if half == 1 else 3)
 	if half == 1:
 		state = "halftime"
 		state_timer = 2.5
@@ -625,6 +670,7 @@ func _goal(scoring_team: int) -> void:
 	_conceding_team = 1 - scoring_team
 	state = "goal"
 	state_timer = 2.5
+	sfx.whistle()
 	ball.owner_player = null
 	charging = false
 	var scorer := ball.last_touch
@@ -633,7 +679,7 @@ func _goal(scoring_team: int) -> void:
 	if not own_goal and scorer != null and scorer.display_name != "":
 		msg_label.text = "GOAL!\n%s" % scorer.display_name
 	if grounds != null:
-		grounds.react("goal_for" if scoring_team == 0 else "goal_against")
+		_crowd("goal_for" if scoring_team == 0 else "goal_against")
 	print("[%s] GOAL team %d  -> %d - %d" % [_clock_text(), scoring_team, score[0], score[1]])
 
 
@@ -698,7 +744,6 @@ func _unhandled_input(event: InputEvent) -> void:
 					controlled.start_tackle()
 			KEY_Q:
 				if state == "play" or state == "restart":
-					aim_point = _mouse_ground_point()
 					_manual_switch()
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -727,6 +772,8 @@ func _update_human(delta: float) -> void:
 	if autoplay:
 		return
 	switch_cooldown = maxf(0.0, switch_cooldown - delta)
+	manual_lock = maxf(0.0, manual_lock - delta)
+	q_time += delta
 	_auto_switch()
 	if controlled == null:
 		return
@@ -827,31 +874,76 @@ func _pass_target_in_cone(p: Player, aim: Vector3) -> Player:
 	return best
 
 
-## Control only switches on your own passes (see _human_pass). Exceptions, from earlier decisions:
-## you control your keeper while he holds the ball, and you take your own set pieces.
+## Automatic switching (Marcel, 2026-11-07): your pass -> receiver, a teammate wins the ball,
+## a loose ball that a teammate is clearly closer to, and when you've been beaten.
+## Plus, from earlier decisions: your keeper while he holds the ball, and your own set pieces.
+var manual_lock := 0.0          # after Q, distance-based auto-switching waits a moment
+var q_cycle: Array[Player] = []
+var q_index := 0
+var q_time := 99.0
+
+
 func _auto_switch() -> void:
 	var holder := ball.owner_player
 	if holder != null and holder.team == 0 and (holder.role == "GK" or holder.restart_kind != ""):
 		controlled = holder
 		return
+	if holder != null and holder.team == 0 and holder != controlled:
+		controlled = holder   # a teammate won / received the ball
+		switch_cooldown = 0.5
+		return
 	if controlled != null and controlled.role == "GK" and holder != controlled:
-		# keeper has released the ball (long kick): hand control back to an outfielder
 		controlled = _nearest_to_ball(home, true)
+		return
+	if controlled == null or switch_cooldown > 0.0 or manual_lock > 0.0:
+		return
+	if ball.pass_target != null and ball.pass_target.team == 0:
+		return   # one of our passes is on its way, the receiver switch already happened
+	var target := ball.position + ball.vel * 0.3
+	if holder == null:
+		# loose ball: only switch when someone is clearly closer
+		var best := _nearest_to_ball(home, true)
+		if best != null and best != controlled and Util.flat_dist(best.position, target) + LOOSE_SWITCH_MARGIN < Util.flat_dist(controlled.position, target):
+			controlled = best
+			switch_cooldown = 0.8
+		return
+	if holder.team == 1:
+		# beaten: the ball carrier is past you, towards your goal -> nearest teammate goal-side of him
+		var dir := controlled.attack_dir
+		if (controlled.position.x - holder.position.x) * dir > BEATEN_MARGIN:
+			var best_d := INF
+			var best: Player = null
+			for p in home:
+				if p.role == "GK" or p == controlled:
+					continue
+				if (p.position.x - holder.position.x) * dir >= 0.0:
+					continue
+				var d := Util.flat_dist(p.position, holder.position)
+				if d < best_d:
+					best_d = d
+					best = p
+			if best != null:
+				controlled = best
+				switch_cooldown = 1.0
 
 
-## Q: switch to the teammate nearest to the mouse pointer.
+## Q: nearest teammate to the ball; pressing again quickly cycles to the next nearest.
 func _manual_switch() -> void:
-	var best: Player = null
-	var best_d := INF
-	for p in home:
-		if p.role == "GK" or p == controlled:
-			continue
-		var d := Util.flat_dist(p.position, aim_point)
-		if d < best_d:
-			best_d = d
-			best = p
-	if best != null:
-		controlled = best
+	if q_time > Q_CYCLE_WINDOW or q_cycle.is_empty():
+		q_cycle.clear()
+		for p in home:
+			if p.role != "GK" and p != controlled:
+				q_cycle.append(p)
+		q_cycle.sort_custom(func(a: Player, b: Player) -> bool:
+			return Util.flat_dist(a.position, ball.position) < Util.flat_dist(b.position, ball.position))
+		q_index = 0
+	else:
+		q_index = (q_index + 1) % q_cycle.size()
+	if q_cycle.is_empty():
+		return
+	controlled = q_cycle[q_index]
+	q_time = 0.0
+	manual_lock = 1.5
 
 
 func _mouse_ground_point() -> Vector3:
@@ -893,7 +985,9 @@ func _resolve_possession(delta: float) -> void:
 			return
 		# pressure: stand on the ball long enough and you nick it
 		var press_reach := 1.0 if opp.is_human else 0.9
-		if d < press_reach:
+		# you can't nick the ball from straight behind: the presser has to be beside or in front
+		var side := Util.flat(opp.position - holder.position).normalized().dot(holder.facing)
+		if d < press_reach and side > -0.35:
 			opp.contact_time += delta
 		else:
 			opp.contact_time = maxf(0.0, opp.contact_time - delta * 2.0)
@@ -942,7 +1036,7 @@ func _try_collect() -> void:
 		if spd > 12.0 and ball.last_touch != null and ball.last_touch.team != best.team:
 			stats["saves"][best.team] += 1
 			toast("SAVE!")
-			grounds.react("save" if best.team == 0 else "chance")
+			_crowd("save" if best.team == 0 else "chance")
 	elif spd > (19.0 if best.is_human else 16.0) and ball.pass_target != best:
 		# too hot to control: deflection
 		ball.vel = Vector3(ball.vel.x * 0.4 + randf_range(-3.0, 3.0), 1.5, ball.vel.z * 0.4 + randf_range(-3.0, 3.0))
@@ -954,6 +1048,8 @@ func _try_collect() -> void:
 
 
 func _give_ball(p: Player) -> void:
+	if ball.last_touch != null and ball.last_touch.team != p.team and ball.owner_player == null:
+		stats["intercepts"][p.team] += 1
 	ball.owner_player = p
 	ball.pass_target = null
 	ball.last_touch = p
@@ -973,7 +1069,7 @@ func _steal(winner: Player, loser: Player) -> void:
 	winner.tackle_timer = 0.0
 	stats["steals"][winner.team] += 1
 	if winner.team == 0 and grounds != null:
-		grounds.react("tackle")
+		_crowd("tackle")
 	if winner.is_human:
 		toast("WON IT!")
 	elif loser.is_human:
@@ -1065,6 +1161,21 @@ func is_chaser(p: Player) -> bool:
 		# the human does the chasing unless this AI is way closer
 		return Util.flat_dist(p.position, ball.position) < Util.flat_dist(controlled.position, ball.position) - 3.0
 	return true
+
+
+## The second-nearest outfielder to the ball covers when the opponent has it close by.
+func is_second_presser(p: Player) -> bool:
+	var first := _nearest_to_ball(team_list(p.team), true)
+	var best: Player = null
+	var best_d := INF
+	for q in team_list(p.team):
+		if q.role == "GK" or q == first or q.is_human:
+			continue
+		var d := Util.flat_dist(q.position, ball.position)
+		if d < best_d:
+			best_d = d
+			best = q
+	return best == p and best_d < 18.0
 
 
 func nearest_opponent(p: Player) -> Player:
@@ -1506,6 +1617,11 @@ func _build_hud() -> void:
 	hint.offset_top = -34
 	hint.label_settings = _font(16)
 	layer.add_child(hint)
+
+	var mm := Minimap.new()
+	mm.setup(self)
+	layer.add_child(mm.arrows)
+	layer.add_child(mm)
 
 	power_bg = ColorRect.new()
 	power_bg.color = Color(0, 0, 0, 0.5)

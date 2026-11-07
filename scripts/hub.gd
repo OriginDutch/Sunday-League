@@ -126,7 +126,7 @@ func refresh() -> void:
 		c.queue_free()
 
 	_header("SHOP")
-	_shop_button("chair", "Chair — £%d  (1 seat)" % ClubState.CHAIR_PRICE)
+	_shop_button("chair", "Chair — £%d  (1 seat, up to %d per section)" % [ClubState.CHAIR_PRICE, ClubState.MAX_CHAIRS_PER_SLOT])
 	_shop_button("bench", "Bench — £%d  (%d seats)" % [ClubState.BENCH_PRICE, ClubState.BENCH_SEATS])
 	_small("Fans only pay (£%d) if they have a seat. Everyone else watches for free." % ClubState.TICKET_PRICE)
 
@@ -145,6 +145,7 @@ func refresh() -> void:
 		var idx := i
 		b.pressed.connect(func() -> void:
 			if club.recruit(idx):
+				club.save()
 				refresh())
 		row.add_child(b)
 		list_box.add_child(row)
@@ -210,6 +211,7 @@ func _on_wipe() -> void:
 	wipe_armed = false
 	wipe_btn.text = "New game"
 	main.new_game()
+	club.save()
 
 
 func show_hub(on: bool) -> void:

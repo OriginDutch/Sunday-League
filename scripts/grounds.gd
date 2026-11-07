@@ -6,6 +6,7 @@ const SLOT_SPACING := 4.0
 const SLOT_OFFSET := 4.0          # metres behind the touchline
 const STAND_OFFSET := 1.8         # standing (non-paying) fans, between line and seats
 const MAX_VISIBLE_FANS := 220
+const CHAIR_OFFSETS := [-0.82, -0.27, 0.27, 0.82]   # seat positions within a section (bench or up to 4 chairs)
 
 var state: ClubState
 var furniture_root: Node3D
@@ -58,11 +59,11 @@ static func slot_yaw(i: int) -> float:
 	return 0.0 if i < ClubState.SLOTS_PER_SIDE else PI   # face the pitch
 
 
-func nearest_free_slot(p: Vector3, max_dist: float = 3.0) -> int:
+func nearest_free_slot(p: Vector3, item: String, max_dist: float = 3.0) -> int:
 	var best := -1
 	var best_d := max_dist
 	for i in slot_count():
-		if state.slots.has(str(i)):
+		if not state.can_place(item, i):
 			continue
 		var d := Util.flat_dist(slot_position(i), p)
 		if d < best_d:
@@ -71,11 +72,10 @@ func nearest_free_slot(p: Vector3, max_dist: float = 3.0) -> int:
 	return best
 
 
-func show_markers(on: bool, hover: int = -1) -> void:
+func show_markers(on: bool, item: String = "", hover: int = -1) -> void:
 	marker_root.visible = on
 	for i in markers.size():
-		var taken := state.slots.has(str(i))
-		markers[i].visible = not taken
+		markers[i].visible = item != "" and state.can_place(item, i)
 		markers[i].material_override = hover_mat if i == hover else free_mat
 
 
@@ -85,6 +85,7 @@ func rebuild_furniture() -> void:
 	for key in state.slots:
 		var i := int(key)
 		var item: String = state.slots[key]
+		var n_chairs := state.chairs_in(str(key))
 		var root := Node3D.new()
 		root.position = slot_position(i)
 		root.rotation.y = slot_yaw(i)
@@ -96,13 +97,15 @@ func rebuild_furniture() -> void:
 			Util.box(root, Vector3(0.08, 0.45, 0.4), Vector3(-0.95, 0.22, 0), metal)
 			Util.box(root, Vector3(0.08, 0.45, 0.4), Vector3(0.95, 0.22, 0), metal)
 		else:
-			Util.box(root, Vector3(0.5, 0.06, 0.5), Vector3(0, 0.45, 0), Color(0.15, 0.45, 0.25))
-			Util.box(root, Vector3(0.5, 0.5, 0.06), Vector3(0, 0.72, -0.22), Color(0.15, 0.45, 0.25))
-			for lx in [-0.2, 0.2]:
-				for lz in [-0.2, 0.2]:
-					var fx: float = lx
-					var fz: float = lz
-					Util.box(root, Vector3(0.04, 0.45, 0.04), Vector3(fx, 0.22, fz), metal)
+			for c in n_chairs:
+				var cx: float = CHAIR_OFFSETS[c]
+				Util.box(root, Vector3(0.5, 0.06, 0.5), Vector3(cx, 0.45, 0), Color(0.15, 0.45, 0.25))
+				Util.box(root, Vector3(0.5, 0.5, 0.06), Vector3(cx, 0.72, -0.22), Color(0.15, 0.45, 0.25))
+				for lx in [-0.2, 0.2]:
+					for lz in [-0.2, 0.2]:
+						var fx: float = lx
+						var fz: float = lz
+						Util.box(root, Vector3(0.04, 0.45, 0.04), Vector3(cx + fx, 0.22, fz), metal)
 
 
 ## World positions (and facing) of every seat you own.
@@ -112,7 +115,7 @@ func seat_list() -> Array:
 		var i := int(key)
 		var base := slot_position(i)
 		var yaw := slot_yaw(i)
-		var offsets: Array = [-0.82, -0.27, 0.27, 0.82] if state.slots[key] == "bench" else [0.0]
+		var offsets: Array = CHAIR_OFFSETS.slice(0, state.seats_in(str(key)))
 		for o in offsets:
 			var ox: float = o
 			var local := Vector3(ox, 0.0, 0).rotated(Vector3.UP, yaw)
@@ -162,6 +165,55 @@ func clear_crowd() -> void:
 	fans.clear()
 
 
+const CHANTS_IDLE := ["COME ON YOU GREENS!", "WHO ARE YA?!", "SUNDAY LEAGUE, SUNDAY LEAGUE!",
+	"PASS IT!", "SHOOOOT!", "Is the bar open at half time?", "We love you lads!", "Get stuck in!",
+	"My nan's quicker than him", "REF! REF!", "Wake up, number 4!", "Who's got the crisps?"]
+const CHANTS := {
+	"goal_for": ["GET IN!!", "YESSSSS!", "WHAT A GOAL!", "ONE-NIL TO THE SUNDAY BOYS!", "SCENES!"],
+	"goal_against": ["Shocking.", "WAKE UP!", "Where was the defence?!", "Keeper's asleep!", "Oh come ON"],
+	"save": ["What a save!", "HANDS LIKE BUCKETS!", "Keeper keeper keeper!"],
+	"offside": ["OFFSIDE?! NEVER!", "REF YOU'RE BLIND!", "Get some glasses!", "He was level!"],
+	"tackle": ["GET IN THERE!", "Proper tackle!", "Have some of that!"],
+	"chance": ["Ooooh!", "So close!"],
+}
+var chant_timer := 3.0
+var bubbles: Array[Label3D] = []
+
+
 func react(kind: String) -> void:
 	for f in fans:
 		f.react(kind)
+	if CHANTS.has(kind) and (kind in ["goal_for", "goal_against", "offside"] or randf() < 0.4):
+		var lines: Array = CHANTS[kind]
+		for i in mini(2, maxi(1, fans.size() / 15)):
+			chant(lines.pick_random())
+
+
+## A speech bubble above a random fan.
+func chant(text: String) -> void:
+	if fans.is_empty():
+		return
+	var f: Fan = fans.pick_random()
+	var l := Label3D.new()
+	l.text = text
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.font_size = 72
+	l.outline_size = 14
+	l.pixel_size = 0.012
+	l.modulate = Color(1, 1, 0.85)
+	l.no_depth_test = true
+	l.position = f.position + Vector3(randf_range(-0.3, 0.3), 2.6, 0)
+	crowd_root.add_child(l)
+	var tw := l.create_tween()
+	tw.tween_property(l, "position:y", l.position.y + 1.2, 2.6)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 2.6).set_delay(1.4)
+	tw.tween_callback(l.queue_free)
+
+
+func _process(delta: float) -> void:
+	if fans.is_empty():
+		return
+	chant_timer -= delta
+	if chant_timer <= 0.0:
+		chant_timer = randf_range(9.0, 20.0)
+		chant(CHANTS_IDLE.pick_random())

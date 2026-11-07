@@ -17,6 +17,7 @@ var owner_player: Player = null   # who is dribbling it right now
 var last_touch: Player = null
 var pass_target: Player = null    # intended receiver of the last pass
 var pass_meet := Vector3.INF      # where passer and receiver are supposed to meet
+var pass_lob := false             # last pass went through the air
 var time_since_kick := 99.0
 var hold_time := 0.0               # how long the current owner has had it
 var _last_owner: Player = null
@@ -61,9 +62,14 @@ func flat_speed() -> float:
 func kick(v: Vector3, by: Player, receiver: Player = null) -> void:
 	owner_player = null
 	vel = v
+	if receiver != null and by != null:
+		main.stats["passes"][by.team] += 1
+	if main.sfx != null and main.mode == "match":
+		main.sfx.kick(v.length())
 	last_touch = by
 	pass_target = receiver
 	pass_meet = Vector3.INF
+	pass_lob = false
 	time_since_kick = 0.0
 	if by != null:
 		by.touch_cooldown = 0.3
@@ -92,7 +98,14 @@ func step(delta: float) -> void:
 	position += vel * delta
 	if position.y < RADIUS:
 		position.y = RADIUS
-		vel.y = -vel.y * BOUNCE if vel.y < -2.0 else 0.0
+		if vel.y < -2.0:
+			# landing: the grass takes a lot of the pace off
+			var damp := clampf(1.0 - absf(vel.y) * 0.04, 0.55, 0.9)
+			vel.x *= damp
+			vel.z *= damp
+			vel.y = -vel.y * BOUNCE
+		else:
+			vel.y = 0.0
 
 	var h := Vector2(vel.x, vel.z)
 	var spd := h.length()

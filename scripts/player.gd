@@ -189,6 +189,7 @@ func pass_to(receiver: Player) -> void:
 	var run := receiver.vel
 	if receiver.is_human or receiver.team == 0 and main.controlled == receiver:
 		run = receiver.desired_move * Player.SPEED
+	run *= Main.PASS_LEAD   # lead the run, but not all the way: the receiver also comes to the ball
 	var best_target := receiver.position
 	var best_v := 10.0
 	var best_score := INF
@@ -230,6 +231,7 @@ func _lob_to(receiver: Player, run: Vector3) -> void:
 	face_towards(to)
 	main.ball.kick(to.normalized() * vh + Vector3.UP * vy, self, receiver)
 	main.ball.pass_meet = target
+	main.ball.pass_lob = true
 
 
 func pass_towards(point: Vector3) -> void:
@@ -325,10 +327,11 @@ func _ai_outfield(delta: float) -> void:
 		wants_sprint = Util.flat_dist(position, spot) > 6.0
 		return
 
-	if b.pass_target == self and b.pass_meet != Vector3.INF and Util.flat_dist(position, b.position) > 4.0:
-		# keep making the run to where the pass is going
-		desired_move = _seek(b.pass_meet, 1.0)
-		wants_sprint = Util.flat_dist(position, b.pass_meet) > 2.0
+	if b.pass_target == self and b.pass_meet != Vector3.INF and Util.flat_dist(position, b.position) > 6.0:
+		# ground pass: come towards the ball rather than wait for it. lob: get under it.
+		var meet := b.pass_meet if b.pass_lob else b.pass_meet.lerp(Util.flat(b.position), 0.35)
+		desired_move = _seek(meet, 1.0)
+		wants_sprint = Util.flat_dist(position, meet) > 2.0
 		return
 	if b.pass_target == self or main.is_chaser(self):
 		var target := Util.flat(b.position + b.vel * 0.25)
@@ -340,39 +343,82 @@ func _ai_outfield(delta: float) -> void:
 		desired_move = _seek(target, 1.0)
 		wants_sprint = d > 3.0
 		if holder != null and holder.team != team and d < Main.AI_TACKLE_START_RANGE:
-			var rate := Main.AI_TACKLE_RATE_VS_HUMAN if holder.is_human else 1.2
+			var rate := Main.AI_TACKLE_RATE_VS_HUMAN if holder.is_human else Main.AI_TACKLE_RATE
 			if randf() < rate * delta:
 				start_tackle()
+		return
+
+	# read an opponent's pass and cut it out
+	if holder == null and b.last_touch != null and b.last_touch.team != team and b.flat_speed() > 5.0:
+		var ip := _intercept_point()
+		if ip != Vector3.INF:
+			desired_move = _seek(ip, 1.0)
+			wants_sprint = true
+			return
+
+	# second man: cover goal-side of the ball carrier, ready to step in
+	if holder != null and holder.team != team and main.is_second_presser(self):
+		var own_goal := Vector3(-Main.HALF_L * attack_dir, 0, 0)
+		var cover := holder.position + Util.flat(own_goal - holder.position).normalized() * Main.COVER_DISTANCE
+		desired_move = _seek(cover, 1.0)
+		wants_sprint = Util.flat_dist(position, cover) > 4.0
 		return
 
 	desired_move = _seek(_defend_spot(), 0.9)
 	wants_sprint = Util.flat_dist(position, _defend_spot()) > 5.0
 
 
+## Where on the moving ball's path (next ~1.2 s) this player could get to first, or INF.
+func _intercept_point() -> Vector3:
+	var b := main.ball
+	var bp := Util.flat(b.position)
+	var bv := Util.flat(b.vel)
+	var t := 0.15
+	while t <= 1.2:
+		var p := bp + bv * t
+		var d := Util.flat_dist(position, p)
+		if d > Main.INTERCEPT_RANGE:
+			t += 0.15
+			continue
+		if d / (Player.SPRINT * speed_mult) <= t + 0.1:
+			return p
+		t += 0.15
+	return Vector3.INF
+
+
 func _ai_dribble() -> void:
 	var goal := Vector3(Main.HALF_L * attack_dir, 0, 0)
-	var steer := Util.flat(goal - position).normalized()
+	var to_goal := Util.flat(goal - position).normalized()
 	# near the boards / byline: cut back inside instead of running into the wall
 	var dist_x := absf(goal.x - position.x)
-	var near_wall := absf(position.z) > Main.HALF_W - 3.0
-	if near_wall or (dist_x < 5.0 and absf(position.z) > Main.GOAL_W):
+	if absf(position.z) > Main.HALF_W - 3.0 or (dist_x < 5.0 and absf(position.z) > Main.GOAL_W):
 		var inside := Vector3(goal.x - attack_dir * 9.0, 0, position.z * 0.3)
-		steer = Util.flat(inside - position).normalized()
-	var opp := main.nearest_opponent(self)
-	if opp != null:
-		var away := Util.flat(position - opp.position)
-		var d := away.length()
-		if d < 3.5 and d > 0.01:
-			steer += away / d * (3.5 - d) * 0.45
-	desired_move = steer.normalized()
+		to_goal = Util.flat(inside - position).normalized()
+	# look for space: try a fan of directions around goal-wards, pick the one with most room
+	var best_dir := to_goal
+	var best_score := -INF
+	for deg in [0.0, -20.0, 20.0, -45.0, 45.0]:
+		var a: float = deg
+		var dir := to_goal.rotated(Vector3.UP, deg_to_rad(a))
+		var probe := position + dir * 4.0
+		if absf(probe.z) > Main.HALF_W - 1.0 or absf(probe.x) > Main.HALF_L - 1.0:
+			continue
+		var room := 6.0
+		for o in main.team_list(1 - team):
+			room = minf(room, Util.flat_dist(o.position, probe))
+		var score := room - absf(a) * 0.06
+		if score > best_score:
+			best_score = score
+			best_dir = dir
+	desired_move = best_dir
 
 
 func _ai_try_shoot() -> bool:
 	var gx := Main.HALF_L * attack_dir
 	var dist_x := absf(gx - position.x)
-	if dist_x > Main.AI_SHOOT_RANGE or absf(position.z) > 12.0:
+	if dist_x > Main.AI_SHOOT_RANGE or absf(position.z) > 16.0:
 		return false
-	var chance := remap(dist_x, Main.AI_SHOOT_RANGE, 4.0, 0.2, 0.85)
+	var chance := remap(dist_x, Main.AI_SHOOT_RANGE, 4.0, 0.08, 0.85)
 	if randf() > chance:
 		return false
 	var aim_z := randf_range(-Main.GOAL_W * 0.5 + 0.3, Main.GOAL_W * 0.5 - 0.3)
@@ -414,6 +460,7 @@ func _ai_take_restart() -> void:
 
 ## Last resort when held too long: pass to anyone, else hoof it towards the middle.
 func _ai_bail_out() -> void:
+	main.stats["bailouts"][team] += 1
 	var best: Player = null
 	var best_d := INF
 	for m in main.team_list(team):

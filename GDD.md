@@ -293,7 +293,10 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Decided (Marcel, 2026-11-07): the lower tier can grow up to 40 rows** — a massive stadium if the player wants it; it's the player's choice, not required. Promotion requirements already exist (§10a, kept low) — the real-world numbers above are reference only.
 - **Decided (Marcel, 2026-11-07):**
   - **Standing terraces as a side branch**: yes.
-  - **All-seater rule**: yes, mirroring the real rule (real: England's top two tiers must be all-seater for clubs there ≥3 seasons since 1994-95; since 2022 licensed safe standing (rail seats) allowed; UEFA competitions all-seater — Bundesliga clubs convert rail seats for European nights). Exact mapping to our fictional pyramid: to confirm.
+  - **All-seater rule: dropped** (Marcel: too deep into real rules for a semi-arcade game). Instead (2026-11-07):
+    - **No seating obligation anywhere** — standing stays standing, also at the top and in Europe; no rail seats.
+    - **Standing only on the first (lowest) tier.**
+    - Standing vs seating is a **flavour choice**: standing = more atmosphere/fans, less revenue per place; seating = the reverse. (Numbers still open.)
   - **Stage jump**: **1 week demolition, then construction of the new replacement stand starts** (its own build time; how long per type is still open).
   - **Max rows: lower 40 + second 30 + third 20** (90 rows) — the "super stadium" for players who want to and can get there.
   - Marcel asked whether 2 × 40 rows is insane in depth and for real examples (answered in chat: deepest single banks are ~40 m high, e.g. Dortmund's Südtribüne; stacking two 40-row tiers is rare).
@@ -485,7 +488,7 @@ Simulated pace to 100 paying supporters: about **20 matches** when winning half 
 | 2026-11-07 | 3D test asset The Shed: "High quality Low Poly", 3 rows, 11.5 m sections (9 per side = 103.5 m), steel + corrugated roof, plastic seats, generic colours with recolourable club materials (§10f) |
 | 2026-11-07 | Stands bought per section; side screen disappears between adjacent sections; club colours are a buyable upgrade you apply yourself (§10f) |
 | 2026-11-07 | Workflow: Claude commits + pushes, Marcel pulls manually (no auto-pull for now) |
-| 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch; all-seater rule mirroring reality; stage jump = 1 week demolition then build |
+| 2026-11-07 | Lower tier can grow up to 40 rows (player's choice); max 40+30+20 = super stadium; standing branch (first tier only, no all-seater rule, standing = atmosphere vs seats = revenue); stage jump = 1 week demolition then build |
 | 2026-11-07 | Stands: stages + upgrades within stages; one stadium shape + per-corner on/off; shape changeable later; career ≥14 seasons, likely 20–25+ |
 | 2026-11-07 | Big stand POC: full side, cantilever, skyboxes, floodlight bar + masts, 20/15 rows, ~30% fans in club colours, club name in seats, simple facade (§10i) |
 | 2026-11-07 | Fancy lighting is the default; audio goes into the public repo (royalty free); minimum cheer volume |

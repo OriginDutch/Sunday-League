@@ -228,6 +228,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Kicks re-cut (Marcel: "trappen moet een instant geluid geven"): some clips had 0.2–0.25 s silence in front and the 50 ms fade-in softened the hit. Now cut 2 ms before the transient, 1 ms fade-in, peak-normalised, stored as **.wav** (no decode delay). Cheers stay .ogg.
 - Licence: Marcel: the files are royalty free, **repo stays public and the audio goes into git** (2026-11-07). Code still skips missing files.
 - Cheers re-cut to Marcel's timings (relative to the first cut): #1 4–10 s soft end, #2 7–13 s, #3 7.25–13.25 s (build-up, no sharp hit, so 7.25), #4 4.5–10.5 s, #5 5–8 s (short); hard start (5 ms), ~1 s fade-out (1.5 s on #1). #6 unchanged (no instruction yet).
+- Cheers v3 (Marcel's second round): #1–#3 start and end 0.25 s later, #4 unchanged, #5 starts 0.25 s earlier (4.75–8 s), #6 now cut too (3.75–11 s). Entry a bit more gradual but still abrupt (fade-in 5 → 50 ms), quicker stop (fade-out 1.0 → 0.6 s; 1.0 s on #1, 0.5 s on #5). Peaks ≤ -1.5 dB, no clipping.
 - Minimum cheer volume (Marcel: "zeker, moeten we finetunen"): floor 0.35 of full (≈ -9 dB), Claude's pick.
 - Next: real recordings from free/CC0 libraries (Marcel downloads, Claude cuts + loops + builds in). Open: keep the procedural sounds as fallback or remove them.
 

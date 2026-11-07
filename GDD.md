@@ -233,6 +233,16 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Next: real recordings from free/CC0 libraries (Marcel downloads, Claude cuts + loops + builds in). Open: keep the procedural sounds as fallback or remove them.
 
 
+## 10i. 3D POC #2 — big two-tier stand (2026-11-07)
+**Marcel's ask:** a big stand as a POC, including floodlights, stairs, aisles, two tiers, a roof, roof beams, and some people spread over the seats.
+
+**Answers so far:**
+- Width: **full long side**, 9 sections = 103.5 m, no corners.
+- Roof: **cantilever** (no columns in front of the view).
+- Between the tiers: **a row of skyboxes** (glass boxes with balcony).
+- Floodlights: **both** — light bar on the roof edge + separate masts.
+- Still to ask: rows per tier, how full / what the people look like, seat colours/pattern, back facade, deliverables.
+
 ## 10b. Economy
 
 ### Income

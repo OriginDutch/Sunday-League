@@ -148,6 +148,11 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Sections:** the ground is divided into **9 × 5 × 9 × 5 sections** around the pitch (corners stay open for now). Stands are built **section by section**. Where there's no stand you can still put a standing rail or chairs/benches. **Building zones on top of that** for buildings.
 - **Demolishing / replacing:** you get money back **pro rata**. Upgrades **depreciate from 75% to 10% over ~3 seasons**.
 - **Build time:** depends on the size of the upgrade (TBD). **Instant for now**; build phases come in a later round.
+- **In-game build step 1 (Marcel agreed 2026-11-07):** calendar + construction mechanic + bleachers as the first new stage; Shed and the rest step by step after that.
+- **Calendar decisions (Marcel, 2026-11-07):**
+  - A week is **not** one match: cup, European and pre-season matches can fall in the same week, and fixture spacing can put **two league matches in one week**.
+  - Straight to a **full season: 19 home, 19 away**, always a return match. Roughly half of your home matches fall in the first half of the season, the other half in the second half; same for away matches.
+- **Sections vs slots (Marcel, 2026-11-07):** move from the 40 small slots to the **~11.5 m sections** of the stand POC (benches/chairs look odd otherwise) — work out what fits in 11.5 m. Also think about the **edges: ad boards, fences/rails, facilities, player dugouts** and similar. Details open (Claude proposal in chat).
 - **Build times (Marcel, 2026-11-07: "voelt best goed"), per section, tunable:** chairs/benches instant · bleachers 1 wk · The Shed 2 · main stand 4 · modern tier 6 · 2nd tier 8 · 3rd tier 12 weeks. Extra rows within a stage = half the stage time; corner section ×1.2; +1 week demolition on a stage jump. A section under construction is **closed** (no income from those places).
   - **No limit** on how many sections you build at once (money is the limit) — decided.
   - **Rush build** — decided in principle: pay **+50% cost for 75% of the build time** (Marcel's numbers, tunable).

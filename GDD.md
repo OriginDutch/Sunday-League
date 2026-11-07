@@ -341,6 +341,7 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - Real: clubs mostly lose money (avg pre-tax 2024/25: PL −£31.1m, Championship −£15.1m, League One −£5m, League Two −£2.6m); wages/revenue 65% PL, ~96% Championship; pay from £20–40 per game at Step 6 to ~£60k/week in the PL.
   - Game (Claude's proposal): costs as % of the reference club's income — wages, staff, ground running, travel/match costs — leaving a **surplus to build with: 55% at the bottom → 20% at the top**.
   - **Pace finding (open):** surplus ÷ cost per section of the stage you'd build there → ~0.4–1.5 sections per season up to League 5, but 5–40 per season from League 3 up (top income is TV/sponsors, stand prices are priced on tickets). Options discussed with Marcel, nothing decided.
+  - Marcel (2026-11-07): transfer fees are not in the model yet and will drain money at the top ("70 miljoen voor een verdediger"). → Transfers as the big money sink higher up; still to be worked out.
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.

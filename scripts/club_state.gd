@@ -66,7 +66,18 @@ const ROW_UPGRADE_WEEKS := 0.5            # extra rows within a stage: half the 
 const DEMOLITION_WEEKS := 1.0             # stage jump: clear the old furniture first
 const RUSH_COST := 1.5                    # rush build: +50% cost...
 const RUSH_TIME := 0.75                   # ...for 75% of the build time
-const SECTION_ITEMS := ["bleachers", "bleachers_rush", "rows", "rows_rush", "hardcore"]   # hardcore: free toggle, no build
+## Stand stages per section (GDD §10h2, Marcel 2026-11-08). Prices per place from the economy model;
+## rows go up in steps; a covered stage raises the ticket price of its seats and pleases the fans.
+const STAGES := {
+	"bleachers": {"name": "Open bleachers", "rows": [3, 5, 7], "per_place": 30.0, "weeks": 1.0, "row_weeks": 0.5, "covered": false, "ticket": 1.0},
+	"shed": {"name": "The Shed", "rows": [3, 5, 8], "per_place": 5600.0 / 60.0, "weeks": 2.0, "row_weeks": 1.0, "covered": true, "ticket": 1.25},
+	"main": {"name": "Main stand", "rows": [10, 12, 15], "per_place": 250.0, "weeks": 4.0, "row_weeks": 2.0, "covered": true, "ticket": 1.5},
+}
+const STAGE_ORDER := ["bleachers", "shed", "main"]
+const TUNNEL_SECTION := 13          # middle of the West side (camera side): players' tunnel when it's a main stand
+const TUNNEL_ROWS := 4              # the tunnel section starts above the tunnel over its full width
+const COVERED_APPROVAL := 0.5       # a fan under a roof counts 1.5× for the seating part of approval
+const SECTION_ITEMS := ["bleachers", "bleachers_rush", "shed", "shed_rush", "main", "main_rush", "rows", "rows_rush", "hardcore"]   # hardcore: free toggle, no build
 const SAVE_VERSION := 3             # v2 = sections, v3 = league; older saves start a new game
 const CLUB_NAME := "Your club"     # placeholder until the player can name the club
 
@@ -143,9 +154,47 @@ func seats() -> int:
 	for k in slots:
 		n += seats_in(str(k))
 	for k in sections:
-		if not is_building(int(k)):
-			n += int(sections[k]["rows"]) * BLEACHER_SEATS_PER_ROW
+		n += section_seats(int(k))
 	return n
+
+
+func stage_of(sec: int) -> String:
+	var k := str(sec)
+	return String(sections[k].get("stage", "bleachers")) if sections.has(k) else ""
+
+
+## Seats in a finished stand section (0 while it's being built).
+func section_seats(sec: int) -> int:
+	var k := str(sec)
+	if not sections.has(k) or is_building(sec):
+		return 0
+	return stand_seats(stage_of(sec), int(sections[k]["rows"]), sec)
+
+
+static func stand_seats(stage: String, rows: int, sec: int) -> int:
+	if stage == "main" and sec == TUNNEL_SECTION:
+		rows -= TUNNEL_ROWS
+	return rows * BLEACHER_SEATS_PER_ROW
+
+
+## Seat capacity per ticket multiplier, best first: [[mult, seats, covered], ...] (covered fills first, Marcel).
+func seat_tiers() -> Array:
+	var by := {}
+	for k in sections:
+		var n := section_seats(int(k))
+		if n > 0:
+			var st: Dictionary = STAGES[stage_of(int(k))]
+			var m: float = st["ticket"]
+			by[m] = int(by.get(m, 0)) + n
+	var plain := 0
+	for k in slots:
+		plain += seats_in(str(k))
+	by[1.0] = int(by.get(1.0, 0)) + plain
+	var out := []
+	for m in by:
+		out.append([float(m), int(by[m]), float(m) > 1.0])
+	out.sort_custom(func(a, b): return a[0] > b[0])
+	return out
 
 
 # ------------------------------------------------------------------ time & building
@@ -192,41 +241,68 @@ func bleacher_rows(sec: int) -> int:
 	return int(sections[k]["rows"]) if sections.has(k) else 0
 
 
-## Section items: "bleachers" on a section without a stand; "rows" adds the next row step.
+static func item_stage(item: String) -> String:
+	return item.trim_suffix("_rush")
+
+
+## The row count a build would give: a new stage starts at its first step, "rows" goes one step up.
+func next_rows(item: String, sec: int) -> int:
+	var st := item_stage(item)
+	if st == "rows":
+		var cur := stage_of(sec)
+		if cur == "":
+			return 0
+		var steps: Array = STAGES[cur]["rows"]
+		var i := steps.find(bleacher_rows(sec))
+		return int(steps[i + 1]) if i >= 0 and i + 1 < steps.size() else 0
+	return int(STAGES[st]["rows"][0]) if STAGES.has(st) else 0
+
+
+## Section items: a stage ("bleachers", "shed", "main") on a section that has another stage or none
+## (skipping stages is fine, Marcel); "rows" adds the next row step of the stage that's there.
 func can_build(item: String, sec: int) -> bool:
 	if item == "hardcore":
 		return sec >= 0
 	if sec < 0 or is_building(sec):
 		return false
-	if item.begins_with("bleachers"):
-		return bleacher_rows(sec) == 0
-	if item.begins_with("rows"):
-		var r := bleacher_rows(sec)
-		return r > 0 and r < BLEACHER_ROWS[-1]
-	return false
+	var st := item_stage(item)
+	if st == "rows":
+		return next_rows(item, sec) > 0
+	return STAGES.has(st) and stage_of(sec) != st
+
+
+## Places a build adds (for the price) — a new stage is priced on all its places.
+func build_places(item: String, sec: int = -1) -> int:
+	var st := item_stage(item)
+	if st == "rows":
+		var nr := next_rows(item, sec) if sec >= 0 else 0
+		return (nr - bleacher_rows(sec)) * BLEACHER_SEATS_PER_ROW if nr > 0 else 2 * BLEACHER_SEATS_PER_ROW
+	return int(STAGES[st]["rows"][0]) * BLEACHER_SEATS_PER_ROW
 
 
 func build_cost(item: String, sec: int = -1) -> int:
 	if item == "hardcore":
 		return 0
-	var places := BLEACHER_ROWS[0] * BLEACHER_SEATS_PER_ROW
-	if item.begins_with("rows"):
-		places = 2 * BLEACHER_SEATS_PER_ROW
-		var r := bleacher_rows(sec) if sec >= 0 else 0
-		var i := BLEACHER_ROWS.find(r)
-		if i >= 0 and i + 1 < BLEACHER_ROWS.size():
-			places = (BLEACHER_ROWS[i + 1] - r) * BLEACHER_SEATS_PER_ROW
-	var cost := places * BLEACHER_PRICE_PER_PLACE
+	var st := item_stage(item)
+	if st == "rows":
+		st = stage_of(sec) if sec >= 0 and stage_of(sec) != "" else "bleachers"
+	var cost := build_places(item, sec) * float(STAGES[st]["per_place"])
 	return int(round(cost * (RUSH_COST if item.ends_with("_rush") else 1.0)))
 
 
 func build_weeks(item: String, sec: int = -1) -> float:
 	if item == "hardcore":
 		return 0.0
-	var w := BLEACHER_WEEKS if item.begins_with("bleachers") else ROW_UPGRADE_WEEKS
+	var st := item_stage(item)
+	var w: float
+	if st == "rows":
+		var cur := stage_of(sec) if sec >= 0 and stage_of(sec) != "" else "bleachers"
+		w = float(STAGES[cur]["row_weeks"])
+	else:
+		w = float(STAGES[st]["weeks"])
 	if item.ends_with("_rush"):
 		w *= RUSH_TIME
-	if item.begins_with("bleachers") and sec >= 0 and _section_has_furniture(sec):
+	if st != "rows" and sec >= 0 and (_section_has_furniture(sec) or stage_of(sec) != ""):
 		w += DEMOLITION_WEEKS   # stage jump: one week demolition first (not rushed)
 	return w
 
@@ -234,16 +310,18 @@ func build_weeks(item: String, sec: int = -1) -> float:
 func start_build(item: String, sec: int) -> bool:
 	if not can_build(item, sec) or money < build_cost(item, sec):
 		return false
-	book("build", "Section %d · %s" % [sec + 1, "+2 rows" if item.begins_with("rows") else "bleachers"],
+	var st := item_stage(item)
+	var stage := stage_of(sec) if st == "rows" else st
+	var rows := next_rows(item, sec)
+	book("build", "Section %d · %s" % [sec + 1, ("%s to %d rows" % [STAGES[stage]["name"], rows]) if st == "rows" else String(STAGES[stage]["name"])],
 		{"Building": -build_cost(item, sec)}, {"note": "rush" if item.ends_with("_rush") else ""})
-	var rows := BLEACHER_ROWS[0]
-	if item.begins_with("rows"):
-		rows = BLEACHER_ROWS[BLEACHER_ROWS.find(bleacher_rows(sec)) + 1]
 	var weeks := build_weeks(item, sec)
 	# demolish the old furniture in this section
 	for k in SPOTS_PER_SECTION:
 		slots.erase(str(sec * SPOTS_PER_SECTION + k))
-	builds.append({"sec": sec, "stage": "bleachers", "rows": rows, "start": now(), "finish": now() + weeks})
+	if st != "rows":
+		sections.erase(str(sec))   # demolished: the old stand is gone while the new one goes up
+	builds.append({"sec": sec, "stage": stage, "rows": rows, "start": now(), "finish": now() + weeks})
 	return true
 
 
@@ -319,7 +397,16 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int, 
 	var attendance := fans if home else 0
 	var seated := mini(attendance, seats())
 	var standing := attendance - seated
-	var revenue := seated * ticket_price()
+	# covered seats fill first (Marcel) and cost more: Shed +25%, main stand +50%
+	var revenue := 0.0
+	var covered := 0
+	var left := seated
+	for tier in seat_tiers():
+		var n := mini(left, int(tier[1]))
+		revenue += n * ticket_price() * float(tier[0])
+		if tier[2]:
+			covered += n
+		left -= n
 	var lines := {}
 	if home:
 		lines = {"Tickets": revenue, "Tea hut": attendance * econ("spend"), "Match subs": squad.size() * SUBS_PER_PLAYER,
@@ -345,7 +432,7 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int, 
 	elif result == "L":
 		d_app = APPROVAL_LOSS
 	var ent := minf(entertainment_events * 0.6, APPROVAL_ENTERTAINMENT_MAX)
-	var no_seat := APPROVAL_NO_SEAT_MAX * (float(standing) / maxf(attendance, 1.0)) if home else 0.0
+	var no_seat := APPROVAL_NO_SEAT_MAX * (float(standing) - COVERED_APPROVAL * covered) / maxf(attendance, 1.0) if home else 0.0
 	var approval_before := approval
 	approval = clampf(approval + d_app + ent + no_seat, 0.0, 100.0)
 

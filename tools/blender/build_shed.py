@@ -317,7 +317,7 @@ if "--render-set" in sys.argv:
     for rows, x0, l, r in ((3, -W, None, 5), (5, 0.0, 3, 8), (8, W, 5, None)):
         n_seats += build_section(rows, x0, l, r)
 else:
-    n_seats = build_section(ROWS)
+    n_seats = build_section(ROWS, 0.0, ROWS, ROWS)   # game export: no side screens (the game adds them per neighbour)
 
 # ------------------------------------------------------------------ join per material (few draw calls in the game)
 by_mat = {}
@@ -347,7 +347,10 @@ if "--render-set" not in sys.argv:
         bpy.ops.export_scene.gltf(filepath=os.path.join(_models, _name), export_format='GLB', use_selection=False, export_apply=True)
     import json
     with open(os.path.join(_models, "the_shed_%d_seats.json" % ROWS), "w") as f:
-        json.dump({"rows": ROWS, "seats": SEATS, "note": "[x, y, z, row] in the section's local Godot space"}, f)
+        fy, fz, by, bz, wy = profile(ROWS)
+        json.dump({"rows": ROWS, "seats": SEATS, "note": "[x, y, z, row] in the section's local Godot space; profile in Blender (y back, z up)",
+            "profile": {"front_y": fy, "front_z": fz, "back_y": by, "back_z": bz, "wall_y": wy, "side_front_y": WALK_D + TREAD * 0.6,
+            "color": "#9BA6AA"}}, f)
 bpy.ops.wm.save_as_mainfile(filepath="/tmp/the_shed.blend")
 
 # ------------------------------------------------------------------ preview renders

@@ -15,13 +15,15 @@ const STANDING_SPACING := 0.6     # standing fans along the touchlines and behin
 const FLAG_CHANCE := 0.03         # per hard-core place (Marcel: starting value), grows with the crowd
 const CHAIR_OFFSETS := [-0.75, -0.25, 0.25, 0.75]   # seat positions within a spot
 const END_EXTRA := 2.5          # sections behind the goals sit further back (clear of the nets)
-const DUGOUT_SECTION := 4         # middle section of the far (main) side
+const DUGOUT_SECTION := 13        # middle of the West side (camera side), with the tunnel (Marcel 2026-11-08)
 const DUGOUT_CLEAR_X := 7.5       # no standing fans in front of the dugouts
 # open bleachers (block 4): procedural for now
 const BL_FIRST_D := 4.0           # first row, metres behind the line (same as the chairs)
 const BL_TREAD := 0.8             # row depth
 const BL_RISE := 0.38             # row height step
 const BL_FIRST_H := 0.45          # seat height of the first row
+const STAND_FRONT_D := 2.9        # The Shed / main stand: front wall this far behind the line (behind the rope)
+const StandClip = preload("res://scripts/stand_clip.gdshader")
 
 var state: ClubState
 var furniture_root: Node3D
@@ -180,15 +182,21 @@ func rebuild_furniture() -> void:
 		active_slots = state.slots
 		for key in state.sections:
 			var sec := int(key)
-			if not state.is_building(sec):
+			if state.is_building(sec):
+				continue
+			var stage := state.stage_of(sec)
+			if stage == "bleachers":
 				_bleachers(sec, int(state.sections[key]["rows"]))
+			else:
+				_stand(sec, stage, int(state.sections[key]["rows"]))
 		for b in state.builds:
 			_construction(int(b["sec"]), int(b["rows"]), state.ready_label(b))
 		# stairs where two finished bleacher sections meet (Marcel, 2026-11-07)
 		for key in state.sections:
 			var a := int(key)
 			var nb := _next_in_side(a)
-			if nb >= 0 and state.sections.has(str(nb)) and not state.is_building(a) and not state.is_building(nb):
+			if nb >= 0 and state.sections.has(str(nb)) and not state.is_building(a) and not state.is_building(nb) \
+					and state.stage_of(a) == "bleachers" and state.stage_of(nb) == "bleachers":
 				_bleacher_stairs(a, nb, int(state.sections[key]["rows"]), int(state.sections[str(nb)]["rows"]))
 	for key in active_slots:
 		var i := int(key)
@@ -288,6 +296,147 @@ func _bleachers(sec: int, rows: int) -> void:
 		Util.box(root, Vector3(0.06, 1.0, 0.06), Vector3(fx, top_h + 0.5, -back_d), frame)
 	Util.box(root, Vector3(w, 0.05, 0.05), Vector3(0, top_h + 1.0, -back_d), alu)       # back rail
 	Util.box(root, Vector3(w, 0.05, 0.05), Vector3(0, top_h + 0.55, -back_d), alu)
+
+
+# ------------------------------------------------------------------ The Shed / main stand (GDD §10h2)
+
+var _stand_scenes := {}
+var _stand_info := {}
+var _clip_mats := {}
+
+
+static func stand_model(stage: String, rows: int, sec: int) -> String:
+	if stage == "shed":
+		return "res://assets/models/the_shed_%d.glb" % rows
+	if stage == "main":
+		return "res://assets/models/main_stand_%d%s.glb" % [rows, "_tunnel" if sec == ClubState.TUNNEL_SECTION else ""]
+	return ""
+
+
+## Seats ([x, y, z, row] in the model's space) and the roof profile of a stand variant.
+func stand_info(stage: String, rows: int, sec: int) -> Dictionary:
+	var path := stand_model(stage, rows, sec)
+	if path == "":
+		return {}
+	if not _stand_info.has(path):
+		var f := FileAccess.open(path.replace(".glb", "_seats.json"), FileAccess.READ)
+		_stand_info[path] = JSON.parse_string(f.get_as_text()) if f != null else {}
+	return _stand_info[path]
+
+
+## Materials swapped for the sight-line clip shader (same colour, roughness, metal).
+func _clip_mat(m: Material) -> Material:
+	if not (m is BaseMaterial3D):
+		return m
+	if not _clip_mats.has(m):
+		var b := m as BaseMaterial3D
+		var sm := ShaderMaterial.new()
+		sm.shader = StandClip
+		sm.set_shader_parameter("albedo", b.albedo_color)
+		sm.set_shader_parameter("roughness", b.roughness)
+		sm.set_shader_parameter("metallic", b.metallic)
+		_clip_mats[m] = sm
+	return _clip_mats[m]
+
+
+func clipify(n: Node) -> void:
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		if mi.mesh != null:
+			for i in mi.mesh.get_surface_count():
+				var m := mi.get_active_material(i)
+				if m != null:
+					mi.set_surface_override_material(i, _clip_mat(m))
+	for c in n.get_children():
+		clipify(c)
+
+
+func _stand(sec: int, stage: String, rows: int) -> void:
+	var path := stand_model(stage, rows, sec)
+	if not ResourceLoader.exists(path):
+		push_warning("Stand model missing (run godot --path . --headless --import): " + path)
+		return
+	if not _stand_scenes.has(path):
+		_stand_scenes[path] = load(path)
+	var root := Node3D.new()
+	var f := section_frame(sec)
+	root.position = f["line"]
+	root.rotation.y = f["yaw"]
+	furniture_root.add_child(root)
+	var inst: Node3D = _stand_scenes[path].instantiate()
+	inst.position = Vector3(0, 0, -STAND_FRONT_D)
+	root.add_child(inst)
+	clipify(inst)
+	# side walls (Marcel): full at an open end, none between equal neighbours, between unequal ones only
+	# the strip between the lower and the higher roof (drawn by the taller one)
+	var me: Dictionary = stand_info(stage, rows, sec).get("profile", {})
+	if me.is_empty():
+		return
+	# along a side the section number goes up towards +x (long sides) or +z (ends)
+	var along := Vector3.RIGHT if sec < 2 * ClubState.SECTIONS_LONG else Vector3.BACK
+	var next_x := signf(along.rotated(Vector3.UP, -float(f["yaw"])).x)
+	for pair in [[_prev_in_side(sec), -next_x], [_next_in_side(sec), next_x]]:
+		var nb: int = pair[0]
+		var local_x: float = pair[1]
+		var them: Dictionary = {}
+		if nb >= 0 and state.sections.has(str(nb)) and not state.is_building(nb) and state.stage_of(nb) in ["shed", "main"]:
+			them = stand_info(state.stage_of(nb), int(state.sections[str(nb)]["rows"]), nb).get("profile", {})
+		var pts := _side_wall(me, them)
+		if pts.size() >= 3:
+			_wall_prism(root, pts, local_x * (ClubState.SECTION_W * 0.5 + 0.06), Color(String(me.get("color", "#9BA6AA"))))
+
+
+static func _roof_at(p: Dictionary, y: float) -> float:
+	var fy: float = p["front_y"]
+	var by: float = p["back_y"]
+	return float(p["front_z"]) + (float(p["back_z"]) - float(p["front_z"])) * (y - fy) / (by - fy)
+
+
+## Side wall polygon in the model's (y back, z up) plane; empty = no wall.
+static func _side_wall(me: Dictionary, them: Dictionary) -> PackedVector2Array:
+	var wy: float = me["wall_y"]
+	if them.is_empty():
+		var sy: float = me["side_front_y"]
+		return PackedVector2Array([Vector2(sy, 0.0), Vector2(wy, 0.0), Vector2(wy, _roof_at(me, wy)), Vector2(sy, _roof_at(me, sy))])
+	if float(them["back_z"]) >= float(me["back_z"]) - 0.01:
+		return PackedVector2Array()   # equal or taller neighbour: nothing (the taller one draws the strip)
+	var fy: float = me["front_y"]
+	var nbw := minf(float(them["wall_y"]), wy)
+	return PackedVector2Array([Vector2(fy, _roof_at(them, fy)), Vector2(nbw, _roof_at(them, nbw)), Vector2(nbw, 0.0),
+		Vector2(wy, 0.0), Vector2(wy, _roof_at(me, wy)), Vector2(fy, _roof_at(me, fy))])
+
+
+## A thin wall from a (y back, z up) polygon at local x, in a section root (model sits STAND_FRONT_D back).
+func _wall_prism(root: Node3D, pts: PackedVector2Array, x: float, col: Color) -> void:
+	var tris := Geometry2D.triangulate_polygon(pts)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var to3 := func(p: Vector2, xx: float) -> Vector3: return Vector3(xx, p.y, -p.x - STAND_FRONT_D)
+	for side in [-0.05, 0.05]:
+		for i in range(0, tris.size(), 3):
+			for j in 3:
+				st.add_vertex(to3.call(pts[tris[i + j]], x + side))
+	for i in pts.size():
+		var a := pts[i]
+		var b := pts[(i + 1) % pts.size()]
+		st.add_vertex(to3.call(a, x - 0.05)); st.add_vertex(to3.call(b, x - 0.05)); st.add_vertex(to3.call(b, x + 0.05))
+		st.add_vertex(to3.call(a, x - 0.05)); st.add_vertex(to3.call(b, x + 0.05)); st.add_vertex(to3.call(a, x + 0.05))
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.roughness = 0.7
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = _clip_mat(m)
+	root.add_child(mi)
+
+
+static func _prev_in_side(sec: int) -> int:
+	var L := ClubState.SECTIONS_LONG
+	var S := ClubState.SECTIONS_SHORT
+	var starts := [0, L, 2 * L, 2 * L + S]
+	return -1 if sec in starts else sec - 1
 
 
 ## The next section along the same side, or -1 at the end of a side.
@@ -473,6 +622,15 @@ func seat_list() -> Array:
 			if state.is_building(sec):
 				continue
 			var yaw: float = section_frame(sec)["yaw"]
+			var stage := state.stage_of(sec)
+			if stage != "bleachers":
+				var info := stand_info(stage, int(state.sections[key]["rows"]), sec)
+				var mult: float = ClubState.STAGES[stage]["ticket"]
+				var fr := section_frame(sec)
+				for sv in info.get("seats", []):
+					var lp := Vector3(float(sv[0]), float(sv[1]) - 0.45, float(sv[2]) - STAND_FRONT_D)
+					out.append({"pos": fr["line"] + lp.rotated(Vector3.UP, yaw), "yaw": yaw, "sec": sec, "mult": mult})
+				continue
 			for r in int(state.sections[key]["rows"]):
 				for i in ClubState.BLEACHER_SEATS_PER_ROW:
 					var x := -4.75 + i * 0.5
@@ -488,6 +646,19 @@ func spawn_crowd(attendance: int, travelling: int = 0) -> void:
 	clear_crowd()
 	var seats := seat_list()
 	seats.shuffle()
+	# covered seats fill first, the dearest stand first (Marcel 2026-11-08); shuffled within each group
+	var groups := {}
+	for st in seats:
+		var m: float = st.get("mult", 1.0)
+		if not groups.has(m):
+			groups[m] = []
+		groups[m].append(st)
+	var keys := groups.keys()
+	keys.sort()
+	keys.reverse()
+	seats = []
+	for m in keys:
+		seats.append_array(groups[m])
 	var seated := mini(attendance, seats.size())
 	var ours := not away_mode
 	var places := []
@@ -504,7 +675,7 @@ func spawn_crowd(attendance: int, travelling: int = 0) -> void:
 	if travelling > 0:
 		var near := []
 		for k in mini(travelling, 120):
-			var x := (k / 2 - 30) * STANDING_SPACING + randf_range(-0.1, 0.1)
+			var x := 9.0 + (k / 2) * STANDING_SPACING + randf_range(-0.1, 0.1)   # beside the dugouts (West middle)
 			near.append({"pos": Vector3(x, 0, Main.HALF_W + STAND_OFFSET + (k % 2) * 0.5), "yaw": PI, "hard": false, "standing": true})
 		_crowd(near, true, travelling)
 	for pl in places:
@@ -529,7 +700,7 @@ func _standing_spots(away: bool) -> Array:
 		var z: float = side[0] * (Main.HALF_W + STAND_OFFSET)
 		var x := -Main.HALF_L + 1.0
 		while x < Main.HALF_L - 1.0:
-			if not (side[0] < 0.0 and absf(x) < DUGOUT_CLEAR_X) and not (away and side[0] > 0.0 and absf(x) < 20.0):
+			if not (side[0] > 0.0 and absf(x) < DUGOUT_CLEAR_X) and not (away and side[0] > 0.0 and x > 8.0 and x < 46.0):
 				for row in 2:
 					var zz: float = z + side[0] * row * 0.5
 					out.append({"pos": Vector3(x + randf_range(-0.08, 0.08), 0, zz), "yaw": 0.0 if side[0] < 0.0 else PI,

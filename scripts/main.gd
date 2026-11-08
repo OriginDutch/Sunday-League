@@ -337,6 +337,27 @@ func _ready() -> void:
 				# dev: --club-colours=primaryhex,secondaryhex  (demo of the club colours upgrade)
 				var cc: PackedStringArray = arg.trim_prefix("--club-colours=").split(",")
 				bs.set_club_colours(Color(cc[0]), Color(cc[1]))
+	if "--stands-demo" in args:
+		# dev: every stand type around the ground (screenshots): West main stand with the tunnel, East a
+		# Shed mix 3/5/8 next to bleachers, North main 10/12, South bleachers
+		club.builds.clear()
+		club.sections.clear()
+		club.slots.clear()
+		for k in 9:
+			club.sections[str(9 + k)] = {"stage": "main", "rows": [10, 12, 15, 15, 15, 15, 15, 12, 10][k]}
+			club.sections[str(k)] = {"stage": ["shed", "shed", "shed", "bleachers", "shed", "shed", "shed", "bleachers", "shed"][k],
+				"rows": [3, 5, 8, 7, 8, 8, 5, 5, 3][k]}
+		for k in 5:
+			club.sections[str(18 + k)] = {"stage": "main", "rows": [10, 12, 12, 12, 10][k]}
+			club.sections[str(23 + k)] = {"stage": "bleachers", "rows": 7}
+		grounds.rebuild_furniture()
+		hub.refresh()
+		print("STANDS DEMO seats ", club.seats(), " tiers ", club.seat_tiers())
+		if "--stands-match" in args:
+			club.fans = 2500
+			while club.squad.size() < ClubState.SQUAD_SIZE:
+				club.recruit(0)
+			start_friendly()
 	if "--fps" in args:
 		_toggle_fps()
 	if "--tackle-test" in args:
@@ -707,7 +728,7 @@ func start_friendly() -> void:
 	else:
 		opp = club.league.teams[fx["opponent"]]
 	opponent_name = opp["name"]
-	match_home = fx["home"] or "--crowd-max" in OS.get_cmdline_user_args()
+	match_home = fx["home"] or "--crowd-max" in OS.get_cmdline_user_args() or "--stands-match" in OS.get_cmdline_user_args()
 	match_opp_strength = float(opp["str"])
 	placing_item = ""
 	grounds.show_markers(false)
@@ -865,6 +886,7 @@ func reset_hub_camera() -> void:
 
 
 func _hub_camera() -> void:
+	_set_stand_clip(false)
 	var p := deg_to_rad(hub_pitch)
 	var offset := Vector3(0, sin(p), cos(p)) * HUB_DIST * hub_zoom
 	camera.position = hub_focus + offset.rotated(Vector3.UP, hub_yaw)
@@ -3134,6 +3156,7 @@ func _build_camera() -> void:
 
 func _update_camera(delta: float) -> void:
 	if state == "penalties" or (state == "fulltime" and not pens.is_empty()):
+		_set_stand_clip(false)
 		# behind the penalty taker, looking at the goal
 		var gx := HALF_L
 		camera.position = camera.position.lerp(Vector3(gx - PEN_SPOT - 9.0, 4.6, 0.0) if mode == "match" else camera.position, clampf(delta * 3.0, 0.0, 1.0))
@@ -3151,6 +3174,11 @@ func _update_camera(delta: float) -> void:
 	if controlled != null and not autoplay:
 		focus = focus.lerp(controlled.position, 0.3)
 	var want := Vector3(clampf(focus.x + lead, -HALF_L + 8.0, HALF_L - 8.0), 0, clampf(focus.z * 0.9, -HALF_W + 4.0, HALF_W - 2.0))
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--cam-focus="):
+			# dev: point the match camera at x,z (screenshots of the stands near the camera)
+			var v := arg.trim_prefix("--cam-focus=").split(",")
+			want = Vector3(float(v[0]), 0, float(v[1]))
 	cam_target = cam_target.lerp(want, clampf(delta * 2.5, 0.0, 1.0))
 	_place_camera()
 
@@ -3161,6 +3189,24 @@ var match_zoom := 1.0   # mouse wheel during a match
 func _place_camera() -> void:
 	camera.position = cam_target + Vector3(0, 25.0, 21.0) * match_zoom
 	camera.look_at(cam_target + Vector3(0, 0, -1.0), Vector3.UP)
+	_set_stand_clip(true)
+
+
+## Stands on the West (camera) side: hide what sticks up above the camera's sight line to the near
+## touchline (Marcel, option B: "only what really blocks the view"). See stand_clip.gdshader.
+func _set_stand_clip(on: bool) -> void:
+	var touch := HALF_W + 0.3
+	if "--clip-test" in OS.get_cmdline_user_args():
+		RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, 0.4, 1.0, 0.0))   # dev: force a clip in the hub
+		return
+	var cz := camera.global_position.z if camera != null else 0.0
+	if not on or cz <= touch + 1.0:
+		RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, 0.0, 0.0, 0.0))
+		return
+	var slope := camera.global_position.y / (cz - touch)
+	RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, slope, 1.0, 0.25))
+	if Engine.get_physics_frames() % 120 == 0 and "--clip-debug" in OS.get_cmdline_user_args():
+		print("CLIP ", Vector4(touch, slope, 1.0, 0.25), " cam ", camera.global_position, " get ", RenderingServer.global_shader_parameter_get("stand_clip"))
 
 
 func _make_ring(inner: float, outer: float, color: Color) -> MeshInstance3D:

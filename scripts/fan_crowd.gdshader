@@ -25,6 +25,7 @@ uniform vec3 trousers_pal[8];
 uniform vec3 coat_pal[8];
 uniform vec3 shirt_pal[16];       // 0 = club colour
 uniform sampler2D crest : source_color, filter_linear_mipmap, repeat_disable;
+global uniform vec4 stand_clip;   // see stand_clip.gdshader: fans above the camera's sight line on the West side aren't drawn
 
 varying vec3 v_col;
 varying vec2 v_uv;
@@ -167,6 +168,10 @@ void vertex() {
 }
 
 void fragment() {
+	vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	if (stand_clip.z > 0.5 && wp.z > stand_clip.x && wp.y > (wp.z - stand_clip.x) * stand_clip.y + stand_clip.w) {
+		discard;
+	}
 	NORMAL = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));
 	vec3 col = v_col;
 	if (v_kind == 1) {

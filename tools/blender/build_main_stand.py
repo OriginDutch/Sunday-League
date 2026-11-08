@@ -418,7 +418,7 @@ elif RENDER_SET == "rows":
     rs = (10, 12, 15)
     n_seats = sum(build_section(r, False, (k - 1) * W, rs[k - 1] if k > 0 else None, rs[k + 1] if k < 2 else None) for k, r in enumerate(rs))
 else:
-    n_seats = build_section(ROWS, TUNNEL)
+    n_seats = build_section(ROWS, TUNNEL, 0.0, ROWS, ROWS)   # game export: no side screens (the game adds them per neighbour)
 
 # join per material (few draw calls in the game)
 by_mat = {}
@@ -446,7 +446,10 @@ if not RENDER_SET:
     bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=False, export_apply=True)
     import json
     with open(out.replace(".glb", "_seats.json"), "w") as f:
-        json.dump({"rows": ROWS, "tunnel": TUNNEL, "seats": SEATS, "note": "[x, y, z, row] in the section's local Godot space"}, f)
+        fy, fz, by, bz, wy = profile(ROWS)
+        json.dump({"rows": ROWS, "tunnel": TUNNEL, "seats": SEATS, "note": "[x, y, z, row] in the section's local Godot space; profile in Blender (y back, z up)",
+            "profile": {"front_y": fy, "front_z": fz, "back_y": by, "back_z": bz, "wall_y": wy, "side_front_y": WALK_D + TREAD * 2,
+            "color": "#C9C6BC"}}, f)
 
 if RENDER_SET:
     world = bpy.data.worlds.new("World"); scene.world = world

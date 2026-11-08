@@ -427,6 +427,15 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   - Roof numbers agreed: **approval: fans under a roof count 1.5× for the seating part**; **ticket +25% in The Shed, +50% in the main stand** on top of the division price; weather effect once weather exists.
   - Seat positions per variant are exported as `*_seats.json` next to the .glb for the crowd. Seats are real geometry in the model for now; fps is watched (Marcel).
 
+- **In the game (2026-11-08/09):**
+  - **Names (Marcel):** the camera side is the main side, **"West"**; opposite **East**; the ends **North** (−x) and **South** (+x). Only names changed. **Dug-outs and the tunnel are on West** (middle section).
+  - **Stages per section** (`ClubState.STAGES`): bleachers 3/5/7 (£30/place, 1 wk, rows ½ wk) · **The Shed 3/5/8** (£5,600 per 3 rows ≈ £93/place, 2 wk, rows 1 wk, ticket ×1.25) · **Main stand 10/12/15** (£250/place = £50k, 4 wk, rows 2 wk, ticket ×1.5). Prices fixed, not per division (finetune later). **Skipping stages is fine** (money is the limit). Changing stage = **1 week demolition** first; the old stand is gone (no seats) while the new one goes up. Rush (+50% cost, 75% time) is now **one switch** above the stand cards (8 cards didn't fit on screen).
+  - **Tunnel:** only when the **middle West section is a main stand**; that section has 4 rows fewer (the tunnel podium).
+  - **Covered seats fill first, dearest stand first** (Marcel); ticket income per seat type; approval: a fan under a roof counts 1.5× for the seating part (`COVERED_APPROVAL` 0.5).
+  - Models: 9 variants in `assets/models/the_shed_N.glb` / `main_stand_N[_tunnel].glb`, each with `*_seats.json` (seat positions + roof profile). Placed 2.9 m behind the line. The game builds the side walls per neighbour from the profiles (full at an open end or next to bleachers, none between equal ones, the strip between the roofs between unequal ones). Fans sit on the real seats.
+  - **Match camera (Marcel, option B "only what really blocks the view"):** `stand_clip.gdshader` + the fan shader don't draw anything on the West side above the sight line from the camera to the near touchline; `main.gd` updates the global `stand_clip` every frame (follows camera and zoom); off in the hub and for penalties.
+  - Dev: `-- --stands-demo` (every stand type around the ground; `--stands-match` starts a home match with 2,500 fans), `tools/dev/stands_test.gd` (costs, times, demolition, tunnel seats, covered-first tickets, approval, save/load).
+
 ## 10i. 3D POC #2 — big two-tier stand (2026-11-07)
 **Marcel's ask:** a big stand as a POC, including floodlights, stairs, aisles, two tiers, a roof, roof beams, and some people spread over the seats.
 

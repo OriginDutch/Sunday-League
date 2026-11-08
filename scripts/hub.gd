@@ -28,6 +28,7 @@ var overlay: Control              # build preview card (kept across refreshes)
 var _prev_key := ""
 var tab := "Club"
 var stand_cat := "Seating"        # Stadium catalogue tab
+var rush := false                 # Stands: build the next one as a rush job (+50% cost, 75% of the time)
 var table_open := false
 var cheats_open := false          # dev cheats (F1 in the hub)
 var away_viewing := ""            # dev cheat: away ground on show in the hub
@@ -666,15 +667,33 @@ func _stadium_tab() -> void:
 		grid.add_child(_shop_card("chair", "Chair", "seat", "+1 seat", "Instant · up to %d per spot" % ClubState.MAX_CHAIRS_PER_SLOT, "Folding. Mostly."))
 		grid.add_child(_shop_card("bench", "Bench", "seat", "+%d seats" % ClubState.BENCH_SEATS, "Instant", "Seats four. Five if you're friendly."))
 	else:
-		var n := ClubState.BLEACHER_ROWS[0] * ClubState.BLEACHER_SEATS_PER_ROW
-		grid.add_child(_shop_card("bleachers", "Open bleachers", "stadium", "+%d seats" % n,
-			"%s wk · +%d wk if seats there" % [_wk(club.build_weeks("bleachers")), int(ClubState.DEMOLITION_WEEKS)], "Aluminium. Cold in January."))
-		grid.add_child(_shop_card("bleachers_rush", "Bleachers, rush", "clock", "+%d seats" % n,
-			"%s wk · +50%% cost" % _wk(club.build_weeks("bleachers_rush")), "Lads on overtime."))
-		grid.add_child(_shop_card("rows", "+2 rows", "plus", "+%d seats" % (2 * ClubState.BLEACHER_SEATS_PER_ROW),
-			"%s wk · on bleachers, max %d rows" % [_wk(club.build_weeks("rows")), ClubState.BLEACHER_ROWS[-1]], "Up we go."))
-		grid.add_child(_shop_card("rows_rush", "+2 rows, rush", "clock", "+%d seats" % (2 * ClubState.BLEACHER_SEATS_PER_ROW),
-			"%s wk · +50%% cost" % _wk(club.build_weeks("rows_rush")), "Same rows, louder builders."))
+		# rush is one switch for every stand card (8 cards didn't fit)
+		var rb := CheckButton.new()
+		rb.text = "Rush build: +50% cost, 75% of the time"
+		rb.button_pressed = rush
+		rb.focus_mode = Control.FOCUS_NONE
+		rb.add_theme_font_override("font", Kit.font(false, 600))
+		rb.add_theme_font_size_override("font_size", 16)
+		rb.add_theme_color_override("font_color", Kit.c("ink"))
+		rb.add_theme_color_override("font_pressed_color", Kit.c("ink"))
+		rb.add_theme_color_override("font_hover_color", Kit.c("ink"))
+		rb.toggled.connect(func(on: bool) -> void:
+			rush = on
+			if main.placing_item != "" and main.placing_item in ClubState.SECTION_ITEMS:
+				main.placing_item = ClubState.item_stage(main.placing_item) + ("_rush" if on else "")
+			refresh())
+		b.add_child(rb)
+		var sfx := "_rush" if rush else ""
+		var flav := {"bleachers": "Aluminium. Cold in January.", "shed": "A roof! Ticket +25%. Fans stay dry.",
+			"main": "Columns in your view. Ticket +50%.", "rows": "Up we go."}
+		var icons := {"bleachers": "stadium", "shed": "stadium", "main": "stadium", "rows": "plus"}
+		for st in ClubState.STAGE_ORDER:
+			var info_st: Dictionary = ClubState.STAGES[st]
+			var steps: Array = info_st["rows"]
+			grid.add_child(_shop_card(st + sfx, info_st["name"], icons[st], "+%d seats · %s rows" % [int(steps[0]) * ClubState.BLEACHER_SEATS_PER_ROW, "/".join(steps.map(func(x): return str(x)))],
+				"%s wk · +%d wk demolition if something's there" % [_wk(club.build_weeks(st + sfx)), int(ClubState.DEMOLITION_WEEKS)], flav[st]))
+		grid.add_child(_shop_card("rows" + sfx, "More rows", icons["rows"], "next row step",
+			"on any stand · price per place of that stand", flav["rows"]))
 	b.add_child(grid)
 	var info := _hbox(8)
 	info.add_child(Kit.icon("info", 18, Kit.c("pen")))
@@ -686,7 +705,7 @@ func _stadium_tab() -> void:
 	if not club.builds.is_empty():
 		b.add_child(Kit.caps("Under construction", Kit.c("muted")))
 		for bd in club.builds:
-			b.add_child(Kit.label("Section %d · bleachers, %d rows · ready %s" % [int(bd["sec"]) + 1, int(bd["rows"]), club.ready_label(bd)],
+			b.add_child(Kit.label("Section %d · %s, %d rows · ready %s" % [int(bd["sec"]) + 1, ClubState.STAGES[bd.get("stage", "bleachers")]["name"], int(bd["rows"]), club.ready_label(bd)],
 				false, 15, 600, Kit.c("ink"), true))
 	Kit.pin(s["root"], 222)
 	_at(s["root"], 40, 140, 444)
@@ -1471,13 +1490,14 @@ func _close_settings() -> void:
 static func _side_name(sec: int) -> String:
 	var L := ClubState.SECTIONS_LONG
 	var S := ClubState.SECTIONS_SHORT
+	# Marcel (2026-11-08): the camera side is the main side, "West"; opposite "East"; the ends North and South
 	if sec < L:
-		return "Main side · Section %d" % (sec + 1)
+		return "East side · Section %d" % (sec + 1)
 	if sec < 2 * L:
-		return "Near side · Section %d" % (sec - L + 1)
+		return "West side · Section %d" % (sec - L + 1)
 	if sec < 2 * L + S:
-		return "West end · Section %d" % (sec - 2 * L + 1)
-	return "East end · Section %d" % (sec - 2 * L - S + 1)
+		return "North end · Section %d" % (sec - 2 * L + 1)
+	return "South end · Section %d" % (sec - 2 * L - S + 1)
 
 
 ## Called by main every hub frame while placing. idx = hovered spot/section (-1 = none).
@@ -1505,8 +1525,13 @@ func _preview_card(item: String, idx: int) -> Control:
 	if item == "hardcore":
 		return _hardcore_card(idx)
 	var sec_item := item in ClubState.SECTION_ITEMS
-	var names := {"chair": "Chair", "bench": "Bench", "bleachers": "Open bleachers", "bleachers_rush": "Open bleachers (rush)",
-		"rows": "+2 rows", "rows_rush": "+2 rows (rush)"}
+	var names := {"chair": "Chair", "bench": "Bench"}
+	if sec_item:
+		var st0 := ClubState.item_stage(item)
+		var nm := "More rows" if st0 == "rows" else String(ClubState.STAGES[st0]["name"])
+		if st0 == "rows" and club.stage_of(idx) != "":
+			nm = "%s to %d rows" % [ClubState.STAGES[club.stage_of(idx)]["name"], club.next_rows(item, idx)]
+		names[item] = nm + (" (rush)" if item.ends_with("_rush") else "")
 	var s := Kit.sheet("plain_card", 400, 0.6, Vector4(24, 24, 24, 20), 12)
 	var b: VBoxContainer = s["body"]
 	b.add_child(Kit.heading(names.get(item, item), 34))
@@ -1521,21 +1546,33 @@ func _preview_card(item: String, idx: int) -> Control:
 	b.add_child(_line("Cash after", ("-£%s" % _money(-after)) if after < 0 else "£%s" % _money(after), Kit.c("danger") if after < 0 else null))
 	b.add_child(Kit.caps("Adds", Kit.c("muted")))
 	var add_seats := 1
-	match item:
-		"bench":
-			add_seats = ClubState.BENCH_SEATS
-		"bleachers", "bleachers_rush":
-			add_seats = ClubState.BLEACHER_ROWS[0] * ClubState.BLEACHER_SEATS_PER_ROW
-		"rows", "rows_rush":
-			add_seats = 2 * ClubState.BLEACHER_SEATS_PER_ROW
-	b.add_child(_adds("seat", "+%d seat%s (%d → %d)" % [add_seats, "" if add_seats == 1 else "s", club.seats(), club.seats() + add_seats]))
-	b.add_child(_adds("cash", "%s per home match when filled" % _pounds(add_seats * club.ticket_price(), true)))
+	var mult := 1.0
+	var lost := 0
+	if item == "bench":
+		add_seats = ClubState.BENCH_SEATS
+	elif sec_item:
+		var st1 := ClubState.item_stage(item)
+		var stage := club.stage_of(idx) if st1 == "rows" else st1
+		if stage == "":
+			stage = "bleachers"
+		lost = club.section_seats(idx)
+		for k in ClubState.SPOTS_PER_SECTION:
+			lost += club.seats_in(str(idx * ClubState.SPOTS_PER_SECTION + k)) if st1 != "rows" else 0
+		add_seats = ClubState.stand_seats(stage, club.next_rows(item, idx), idx) - lost
+		mult = float(ClubState.STAGES[stage]["ticket"])
+	var after_seats := club.seats() + add_seats
+	b.add_child(_adds("seat", "%+d seat%s (%d → %d)" % [add_seats, "" if absi(add_seats) == 1 else "s", club.seats(), after_seats]))
+	b.add_child(_adds("cash", "%s per home match when filled%s" % [_pounds((add_seats + lost) * club.ticket_price() * mult, true),
+		"" if mult == 1.0 else " (covered: +%d%%)" % int(round((mult - 1.0) * 100))]))
+	if sec_item and ClubState.item_stage(item) == "main" and idx == ClubState.TUNNEL_SECTION:
+		b.add_child(_adds("info", "Players' tunnel here: the first %d rows make way for it" % ClubState.TUNNEL_ROWS, Kit.c("ink")))
 	if sec_item:
 		var w := club.build_weeks(item, idx)
 		var ready := club.ready_label({"finish": club.now() + w})
 		b.add_child(_adds("clock", "Ready in %s wk · %s" % [_wk(w), ready], Kit.c("ink")))
-		if item.begins_with("bleachers") and club._section_has_furniture(idx):
-			b.add_child(_adds("demolish", "Clears the chairs/benches here (+%d wk demolition)" % int(ClubState.DEMOLITION_WEEKS), Kit.c("danger")))
+		if ClubState.item_stage(item) != "rows" and (club._section_has_furniture(idx) or club.stage_of(idx) != ""):
+			var what := "the chairs/benches" if club.stage_of(idx) == "" else "the " + String(ClubState.STAGES[club.stage_of(idx)]["name"]).to_lower()
+			b.add_child(_adds("demolish", "Demolishes %s here (+%d wk)" % [what, int(ClubState.DEMOLITION_WEEKS)], Kit.c("danger")))
 		b.add_child(Kit.label("The section is closed while it's being built.", true, 19, 400, Kit.c("pen"), true))
 	else:
 		b.add_child(_adds("clock", "Ready instantly", Kit.c("ink")))

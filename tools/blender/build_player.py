@@ -22,8 +22,8 @@ BONES = {
     "hips":        ((0, 0, 0.95), (0, 0, 1.06), "root"),
     "spine":       ((0, 0, 1.06), (0, 0, 1.28), "hips"),
     "chest":       ((0, 0, 1.28), (0, 0, 1.47), "spine"),
-    "neck":        ((0, 0, 1.47), (0, 0, 1.57), "chest"),
-    "head":        ((0, 0, 1.57), (0, 0, 1.80), "neck"),
+    "neck":        ((0, 0, 1.47), (0, 0, 1.55), "chest"),
+    "head":        ((0, 0, 1.55), (0, 0, 1.84), "neck"),
 }
 for side, sx in (("L", 1), ("R", -1)):
     BONES.update({
@@ -111,6 +111,26 @@ class Part:
             f = self.bm.faces.new(verts[-1])
             f.material_index = idx
 
+    def tube_rings(self, rings, mat, sides=10, squash=(1.0, 1.0)):
+        """Closed vertical tube through several (center, radius) rings — one watertight piece (no seams)."""
+        verts = []
+        for c, r in rings:
+            c = Vector(c)
+            ring = []
+            for i in range(sides):
+                ang = 2 * math.pi * (i + 0.5) / sides
+                ring.append(self.bm.verts.new(c + Vector((math.cos(ang) * r * squash[0], math.sin(ang) * r * squash[1], 0))))
+            verts.append(ring)
+        idx = self.mi(mat)
+        for k in range(len(verts) - 1):
+            r0, r1 = verts[k], verts[k + 1]
+            for i in range(sides):
+                f = self.bm.faces.new((r0[i], r0[(i + 1) % sides], r1[(i + 1) % sides], r1[i]))
+                f.material_index = idx
+        for ring in (verts[0], verts[-1]):
+            f = self.bm.faces.new(ring)
+            f.material_index = idx
+
     def box(self, center, size, mat, rot=None):
         m = Matrix.Translation(Vector(center))
         if rot:
@@ -119,10 +139,16 @@ class Part:
         for f in {f for v in geo["verts"] for f in v.link_faces}:
             f.material_index = self.mi(mat)
 
-    def blob(self, center, scale, mat, subdiv=2, keep=None):
-        """Icosphere, scaled; keep(v_local) -> bool drops vertices to cut shells (hair caps, beards)."""
-        geo = bmesh.ops.create_icosphere(self.bm, subdivisions=subdiv, radius=1.0,
-                                         matrix=Matrix.Translation(Vector(center)) @ Matrix.Diagonal((*scale, 1.0)))
+    def blob(self, center, scale, mat, subdiv=2, keep=None, sym=False):
+        """Icosphere (or a left/right-symmetric UV sphere when sym), scaled; keep(v_local) -> bool drops
+        vertices to cut shells (hair caps, beards)."""
+        m = Matrix.Translation(Vector(center)) @ Matrix.Diagonal((*scale, 1.0))
+        if sym:
+            # rotate so the seam/poles are top-bottom and the vertex columns mirror across x = 0
+            geo = bmesh.ops.create_uvsphere(self.bm, u_segments=14, v_segments=10, radius=1.0,
+                                            matrix=m @ Euler((0, 0, math.pi / 14)).to_matrix().to_4x4())
+        else:
+            geo = bmesh.ops.create_icosphere(self.bm, subdivisions=subdiv, radius=1.0, matrix=m)
         verts = geo["verts"]
         if keep:
             drop = [v for v in verts if not keep((v.co - Vector(center)) / 1.0)]
@@ -172,88 +198,109 @@ def armature():
     return arm
 
 
+HC = Vector((0, -0.01, 1.705))       # head centre
+HS = Vector((0.118, 0.136, 0.158))   # head half-sizes (Marcel: head was far too small)
+
+
+def on_head(x, z, out=0.004):
+    """Point on the head ellipsoid's front at (x, z) offset from the centre, pushed out a little."""
+    k = 1.0 - (x / HS.x) ** 2 - (z / HS.z) ** 2
+    y = -HS.y * math.sqrt(max(0.0, k)) - out
+    return (HC.x + x, HC.y + y, HC.z + z)
+
+
 def body(arm):
     B = BONES
     parts = []
-    # torso
+    # torso: wider, deeper chest, squarer shoulders sloping into the neck (trapezius)
     p = Part("Torso", "chest")
-    p.ring_tube((0, 0.005, 1.27), (0, 0.0, 1.47), 0.15, 0.185, "Shirt", 10, squash=(1.0, 0.62))
-    p.ring_tube((0, 0.0, 1.47), (0, 0.0, 1.50), 0.185, 0.09, "Shirt", 10, squash=(1.0, 0.62))   # shoulders slope
+    p.tube_rings([((0, 0.005, 1.27), 0.16), ((0, 0.003, 1.38), 0.195), ((0, 0.0, 1.45), 0.2),
+                  ((0, 0.003, 1.495), 0.15), ((0, 0.005, 1.525), 0.085)], "Shirt", 10, squash=(1.0, 0.74))
+    for sx in (1, -1):
+        # deltoid/shoulder block: square-ish, not a ball
+        p.box((sx * 0.178, 0.0, 1.43), (0.085, 0.11, 0.085), "Shirt", rot=(0, math.radians(sx * 18), 0))
     parts.append(p)
     p = Part("Belly", "spine")
-    p.ring_tube((0, 0.01, 1.05), (0, 0.005, 1.28), 0.145, 0.15, "Shirt", 10, squash=(1.0, 0.62))
+    p.ring_tube((0, 0.01, 1.04), (0, 0.005, 1.28), 0.15, 0.16, "Shirt", 10, squash=(1.0, 0.72))
     parts.append(p)
     p = Part("Pelvis", "hips")
-    p.ring_tube((0, 0.01, 0.88), (0, 0.01, 1.07), 0.15, 0.148, "Shorts", 10, squash=(1.0, 0.66))
+    p.ring_tube((0, 0.01, 0.87), (0, 0.01, 1.07), 0.16, 0.152, "Shorts", 10, squash=(1.0, 0.72))
     parts.append(p)
     p = Part("Neck", "neck")
-    p.ring_tube((0, 0.0, 1.46), (0, -0.005, 1.60), 0.064, 0.058, "Skin", 8)
+    p.ring_tube((0, 0.0, 1.47), (0, -0.005, 1.58), 0.068, 0.062, "Skin", 8)
     parts.append(p)
     # head + face
     p = Part("Head", "head")
-    hc = (0, -0.005, 1.685)
-    p.blob(hc, (0.088, 0.102, 0.118), "Skin", 2)
-    p.box((0, -0.105, 1.675), (0.024, 0.03, 0.05), "Skin", rot=(math.radians(-8), 0, 0))           # nose
+    p.blob(tuple(HC), tuple(HS), "Skin", 2, sym=True)
+    p.box(on_head(0, -0.012, 0.01), (0.03, 0.04, 0.058), "Skin", rot=(math.radians(-10), 0, 0))     # nose
     for sx in (1, -1):
-        p.blob((sx * 0.035, -0.088, 1.705), (0.011, 0.006, 0.009), "Eyes", 1)                     # eyes
-        p.box((sx * 0.036, -0.094, 1.728), (0.032, 0.008, 0.008), "Hair", rot=(0, 0, math.radians(-sx * 6)))  # brows
-        p.blob((sx * 0.09, -0.0, 1.69), (0.012, 0.024, 0.032), "Skin", 1)                          # ears
-    p.box((0, -0.097, 1.637), (0.036, 0.006, 0.006), "Eyes")                                         # mouth line
+        p.blob(on_head(sx * 0.046, 0.024, 0.002), (0.014, 0.007, 0.012), "Eyes", 1)                 # eyes
+        p.box(on_head(sx * 0.047, 0.058, 0.004), (0.044, 0.012, 0.011), "Hair", rot=(0, 0, math.radians(-sx * 6)))  # brows
+        p.blob((sx * HS.x * 0.98, HC.y + 0.005, HC.z + 0.0), (0.014, 0.028, 0.038), "Skin", 1)      # ears
+    p.box(on_head(0, -0.068, 0.001), (0.046, 0.007, 0.008), "Eyes")                                 # mouth line
     parts.append(p)
 
-    # hair variants (separate objects, same bone) + beard
-    def cap(v, low=0.0, front_cut=-0.6):
-        # keep the top/back of the skull; front: stop above the forehead
-        return v.z > low and not (v.y < front_cut * 0.102 and v.z < 0.55 * 0.118)
+    # hair variants + beard: shells of the same head shape, slightly bigger, so they always fit
+    def hair_keep(back_low, side_low, front_low):
+        def keep(v):
+            n = Vector((v.x / HS.x, v.y / HS.y, v.z / HS.z))
+            if n.y > 0.25:             # back of the head: down to the nape
+                return n.z > back_low
+            if n.y < -0.55:            # front: hairline above the forehead
+                return n.z > front_low
+            return n.z > side_low      # sides: down to the top of the ears
+        return keep
     variants = {
-        "Hair_Short": dict(scale=(0.094, 0.108, 0.124), low=-0.03),
-        "Hair_Buzz": dict(scale=(0.0935, 0.1075, 0.1235), low=-0.045),
-        "Hair_Quiff": dict(scale=(0.095, 0.11, 0.128), low=-0.01),
-        "Hair_Long": dict(scale=(0.097, 0.112, 0.126), low=-0.07),
+        "Hair_Short": (1.06, hair_keep(-0.55, -0.12, 0.42)),
+        "Hair_Buzz": (1.035, hair_keep(-0.5, -0.1, 0.45)),
+        "Hair_Quiff": (1.06, hair_keep(-0.5, -0.1, 0.4)),
+        "Hair_Long": (1.08, hair_keep(-0.95, -0.55, 0.38)),
     }
-    for name, cfg in variants.items():
+    for name, (k, keep) in variants.items():
         p = Part(name, "head")
-        sc = Vector(cfg["scale"])
-        low = cfg["low"]
-        p.blob(hc, cfg["scale"], "Hair", 2, keep=lambda v, low=low: (v.z > low and not (v.y < -0.05 and v.z < 0.055)))
+        p.blob(tuple(HC), tuple(HS * k), "Hair", 2, keep=lambda v, k=k, keep=keep: keep(v / k), sym=True)
         if name == "Hair_Quiff":
-            p.blob((0, -0.06, 1.79), (0.06, 0.05, 0.035), "Hair", 1)
-        if name == "Hair_Long":
-            p.blob((0, 0.05, 1.62), (0.085, 0.05, 0.07), "Hair", 1)
+            p.blob((0, HC.y - 0.07, HC.z + 0.13), (0.07, 0.06, 0.04), "Hair", 1)
         parts.append(p)
+
+    def beard_keep(v):
+        n = Vector((v.x / HS.x, v.y / HS.y, v.z / HS.z))
+        if n.y > 0.35 or n.z > 0.05:
+            return False
+        if abs(n.x) < 0.38 and -0.5 < n.z < -0.25 and n.y < -0.6:     # keep the mouth free
+            return False
+        return n.z < -0.15 or abs(n.x) > 0.8                           # jaw, chin + sideburns
     p = Part("Beard", "head")
-    p.blob((0, -0.015, 1.655), (0.09, 0.098, 0.088), "Hair", 2,
-           keep=lambda v: v.z < -0.012 and v.y < 0.03 and not (abs(v.x) < 0.03 and v.z > -0.035 and v.y < -0.06))
+    p.blob(tuple(HC), tuple(HS * 1.045), "Hair", 2, keep=lambda v: beard_keep(v / 1.045), sym=True)
     parts.append(p)
 
     for side, sx in (("L", 1), ("R", -1)):
         h, t, _ = B[f"upperarm.{side}"]
         p = Part(f"UpperArm.{side}", f"upperarm.{side}")
-        p.ring_tube((h[0], h[1], h[2] + 0.02), Vector(h).lerp(Vector(t), 0.55), 0.06, 0.052, "Shirt", 8)   # sleeve
-        p.ring_tube(Vector(h).lerp(Vector(t), 0.5), t, 0.043, 0.038, "Skin", 8)
-        p.blob((sx * 0.175, 0, 1.425), (0.062, 0.058, 0.05), "Shirt", 2)                                   # shoulder cap
+        p.ring_tube((h[0], h[1], h[2] + 0.01), Vector(h).lerp(Vector(t), 0.55), 0.072, 0.064, "Shirt", 8)   # sleeve
+        p.ring_tube(Vector(h).lerp(Vector(t), 0.5), t, 0.055, 0.048, "Skin", 8)
         parts.append(p)
         h, t, _ = B[f"forearm.{side}"]
         p = Part(f"ForeArm.{side}", f"forearm.{side}")
-        p.ring_tube(h, t, 0.038, 0.03, "Skin", 8)
+        p.ring_tube(h, t, 0.049, 0.036, "Skin", 8, ring_mid=(0.3, 0.052))
         parts.append(p)
         h, t, _ = B[f"hand.{side}"]
         p = Part(f"Hand.{side}", f"hand.{side}")
-        p.box(Vector(h).lerp(Vector(t), 0.5), (0.035, 0.055, 0.09), "Skin")
+        p.box(Vector(h).lerp(Vector(t), 0.5), (0.042, 0.07, 0.1), "Skin")
         parts.append(p)
         h, t, _ = B[f"thigh.{side}"]
         p = Part(f"Thigh.{side}", f"thigh.{side}")
-        p.ring_tube((h[0], h[1], h[2] + 0.05), Vector(h).lerp(Vector(t), 0.45), 0.09, 0.08, "Shorts", 8)   # shorts leg
-        p.ring_tube(Vector(h).lerp(Vector(t), 0.42), t, 0.068, 0.054, "Skin", 8)
+        p.ring_tube((h[0], h[1], h[2] + 0.05), Vector(h).lerp(Vector(t), 0.45), 0.105, 0.095, "Shorts", 8)  # shorts leg
+        p.ring_tube(Vector(h).lerp(Vector(t), 0.42), t, 0.085, 0.066, "Skin", 8)
         parts.append(p)
         h, t, _ = B[f"shin.{side}"]
         p = Part(f"Shin.{side}", f"shin.{side}")
-        p.ring_tube(h, Vector(h).lerp(Vector(t), 0.14), 0.05, 0.05, "Skin", 8)
-        p.ring_tube(Vector(h).lerp(Vector(t), 0.12), t, 0.052, 0.036, "Socks", 8, ring_mid=(0.35, 0.056))
+        p.ring_tube(h, Vector(h).lerp(Vector(t), 0.14), 0.064, 0.064, "Skin", 8)
+        p.ring_tube(Vector(h).lerp(Vector(t), 0.12), t, 0.066, 0.042, "Socks", 8, ring_mid=(0.35, 0.07))
         parts.append(p)
         p = Part(f"Foot.{side}", f"foot.{side}")
-        p.box((sx * 0.10, -0.035, 0.045), (0.085, 0.25, 0.08), "Boots")
-        p.box((sx * 0.10, 0.06, 0.012), (0.08, 0.06, 0.024), "Boots")
+        p.box((sx * 0.10, -0.035, 0.045), (0.095, 0.26, 0.085), "Boots")
+        p.box((sx * 0.10, 0.06, 0.012), (0.09, 0.06, 0.024), "Boots")
         parts.append(p)
     return [q.build(arm) for q in parts]
 
@@ -391,7 +438,7 @@ def preview(arm, objs):
     scene.render.resolution_x, scene.render.resolution_y = 360, 360
     for i, (hair, beard) in enumerate([("Hair_Short", False), ("Hair_Buzz", True), ("Hair_Quiff", False), ("Hair_Long", True)]):
         show_hair(hair, beard)
-        shoot(os.path.join(PREVIEW_DIR, f"face_{i}.png"), (0.35, -1.0, 1.72), (0, 0, 1.68))
+        shoot(os.path.join(PREVIEW_DIR, f"face_{i}.png"), (0.42, -1.15, 1.73), (0, 0, 1.67))
     show_hair("Hair_Short", False)
     # run cycles side view, frame by frame
     scene.render.resolution_x, scene.render.resolution_y = 360, 420

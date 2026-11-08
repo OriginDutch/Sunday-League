@@ -13,6 +13,20 @@ const START_SQUAD := 4              # you start with a few people and recruit th
 const SQUAD_SIZE := 11
 const CANDIDATES := 8               # size of the "Who can play for you" list
 const TICKET_PRICE := 2             # £ per seated fan (fixed in v0.1)
+# Bottom-tier money flows (Marcel, 2026-11-08 — tunable; GDD §10b "Finances tab + bottom-tier economy")
+const TEA_PER_VISITOR := 1          # tea hut: £ per visitor (seated + standing)
+const SUBS_PER_PLAYER := 1          # match subs: every player chips in, home and away
+const SPONSOR_PER_SEASON := 50      # paid in week 1
+const SPONSOR_NAME := "Dave's Plumbing"
+const PRIZE_MONEY := 1.70           # end of the season (one beer)
+const PITCH_HIRE := 8               # per home match
+const REFEREE_FEE := 5              # per home match
+const KIT_WASHING := 2              # per match
+const TRAVEL := 3                   # per away match
+const LEAGUE_FEE := 30              # per season, week 1
+## Ledger categories, in display order. New sources/expenses = a new name here + where it's booked.
+const INCOME_CATS := ["Tickets", "Tea hut", "Match subs", "Sponsor", "Prize money"]
+const EXPENSE_CATS := ["Pitch hire", "Referee", "Kit washing", "Travel", "League fee", "Building"]
 const CHAIR_PRICE := 12
 const BENCH_PRICE := 40
 const BENCH_SEATS := 4
@@ -60,6 +74,13 @@ var fans_carry := 0.0               # fractional fan growth carried over
 var league: LeagueScript                  # your division: fixtures, results, table
 var sections: Dictionary = {}       # section index (String) -> {"stage": "bleachers", "rows": n}
 var builds: Array = []              # [{"sec", "stage", "rows", "finish" (absolute week), "start"}]
+## Money ledger: every booking with its lines (category -> £, + in / - out), per match / season / build,
+## so the Finances tab can total it any way (and a match can be opened in full later).
+var ledger: Array = []              # [{season, week, kind: "match"|"season"|"build", title, lines: {cat: £}, ...}]
+var cash_log: Array = []            # [{season, week, cash}] after every booking (cash chart)
+var cash_pennies := 0.0             # sub-pound remainder (prize money is £1.70)
+var finances_season := 0            # last season whose week-1 money (sponsor, league fee) is booked
+var prize_paid_season := 0
 ## Hard-core sections (Marcel, 2026-11-08): free, as many as you like, purely visual for now —
 ## flags, scarves, club wear and a share always standing. Keys are section numbers as strings.
 var hardcore := {}
@@ -73,6 +94,8 @@ static func new_game() -> ClubState:
 		s.squad.append(Names.person())
 	s.refill_candidates()
 	s.league = LeagueScript.create(CLUB_NAME)
+	s.cash_log.append({"season": 1, "week": 0, "cash": s.money})
+	s.start_season_money()
 	return s
 
 
@@ -186,7 +209,8 @@ func build_weeks(item: String, sec: int = -1) -> float:
 func start_build(item: String, sec: int) -> bool:
 	if not can_build(item, sec) or money < build_cost(item, sec):
 		return false
-	money -= build_cost(item, sec)
+	book("build", "Section %d · %s" % [sec + 1, "+2 rows" if item.begins_with("rows") else "bleachers"],
+		{"Building": -build_cost(item, sec)}, {"note": "rush" if item.ends_with("_rush") else ""})
 	var rows := BLEACHER_ROWS[0]
 	if item.begins_with("rows"):
 		rows = BLEACHER_ROWS[BLEACHER_ROWS.find(bleacher_rows(sec)) + 1]
@@ -256,7 +280,7 @@ func place(item: String, slot: int) -> bool:
 	var key := str(slot)
 	if not can_place(item, slot) or money < price_of(item):
 		return false
-	money -= price_of(item)
+	book("build", "Bench" if item == "bench" else "Chair", {"Building": -price_of(item)})
 	if item == "bench":
 		slots[key] = "bench"
 	else:
@@ -266,12 +290,18 @@ func place(item: String, slot: int) -> bool:
 
 ## Applies a finished match. Home: your fans come, seated ones pay. Away (block 2 placeholder until
 ## away grounds exist): no ticket income and no seating effect, only the result counts.
-func apply_match(goals_for: int, goals_against: int, entertainment_events: int, home: bool = true) -> Dictionary:
+func apply_match(goals_for: int, goals_against: int, entertainment_events: int, home: bool = true, opponent: String = "") -> Dictionary:
 	var attendance := fans if home else 0
 	var seated := mini(attendance, seats())
 	var standing := attendance - seated
 	var revenue := seated * TICKET_PRICE
-	money += revenue
+	var lines := {}
+	if home:
+		lines = {"Tickets": revenue, "Tea hut": attendance * TEA_PER_VISITOR, "Match subs": squad.size() * SUBS_PER_PLAYER,
+			"Pitch hire": -PITCH_HIRE, "Referee": -REFEREE_FEE, "Kit washing": -KIT_WASHING}
+	else:
+		lines = {"Match subs": squad.size() * SUBS_PER_PLAYER, "Kit washing": -KIT_WASHING, "Travel": -TRAVEL}
+	var cash_before := money
 
 	var result := "D"
 	if goals_for > goals_against:
@@ -280,6 +310,8 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int, 
 		result = "L"
 	record[result.to_lower()] += 1
 	matches_played += 1
+	var entry := book("match", opponent if opponent != "" else "Friendly", lines,
+		{"home": home, "result": result, "score": "%d-%d" % [goals_for, goals_against], "fans": attendance})
 
 	# approval
 	var d_app := APPROVAL_DRAW
@@ -320,8 +352,82 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int, 
 		"fans_before": fans_before, "fans_after": fans,
 		"approval_before": approval_before, "approval_after": approval,
 		"approval_parts": {"result": d_app, "entertainment": ent, "seating": no_seat},
-		"home": home,
+		"home": home, "lines": lines, "money_in": entry_in(entry), "money_out": entry_out(entry),
+		"cash_before": cash_before, "cash_after": money,
 	}
+
+
+# ------------------------------------------------------------------ money
+
+## Books money in (+) / out (-) per category and keeps the ledger + cash log.
+func book(kind: String, title: String, lines: Dictionary, extra: Dictionary = {}) -> Dictionary:
+	var e := {"season": league.season, "week": league.current_week(), "kind": kind, "title": title, "lines": lines}
+	e.merge(extra)
+	var total := 0.0
+	for k in lines:
+		total += float(lines[k])
+	cash_pennies += total
+	var whole := int(cash_pennies)          # towards zero; the pennies wait
+	money += whole
+	cash_pennies -= whole
+	ledger.append(e)
+	cash_log.append({"season": league.season, "week": league.current_week(), "cash": money})
+	return e
+
+
+## Week 1 of a season: sponsor in, league fee out (once per season).
+func start_season_money() -> void:
+	if finances_season >= league.season:
+		return
+	finances_season = league.season
+	book("season", "Season %d starts" % league.season, {"Sponsor": SPONSOR_PER_SEASON, "League fee": -LEAGUE_FEE},
+		{"note": SPONSOR_NAME})
+
+
+## After the last match: prize money (once per season).
+func end_season_money() -> void:
+	if prize_paid_season >= league.season or not league.season_over():
+		return
+	prize_paid_season = league.season
+	book("season", "Season %d prize money" % league.season, {"Prize money": PRIZE_MONEY})
+
+
+## In/out per category for one season (all categories present, 0 when nothing happened).
+func season_totals(season: int) -> Dictionary:
+	var inc := {}
+	var out := {}
+	for c in INCOME_CATS:
+		inc[c] = 0.0
+	for c in EXPENSE_CATS:
+		out[c] = 0.0
+	for e in ledger:
+		if int(e["season"]) != season:
+			continue
+		for k in e["lines"]:
+			var v := float(e["lines"][k])
+			if inc.has(k):
+				inc[k] += v
+			elif out.has(k):
+				out[k] += v
+			elif v >= 0.0:
+				inc[k] = inc.get(k, 0.0) + v
+			else:
+				out[k] = out.get(k, 0.0) + v
+	return {"in": inc, "out": out}
+
+
+static func entry_in(e: Dictionary) -> float:
+	var t := 0.0
+	for k in e["lines"]:
+		t += maxf(0.0, float(e["lines"][k]))
+	return t
+
+
+static func entry_out(e: Dictionary) -> float:
+	var t := 0.0
+	for k in e["lines"]:
+		t += minf(0.0, float(e["lines"][k]))
+	return t
 
 
 func is_hardcore(sec: int) -> bool:
@@ -344,6 +450,8 @@ func to_dict() -> Dictionary:
 		"matches_played": matches_played, "fans_carry": fans_carry,
 		"league": league.to_dict(), "sections": sections, "builds": builds,
 		"hardcore": hardcore, "temperature": temperature,
+		"ledger": ledger, "cash_log": cash_log, "cash_pennies": cash_pennies,
+		"finances_season": finances_season, "prize_paid_season": prize_paid_season,
 	}
 
 
@@ -365,6 +473,11 @@ static func from_dict(d: Dictionary) -> ClubState:
 	s.sections = d.get("sections", {})
 	for k in s.sections:
 		s.sections[k]["rows"] = int(s.sections[k]["rows"])
+	s.ledger = d.get("ledger", [])
+	s.cash_log = d.get("cash_log", [])
+	s.cash_pennies = float(d.get("cash_pennies", 0.0))
+	s.finances_season = int(d.get("finances_season", 0))
+	s.prize_paid_season = int(d.get("prize_paid_season", 0))
 	s.hardcore = d.get("hardcore", {})
 	s.temperature = String(d.get("temperature", "mild"))
 	s.builds = d.get("builds", [])
@@ -372,6 +485,7 @@ static func from_dict(d: Dictionary) -> ClubState:
 		b["sec"] = int(b["sec"])
 		b["rows"] = int(b["rows"])
 	s.refill_candidates()
+	s.start_season_money()
 	return s
 
 

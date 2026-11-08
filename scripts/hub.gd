@@ -96,6 +96,8 @@ func refresh() -> void:
 			_recruitment_tab()
 		"Squad":
 			_squad_tab()
+		"Finances":
+			_finances_tab()
 	if cheats_open:
 		_cheats()
 	_strip()
@@ -272,12 +274,8 @@ func _strip() -> void:
 	nav.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	for n in NAV:
 		var b := Kit.nav_item(n[0], n[1], n[0] == tab)
-		if n[0] == "Finances":
-			b.disabled = true
-			b.tooltip_text = "Coming next"
-		else:
-			var t: String = n[0]
-			b.pressed.connect(func() -> void: go(t))
+		var t: String = n[0]
+		b.pressed.connect(func() -> void: go(t))
 		nav.add_child(b)
 	row.add_child(nav)
 	Kit.tape(holder, Vector2(-20, -14), -8)
@@ -769,6 +767,272 @@ func _squad_tab() -> void:
 	_formation_card()
 
 
+# ------------------------------------------------------------------ Finances tab (Marcel, 2026-11-08; mock-up S_Finances)
+
+const LEDGER_ROWS := 6
+
+
+func _finances_tab() -> void:
+	var lg: LeagueScript = club.league
+	var season := lg.season
+	var tot: Dictionary = club.season_totals(season)
+	var notes := {"Sponsor": ClubState.SPONSOR_NAME, "Prize money": "end of season", "League fee": "week 1"}
+	# --- this season, per category
+	var s := Kit.sheet("card", 430, -0.6, Vector4(26, 22, 26, 18), 2)
+	var b: VBoxContainer = s["body"]
+	b.add_child(_spread(Kit.heading("This season", 36), Kit.caps("Week %d / %d" % [mini(lg.current_week(), LeagueScript.SEASON_WEEKS), LeagueScript.SEASON_WEEKS])))
+	b.add_child(Kit.caps("Money in", Kit.c("muted")))
+	var ti := 0.0
+	for k in tot["in"]:
+		var v: float = tot["in"][k]
+		ti += v
+		b.add_child(_fin_row(k, notes.get(k, ""), _pounds(v), Kit.c("ok") if v > 0.0 else Kit.c("muted")))
+	b.add_child(Kit.rule(Kit.c("div"), 1))
+	b.add_child(Kit.caps("Money out", Kit.c("muted")))
+	var to := 0.0
+	for k in tot["out"]:
+		var v: float = tot["out"][k]
+		to += v
+		b.add_child(_fin_row(k, notes.get(k, ""), _pounds(v), Kit.c("danger") if v < 0.0 else Kit.c("muted")))
+	b.add_child(Kit.rule())
+	var net := ti + to
+	b.add_child(_fin_row("In − out", "", _pounds(net, true), Kit.c("ok") if net >= 0.0 else Kit.c("danger"), true))
+	b.add_child(Kit.label("Up on the season. The tea hut is carrying us." if net >= 0.0 else "Down on the season. Nan's doing a bake sale.",
+		true, 19, 400, Kit.c("pen"), true))
+	Kit.pin(s["root"], 222)
+	_at(s["root"], 40, 140, 430)
+	_ledger_card(season)
+	_cash_card(season)
+	_coming_up()
+
+
+func _fin_row(lab: String, note: String, val: String, col: Color, bold := false) -> Control:
+	var h := _hbox(8)
+	h.custom_minimum_size = Vector2(0, 32)
+	var l := Kit.label(lab, false, 19 if bold else 16, 700 if bold else 500, Kit.c("ink") if bold else Kit.c("muted"))
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(l)
+	if note != "":
+		var n := Kit.label(note, true, 17, 400, Kit.c("muted"))
+		n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(n)
+	var sp := Control.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(sp)
+	var v := Kit.label(val, false, 19 if bold else 17, 700 if bold else 600, col)
+	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(v)
+	return h
+
+
+## Match by match (newest first). Every match is stored with all its lines, so a row can open a
+## breakdown later (Marcel: not clickable yet, maybe later); opponent crests go in the crest column.
+func _ledger_card(season: int) -> void:
+	var s := Kit.sheet("plain_card", 820, 0.3, Vector4(24, 22, 24, 16), 8)
+	var b: VBoxContainer = s["body"]
+	b.add_child(_spread(Kit.heading("Match by match", 36), Kit.label("Season %d" % season, false, 15, 500, Kit.c("muted"))))
+	b.add_child(Kit.rule())
+	var W := [62, 26, 0, 40, 64, 84, 84, 92]
+	b.add_child(_ledger_row(["Week", "", "Opponent", "", "Result", "In", "Out", "Net"], W, true))
+	var matches := []
+	for e in club.ledger:
+		if e["kind"] == "match" and int(e["season"]) == season:
+			matches.append(e)
+	matches.reverse()
+	if matches.is_empty():
+		b.add_child(Kit.label("No matches yet this season.", true, 20, 400, Kit.c("muted")))
+	for i in mini(LEDGER_ROWS, matches.size()):
+		var e: Dictionary = matches[i]
+		var ein := ClubState.entry_in(e)
+		var eout := ClubState.entry_out(e)
+		b.add_child(_ledger_row(["Wk %d" % int(e["week"]), "crest", e["title"], "H" if e.get("home", true) else "A",
+			"%s %s" % [e.get("result", ""), e.get("score", "")], _pounds(ein), _pounds(eout), _pounds(ein + eout, true)], W))
+	if matches.size() > LEDGER_ROWS:
+		b.add_child(Kit.label("+ %d earlier" % (matches.size() - LEDGER_ROWS), false, 14, 500, Kit.c("muted")))
+	b.add_child(Kit.label("Away days cost a fiver. Home days pay the bills.", true, 19, 400, Kit.c("pen")))
+	Kit.pin(s["root"], 246)
+	Kit.pin(s["root"], 574)
+	_at(s["root"], 500, 140, 820)
+
+
+func _ledger_row(cells: Array, widths: Array, head := false) -> Control:
+	var wrap := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0)
+	sb.border_width_bottom = 1
+	sb.border_color = Kit.c("tag_border")
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	wrap.add_theme_stylebox_override("panel", sb)
+	wrap.custom_minimum_size = Vector2(0, 30 if head else 40)
+	var h := _hbox(10)
+	for i in cells.size():
+		var c: Control
+		var txt: String = cells[i]
+		if head:
+			c = Kit.caps(txt, Kit.c("muted"))
+		elif i == 1:
+			c = Kit.icon("crest_away", 22, Kit.c("ink"))       # opponent crest (real logos later)
+		elif i == 3:
+			c = Kit.label(txt, false, 13, 700, Kit.c("ink"))
+		elif i == 4:
+			var col := Kit.c("ok") if txt.begins_with("W") else (Kit.c("danger") if txt.begins_with("L") else Kit.c("muted"))
+			c = Kit.label(txt, false, 15, 700, col)
+		elif i >= 5:
+			var col2 := Kit.c("ok") if i == 5 else (Kit.c("danger") if i == 6 else (Kit.c("danger") if txt.begins_with("-") else Kit.c("ok")))
+			c = Kit.label(txt, false, 16, 700 if i == 7 else 600, col2)
+		elif i == 2:
+			c = Kit.label(txt, false, 16, 600, Kit.c("ink"))
+		else:
+			c = Kit.label(txt, false, 15, 600, Kit.c("muted"))
+		if c is Label:
+			(c as Label).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			if i >= 5:
+				(c as Label).horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			(c as Label).clip_text = true
+		c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var w: int = widths[i]
+		if w == 0:
+			c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		else:
+			c.custom_minimum_size = Vector2(w, c.custom_minimum_size.y)
+		h.add_child(c)
+	wrap.add_child(h)
+	return wrap
+
+
+func _cash_card(season: int) -> void:
+	var s := Kit.sheet("plain_card", 820, -0.4, Vector4(24, 16, 24, 10), 4)
+	var b: VBoxContainer = s["body"]
+	b.add_child(_spread(Kit.heading("Cash", 34), Kit.caps("This season, per week")))
+	var chart := CashChart.new()
+	chart.custom_minimum_size = Vector2(770, 160)
+	var pts := []
+	var start_cash := -1
+	for c in club.cash_log:
+		if int(c["season"]) == season:
+			pts.append(Vector2(float(c["week"]), float(c["cash"])))
+		elif int(c["season"]) < season:
+			start_cash = int(c["cash"])
+	if start_cash >= 0 and (pts.is_empty() or pts[0].x > 0.0):
+		pts.push_front(Vector2(0, start_cash))
+	# one dot per week you built something: "4× chair, bench"
+	var per_week := {}
+	for e in club.ledger:
+		if e["kind"] == "build" and int(e["season"]) == season:
+			var wk := int(e["week"])
+			if not per_week.has(wk):
+				per_week[wk] = {}
+			var t := String(e["title"]).to_lower()
+			per_week[wk][t] = int(per_week[wk].get(t, 0)) + 1
+	var marks := []
+	for wk in per_week:
+		var parts := []
+		for t in per_week[wk]:
+			var n: int = per_week[wk][t]
+			parts.append(t if n == 1 else "%d× %s" % [n, t])
+		marks.append([float(wk), ", ".join(parts)])
+	chart.points = pts
+	chart.marks = marks
+	chart.weeks = LeagueScript.SEASON_WEEKS
+	b.add_child(chart)
+	Kit.tape(s["root"], Vector2(360, -14), 2)
+	_at(s["root"], 500, 652, 820)
+
+
+func _coming_up() -> void:
+	var n := Kit.sheet("note", 360, 1.4, Vector4(24, 26, 24, 22), 14)
+	var b: VBoxContainer = n["body"]
+	b.add_child(Kit.heading("Coming up", 34, Kit.c("note_ink")))
+	for bd in club.builds:
+		b.add_child(_coming("clock", "Section %d bleachers" % (int(bd["sec"]) + 1), "paid · ready %s" % club.ready_label(bd), Kit.c("note_ink")))
+	var lg: LeagueScript = club.league
+	var fx: Dictionary = lg.next_fixture()
+	if not fx.is_empty():
+		var opp: String = lg.teams[fx["opponent"]]["name"]
+		var subs := club.squad.size() * ClubState.SUBS_PER_PLAYER
+		if fx["home"]:
+			var cost := ClubState.PITCH_HIRE + ClubState.REFEREE_FEE + ClubState.KIT_WASHING
+			var est := mini(club.fans, club.seats()) * ClubState.TICKET_PRICE + club.fans * ClubState.TEA_PER_VISITOR + subs - cost
+			b.add_child(_coming("stadium", "Next: %s (home)" % opp, "about %s (pitch, ref, kit −£%d)" % [_pounds(est, true), cost], Kit.c("ok")))
+		else:
+			var cost2 := ClubState.KIT_WASHING + ClubState.TRAVEL
+			b.add_child(_coming("stadium", "Next: %s (away)" % opp, "about %s (subs in, kit and travel −£%d)" % [_pounds(subs - cost2, true), cost2], Kit.c("ok")))
+	if club.prize_paid_season < lg.season:
+		b.add_child(_coming("cash", "Prize money", "%s at the end of the season" % _pounds(ClubState.PRIZE_MONEY, true), Kit.c("ok")))
+	b.add_child(_coming("warn", "Next season, week 1", "League fee −£%d · sponsor +£%d" % [ClubState.LEAGUE_FEE, ClubState.SPONSOR_PER_SEASON], Kit.c("danger")))
+	b.add_child(Kit.label("Nan says the urn needs replacing. Not yet, Nan.", true, 19, 400, Kit.c("note_muted"), true))
+	Kit.tape(n["root"], Vector2(130, -14), -3)
+	_at(n["root"], 44, 160, 360, true)
+
+
+func _coming(ic: String, title: String, sub: String, col: Color) -> Control:
+	var h := _hbox(12)
+	var i := Kit.icon(ic, 20, col)
+	i.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	h.add_child(i)
+	var v := _vbox(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(Kit.label(title, false, 16, 600, Kit.c("note_ink"), true))
+	v.add_child(Kit.label(sub, false, 15, 500, Kit.c("note_muted"), true))
+	h.add_child(v)
+	return h
+
+
+## Cash per week this season: a pen line with dots where you built something.
+class CashChart extends Control:
+	var points: Array = []      # [Vector2(week, cash)]
+	var marks: Array = []       # [[week, label]]
+	var weeks := 42
+
+	func _draw() -> void:
+		var pad := Vector2(30, 24)
+		var w := size.x - pad.x * 2.0
+		var h := size.y - pad.y * 2.0
+		var ink := Kit.c("ink")
+		var hi := 10.0
+		var lo := 0.0
+		for p in points:
+			hi = maxf(hi, p.y)
+			lo = minf(lo, p.y)
+		hi *= 1.15
+		var to_px := func(p: Vector2) -> Vector2:
+			return Vector2(pad.x + w * p.x / weeks, pad.y + h * (1.0 - (p.y - lo) / maxf(1.0, hi - lo)))
+		for g in [0.25, 0.5, 0.75]:
+			var y: float = pad.y + h * (1.0 - g)
+			draw_line(Vector2(pad.x, y), Vector2(pad.x + w, y), Kit.c("lines"), 1.0)
+		draw_line(Vector2(pad.x, pad.y + h), Vector2(pad.x + w, pad.y + h), ink, 2.0, true)
+		var f := Kit.font(false, 500)
+		for wk in [1, 10, 20, 30, weeks]:
+			var x: float = pad.x + w * wk / weeks
+			draw_string(f, Vector2(x - 8, size.y - 2), str(wk), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Kit.c("muted"))
+		if points.is_empty():
+			return
+		# a step line: cash holds until the next booking
+		var line := PackedVector2Array()
+		var prev: Vector2 = points[0]
+		line.append(to_px.call(prev))
+		for i in range(1, points.size()):
+			var p: Vector2 = points[i]
+			line.append(to_px.call(Vector2(p.x, prev.y)))
+			line.append(to_px.call(p))
+			prev = p
+		draw_polyline(line, Kit.c("primary"), 3.5, true)
+		var hand := Kit.font(true, 400)
+		for m in marks:
+			var cash_at := 0.0
+			for p in points:
+				if p.x <= m[0]:
+					cash_at = p.y
+			var q: Vector2 = to_px.call(Vector2(m[0], cash_at))
+			draw_circle(q, 5.0, Kit.c("danger"))
+			draw_string(hand, q + Vector2(8, 20), m[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Kit.c("pen"))
+		var last: Vector2 = to_px.call(points[-1])
+		draw_circle(last, 7.0, Kit.c("primary"))
+		draw_dashed_line(last, Vector2(pad.x + w, last.y), Kit.c("muted"), 2.0, 6.0)
+		draw_string(Kit.font(false, 700), last + Vector2(12, -8), Hub._pounds(points[-1].y), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ink)
+
+
 func _squad_row(cells: Array, widths: Array, head := false) -> Control:
 	var wrap := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
@@ -912,6 +1176,8 @@ static func _ordinal(n: int) -> String:
 
 
 static func _money(v: int) -> String:
+	if absi(v) >= 1000000:     # Marcel: shorten around a million
+		return ("-" if v < 0 else "") + ("%.1fm" % (absi(v) / 1000000.0)).replace(".0m", "m")
 	var s := str(absi(v))
 	var out := ""
 	while s.length() > 3:
@@ -919,6 +1185,19 @@ static func _money(v: int) -> String:
 		s = s.substr(0, s.length() - 3)
 	return ("-" if v < 0 else "") + s + out
 
+
+
+## "£1,234", "-£15", "+£1.70", "£1.2m" — sign shown for money out, and for money in when `plus`.
+static func _pounds(v: float, plus := false) -> String:
+	var a := absf(v)
+	var body := ""
+	if a >= 1000000.0:
+		body = _money(int(round(a)))
+	elif absf(a - round(a)) > 0.004:
+		body = "%.2f" % a
+	else:
+		body = _money(int(round(a)))
+	return ("-" if v < -0.004 else ("+" if plus and v > 0.004 else "")) + "£" + body
 
 
 # ================================================================== main menu
@@ -1349,8 +1628,23 @@ func show_summary(s: Dictionary, opponent: String) -> void:
 	cols.add_child(att)
 	# money
 	var mon := _sum_col("Money", "cash")
-	mon.add_child(_sum_row("Ticket income (%d × £%d)" % [s["seated"], ClubState.TICKET_PRICE], "+£%s" % _money(s["revenue"]), Kit.c("ok")))
-	mon.add_child(_sum_row("Cash before", "£%s" % _money(club.money - int(s["revenue"]))))
+	var lines: Dictionary = s.get("lines", {})
+	var costs := 0.0
+	var cost_names := []
+	for k in lines:
+		var v := float(lines[k])
+		if v >= 0.0:
+			var lab: String = k
+			if k == "Tickets":
+				lab = "Tickets (%d × £%d)" % [s["seated"], ClubState.TICKET_PRICE]
+			mon.add_child(_sum_row(lab, _pounds(v, true), Kit.c("ok")))
+		else:
+			costs += v
+			cost_names.append(String(k).to_lower())
+	if costs < 0.0:
+		mon.add_child(_sum_row("Costs (%s)" % ", ".join(cost_names), _pounds(costs), Kit.c("danger")))
+	var net := float(s.get("money_in", 0.0)) + float(s.get("money_out", 0.0))
+	mon.add_child(_sum_row("This match", _pounds(net, true), Kit.c("ok") if net >= 0.0 else Kit.c("danger")))
 	mon.add_child(_sum_row("Cash now", "£%s" % _money(club.money), null, true))
 	cols.add_child(mon)
 	# fans & approval

@@ -426,10 +426,11 @@ func cheat_result(gf: int, ga: int) -> void:
 	if fx.is_empty():
 		return
 	var opp: Dictionary = club.league.teams[fx["opponent"]]
-	var summary := club.apply_match(gf, ga, 3, fx["home"])
+	var summary := club.apply_match(gf, ga, 3, fx["home"], opp["name"])
 	summary["round_results"] = club.league.play_round(gf, ga)
 	summary["position"] = club.league.position_of(0)
 	summary["season_over"] = club.league.season_over()
+	club.end_season_money()
 	club.save()
 	mode = "summary"
 	hub.show_hub(false)
@@ -466,6 +467,7 @@ func cheat_view_home() -> void:
 
 func next_season() -> void:
 	club.league.start_new_season()
+	club.start_season_money()
 	club.complete_builds()   # the 10-week off-season passes
 	club.save()
 	grounds.rebuild_furniture()
@@ -630,8 +632,9 @@ func _hub_test() -> void:
 				if club.league.season_over():
 					break
 				var fx: Dictionary = club.league.next_fixture()
-				var res := club.apply_match(randi_range(0, 3), randi_range(0, 2), 3, fx["home"])
+				var res := club.apply_match(randi_range(0, 3), randi_range(0, 2), 3, fx["home"], club.league.teams[fx["opponent"]]["name"])
 				club.league.play_round(res["goals_for"], res["goals_against"])
+				club.end_season_money()
 			hub.refresh()
 			print("SIM week %d round %d pos %d" % [club.league.current_week(), club.league.round_idx, club.league.position_of(0)])
 	var shown := 0
@@ -1022,10 +1025,11 @@ func _full_time() -> void:
 		return
 	# friendly done: pay, grow, autosave, show summary
 	var ent: int = score[0] + score[1] + stats["saves"][0] + stats["saves"][1] + stats["steals"][0] + stats["steals"][1]
-	var summary := club.apply_match(score[0], score[1], ent, match_home)
+	var summary := club.apply_match(score[0], score[1], ent, match_home, opponent_name)
 	summary["round_results"] = club.league.play_round(score[0], score[1])
 	summary["position"] = club.league.position_of(0)
 	summary["season_over"] = club.league.season_over()
+	club.end_season_money()
 	club.save()
 	print("FRIENDLY DONE -> summary ", summary, " saved to ", ProjectSettings.globalize_path(ClubState.SAVE_PATH))
 	mode = "summary"

@@ -74,7 +74,8 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   - **Level after two legs: extra time + penalties** (Marcel: "C is het devies" — also needed later for cups and European ties). No away goals.
   - **Play-offs in the first 3 weeks of the 10-week off-season**, one round per week (both legs that week); the off-season is equally long for everyone.
   - **You play your own play-off matches**; the other play-offs are simulated.
-  - **Not enough seats for the division you'd go up to → your place goes to the next team** (Marcel, 2026-11-08). Claude's seat proposal (to enter): NL2 10 · NL1 20 · L10 40 · L9 60 · L8 100 · L7 150 · L6 300 · L5 600 · L4 1,000 · L3 2,000 · L2 3,000 · L1 4,000 · Premier 5,000 — awaiting Marcel's OK.
+  - **Not enough seats for the division you'd go up to → your place goes to the next team** (Marcel, 2026-11-08). Claude's seat proposal (to enter): NL2 10 · NL1 20 · L10 40 · L9 60 · L8 100 · L7 150 · L6 300 · L5 600 · L4 1,000 · L3 2,000 · L2 3,000 · L1 4,000 · Premier 5,000 — **OK for now (Marcel)**.
+  - **Extra time = 2 × a third of a half** (OK). **Penalties: you take your own (aim + power); keeping is chance** (your keeper dives at random). **Sudden death after 5 each** (OK).
   - **Difficulty: the same in every division for now** (until the player system exists).
   - **Money per division from the economy model's game column** (ticket, spend per visitor, sponsor, prize money, costs).
   - **Promotion requirements now, as simple seat counts** (Claude proposes numbers, Marcel approves).

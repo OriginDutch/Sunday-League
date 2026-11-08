@@ -73,6 +73,10 @@ const AI_JOCKEY_DISTANCE := 1.6        # AI presser keeps this gap when you have
 const AI_JOCKEY_DISTANCE_AI := 1.1     # ...and this gap against an AI carrier
 const MARK_DISTANCE := 2.2             # markers stand this far goal-side of their man
 const COVER_DISTANCE := 4.5            # second defender covers this far goal-side of the ball carrier
+const COVER_SIDE := 3.0                # ...and this far towards the middle (not in a line behind the presser)
+const SEPARATION_RADIUS := 4.0         # teammates (not chasing the ball) keep about this much room
+const SEPARATION_STRENGTH := 0.9
+const MAX_SHOW_RUNNERS := 2            # at most this many players come short for the ball at once
 const BLOCK_LINE_FACTOR := 0.5         # back line depth = ball depth from own goal x this
 const BLOCK_MIN_DEPTH := 8.0           # back line never deeper than this (m from own goal line)
 const BLOCK_MAX_DEPTH := 36.0          # ...nor higher than this
@@ -172,6 +176,7 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autoplay = "--autoplay" in args or "--shot-test" in args
 	_ui_demo = "--ui-demo" in args
+	_bunch_test = "--bunch-test" in args
 	if "--old-light" in args:
 		light_mode = "old"
 	elif "--new-light" in args:
@@ -676,6 +681,8 @@ func _physics_process(delta: float) -> void:
 		ball.step(delta)
 
 	toast_timer = maxf(0.0, toast_timer - delta)
+	if _bunch_test:
+		_bunch_check(delta)
 	_update_camera(delta)
 	_update_hud()
 	_update_indicators()
@@ -964,6 +971,8 @@ func _full_time() -> void:
 	state = "fulltime"
 	msg_label.text = "FULL TIME  %d - %d" % [score[0], score[1]]
 	print("FULL TIME %d - %d   %s" % [score[0], score[1], str(stats)])
+	if _bunch_test:
+		print("BUNCH summary: %d hits in %d samples" % [_bunch_hits, _bunch_samples])
 	if autoplay:
 		get_tree().quit()
 		return
@@ -1440,6 +1449,41 @@ func _separate_players() -> void:
 # ================================================================== AI helpers (used by Player)
 
 ## Greedy man-marking: most dangerous attacker gets the closest free defender.
+var _bunch_test := false
+var _bunch_t := 0.0
+var _bunch_hits := 0
+var _bunch_samples := 0
+
+
+## dev (--bunch-test): log moments where 3+ teammates stand within 2.5 m of each other.
+func _bunch_check(delta: float) -> void:
+	_bunch_t += delta
+	if _bunch_t < 0.5 or state != "play":
+		return
+	_bunch_t = 0.0
+	_bunch_samples += 1
+	for t in 2:
+		var list := team_list(t)
+		for p in list:
+			if p.role == "GK":
+				continue
+			var near: Array = []
+			for q in list:
+				if q != p and q.role != "GK" and Util.flat_dist(p.position, q.position) < 2.5:
+					near.append(q)
+			if near.size() >= 2:
+				_bunch_hits += 1
+				var holder := ball.owner_player
+				var who := "loose" if holder == null else ("own" if holder.team == t else "opp")
+				var info := []
+				for q in [p] + near:
+					var qq: Player = q
+					info.append("%s(run=%s mark=%s chase=%s 2nd=%s zone=%s)" % [qq.role, qq.run_mode, qq.mark_target != null,
+						is_chaser(qq), is_second_presser(qq), zone_owner(t) == qq])
+				print("BUNCH t%d ball=%s at %s: %s" % [t, who, str(Util.flat(p.position).snapped(Vector3(0.1, 0.1, 0.1))), ", ".join(info)])
+				return
+
+
 func _assign_marks(t: int) -> void:
 	var defenders: Array[Player] = []
 	for p in team_list(t):
@@ -1512,6 +1556,23 @@ func zone_owner(t: int) -> Player:
 			best_d = d
 			best = p
 	return best
+
+
+## True when the team's chaser is already within a few metres of the opposing ball carrier.
+func carrier_pressed(t: int) -> bool:
+	var holder := ball.owner_player
+	if holder == null or holder.team == t:
+		return false
+	var first := _nearest_to_ball(team_list(t), true)
+	return first != null and Util.flat_dist(first.position, holder.position) < 5.0
+
+
+func count_run_mode(t: int, mode_name: String) -> int:
+	var n := 0
+	for p in team_list(t):
+		if p.run_mode == mode_name:
+			n += 1
+	return n
 
 
 func is_second_presser(p: Player) -> bool:

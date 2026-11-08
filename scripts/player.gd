@@ -300,6 +300,22 @@ func _seek(target: Vector3, factor: float) -> Vector3:
 	return to / d * factor * clampf(d / 2.0, 0.25, 1.0)
 
 
+## Keep a bit of room from teammates (Marcel, 2026-11-08: players bunched up). Not for the chaser or
+## the pass receiver — they go for the ball. Returns a push to add to desired_move.
+func _separation() -> Vector3:
+	var push := Vector3.ZERO
+	for q in main.team_list(team):
+		if q == self or q.role == "GK":
+			continue
+		var d := Util.flat(position - q.position)
+		var l := d.length()
+		if l < Main.SEPARATION_RADIUS and l > 0.01:
+			push += d / l * (1.0 - l / Main.SEPARATION_RADIUS)
+		elif l <= 0.01:
+			push += Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+	return push * Main.SEPARATION_STRENGTH
+
+
 func _ai_outfield(delta: float) -> void:
 	var b := main.ball
 	wants_sprint = false
@@ -326,7 +342,7 @@ func _ai_outfield(delta: float) -> void:
 	if holder != null and holder.team == team:
 		_update_run(delta, holder)
 		var spot := _attack_spot(holder)
-		desired_move = _seek(spot, 1.0)
+		desired_move = (_seek(spot, 1.0) + _separation()).limit_length(1.0)
 		wants_sprint = run_mode != "hold" or Util.flat_dist(position, spot) > 6.0
 		return
 
@@ -363,12 +379,19 @@ func _ai_outfield(delta: float) -> void:
 	# second man: cover goal-side of the ball carrier, ready to step in
 	if holder != null and holder.team != team and main.is_second_presser(self):
 		var own_goal := Vector3(-Main.HALF_L * attack_dir, 0, 0)
-		var cover := holder.position + Util.flat(own_goal - holder.position).normalized() * Main.COVER_DISTANCE
-		desired_move = _seek(cover, 1.0)
+		var to_goal := Util.flat(own_goal - holder.position).normalized()
+		# cover goal-side but a few metres towards the middle, not in a line behind the presser
+		var side := Vector3(-to_goal.z, 0, to_goal.x)
+		if side.dot(Vector3(0, 0, -holder.position.z)) < 0.0:
+			side = -side
+		var cover := holder.position + to_goal * Main.COVER_DISTANCE + side * Main.COVER_SIDE
+		desired_move = (_seek(cover, 1.0) + _separation()).limit_length(1.0)
 		wants_sprint = Util.flat_dist(position, cover) > 4.0
 		return
 
-	desired_move = _seek(_defend_spot(), 0.9)
+	# the zone owner presses the carrier (no spacing push); everyone else keeps some room
+	var presser := main.zone_owner(team) == self
+	desired_move = _seek(_defend_spot(), 0.9) if presser else (_seek(_defend_spot(), 0.9) + _separation()).limit_length(1.0)
 	wants_sprint = Util.flat_dist(position, _defend_spot()) > 5.0
 
 
@@ -499,7 +522,7 @@ func _update_run(delta: float, holder: Player) -> void:
 	var r := randf()
 	if r < deep:
 		run_mode = "deep"
-	elif r < deep + show:
+	elif r < deep + show and main.count_run_mode(team, "show") < Main.MAX_SHOW_RUNNERS:
 		run_mode = "show"
 	else:
 		run_mode = "hold"
@@ -561,7 +584,8 @@ func _defend_spot() -> Vector3:
 	var holder := main.ball.owner_player
 	# step out to the ball carrier when he comes into your zone
 	if holder != null and holder.team != team and main.zone_owner(team) == self:
-		spot = holder.position + Util.flat(own_goal - holder.position).normalized() * Main.STEP_OUT_DISTANCE
+		var to_goal := Util.flat(own_goal - holder.position).normalized()
+		spot = holder.position + to_goal * Main.STEP_OUT_DISTANCE
 	else:
 		# pick up an attacker who wanders into the zone
 		var mark := mark_target

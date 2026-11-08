@@ -132,7 +132,7 @@ void vertex() {
 	if (part == 20) {
 		float ph = seed * 6.2831;
 		// travelling waves along the cloth, stronger away from the pole, plus a bit of flutter
-		float wave = sin(now * 7.0 - v_uv.x * 6.0 + ph) * 0.2 + sin(now * 11.0 - v_uv.x * 9.0 + v_uv.y * 3.0 + ph) * 0.06;
+		float wave = sin(now * 6.0 - v_uv.x * 5.0 + ph) * 0.22 + sin(now * 10.0 - v_uv.x * 8.0 + v_uv.y * 3.0 + ph) * 0.07;
 		rest += NORMAL * wave * v_uv.x;
 	}
 	// the flag cloth drags behind the pole: the further from the pole, the older the frame it follows
@@ -140,7 +140,7 @@ void vertex() {
 	int c1 = row1;
 	float cw = w;
 	if (part == 20 && !in_intro) {
-		float fc = mod(f - v_uv.x * 7.0 - v_uv.y * 1.5, float(len));
+		float fc = mod(f - v_uv.x * 3.0 - v_uv.y * 0.8, float(len));
 		c0 = base + int(floor(fc));
 		c1 = base + (int(floor(fc)) + 1) % len;
 		cw = fract(fc);

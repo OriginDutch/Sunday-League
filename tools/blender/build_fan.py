@@ -21,6 +21,15 @@ FPS = 24
 PARTS = ["Skin", "Shirt", "Trousers", "Shoes", "Hair", "Eyes", "Forearm", "Coat", "Scarf", "Cap", "Beanie",
          "Glasses", "Sunglasses", "BeardStubble", "BeardFull", "Goatee", "Moustache", "HeldScarf", "TwirlScarf",
          "FlagPole", "FlagCloth", "Brows"]
+# Flag rig (fans only): the pole is its own bone circling a cone; both hands hold it through IK (baked).
+GRIP = (0.0, -0.22, 1.10)            # bottom hand on the pole, in front of the belly
+bp.BONES.update({
+    "flag":        (GRIP, (GRIP[0], GRIP[1], GRIP[2] + 0.5), "hips"),     # follows the body as it steps forward
+    "grip_lo":     ((0, GRIP[1], GRIP[2] + 0.04), (0, GRIP[1], GRIP[2] + 0.09), "flag"),
+    "grip_hi":     ((0, GRIP[1], GRIP[2] + 0.40), (0, GRIP[1], GRIP[2] + 0.45), "flag"),
+    "elbow_tgt.L": ((0.65, 0.2, 1.0), (0.65, 0.2, 1.05), "chest"),
+    "elbow_tgt.R": ((-0.65, 0.2, 1.0), (-0.65, 0.2, 1.05), "chest"),
+})
 BONE_ORDER = list(bp.BONES.keys())
 
 # hairstyles per body type (the "normal" ones — Marcel: no spikes everywhere); weights are applied in Godot
@@ -276,20 +285,69 @@ def scarf_twirl(ph):
     return P(r)
 
 
+FLAG_TILT = 14.0     # cone centre: leaning forward (degrees) — never back over the people behind
+FLAG_CONE = 18.0     # cone radius (degrees): the tip circles above / in front of the fan
+FLAG_POLE = 3.0      # metres of pole above the bottom hand
+FLAG_W, FLAG_H = 1.9, 1.3
+
+
+def flag_dir(ph):
+    """Pole direction (Blender axes) at phase ph, and the direction its tip is moving."""
+    c, r = math.tan(math.radians(FLAG_TILT)), math.tan(math.radians(FLAG_CONE))
+    d = Vector((r * math.sin(ph), -(c + r * math.cos(ph)), 1.0)).normalized()
+    m = Vector((r * math.cos(ph), r * math.sin(ph), 0.0))
+    return d, m
+
+
 def flag_wave(ph):
-    """Figure-8 over the head: side to side once, up and down twice per loop; the body twists along."""
-    s = math.sin(ph)
-    s2 = math.sin(2 * ph)
-    r = stand()
-    r["spine"] = (-4, s * 12, s * 6)
-    r["chest"] = (-4, s * 10, s * 4)
-    r["head"] = (-12, -s * 10, 0)
-    r["upperarm.R"] = (-148 + 22 * s2, 0, -(38 + 48 * s))
-    r["forearm.R"] = (-28 - 22 * s2, 0, 0)
-    r["hand.R"] = (0, 0, -s * 22)
-    r["upperarm.L"] = (-110 + 15 * s, 0, -12)
-    r["forearm.L"] = (-60, 0, 0)
+    """Classic ultra flag (Marcel's reference): pole near upright, held low with both hands, the tip
+    circling a cone above / in front; the body leans back a bit and twists along."""
+    s, c = math.sin(ph), math.cos(ph)
+    r = stand(arms=False)
+    r["spine"] = (-9 + 2 * c, s * 10, -s * 4)
+    r["chest"] = (-3, s * 6, -s * 2)
+    r["head"] = (-14, -s * 6, 0)
+    both(r, "thigh", -4, 0, -9)
+    both(r, "shin", 8)
     return P(r)
+
+
+def flag_timeline(n=40):
+    return [(f, flag_wave(2 * math.pi * f / n)) for f in range(n + 1)]
+
+
+def key_flag(arm, frame, ph):
+    """The flag bone's rotation for this frame: pole along flag_dir, cloth trailing the motion."""
+    d, m = flag_dir(ph)
+    t = -(m - d * m.dot(d)).normalized()             # cloth points away from where the tip goes
+    side = d.cross(t).normalized()
+    # rest: pole = +Z, cloth = +X (armature space)
+    R_arm = Matrix((t, side, d)).transposed() @ Matrix(((1, 0, 0), (0, 1, 0), (0, 0, 1)))  # columns: X->t, Y->side, Z->d
+    # rest columns are X=(1,0,0), Y=(0,1,0), Z=(0,0,1) so R_arm maps them straight on
+    pb = arm.pose.bones["flag"]
+    rest = pb.bone.matrix_local.to_3x3()
+    local = rest.inverted() @ R_arm @ rest
+    pb.rotation_mode = "QUATERNION"
+    pb.rotation_quaternion = local.to_quaternion()
+    pb.keyframe_insert("rotation_quaternion", frame=frame)
+
+
+def add_flag_ik(arm):
+    for side, grip in (("L", "grip_lo"), ("R", "grip_hi")):
+        c = arm.pose.bones[f"forearm.{side}"].constraints.new("IK")
+        c.target = arm
+        c.subtarget = grip
+        c.pole_target = arm
+        c.pole_subtarget = f"elbow_tgt.{side}"
+        c.pole_angle = math.radians(-90)
+        c.chain_count = 2
+
+
+def remove_ik(arm):
+    for side in ("L", "R"):
+        pb = arm.pose.bones[f"forearm.{side}"]
+        for c in list(pb.constraints):
+            pb.constraints.remove(c)
 
 
 def despair_sit(ph):
@@ -337,19 +395,22 @@ CLIPS = [  # name, timeline, loop
     ("fist_pump", loop(14, fist_pump, 2), True),
     ("scarf_up", loop(48, scarf_up, 6), True),
     ("scarf_twirl", loop(16, scarf_twirl, 1), True),
-    ("flag_wave", loop(40, flag_wave, 2), True),
+    ("flag_wave", flag_timeline(40), True),
     ("despair_sit", loop(48, despair_sit, 6), True),
     ("despair_stand", loop(48, despair_stand, 6), True),
 ]
 SITTING = {"sit_idle", "sit_clap", "despair_sit"}
 
 
-def key_clip(arm, timeline):
+def key_clip(arm, timeline, flag=False):
     act = bpy.data.actions.new("clip")
     arm.animation_data_create()
     arm.animation_data.action = act
+    n = timeline[-1][0]
     for f, pose in timeline:
         bp.pose_key(arm, f, *pose)
+        if flag:
+            key_flag(arm, f, 2 * math.pi * f / n)
     return act
 
 
@@ -370,7 +431,9 @@ def bake(arm):
     clips, mats, sit_amount = {}, [], []
     row = 0
     for name, tl, is_loop in CLIPS:
-        key_clip(arm, tl)
+        key_clip(arm, tl, flag=(name == "flag_wave"))
+        if name == "flag_wave":
+            add_flag_ik(arm)
         last = tl[-1][0]
         n = last if is_loop else last + 1        # loops: the last key equals the first, skip it
         for f in range(n):
@@ -385,6 +448,8 @@ def bake(arm):
             else:
                 s = 0.0
             sit_amount.append(round(s, 3))
+        if name == "flag_wave":
+            remove_ik(arm)
         clips[name] = {"row": row, "frames": n, "loop": is_loop}
         row += n
     return clips, mats, sit_amount
@@ -477,24 +542,23 @@ def held_items(arm):
     for v in p.bm.verts:
         v.co = inv @ v.co
     chunks.append(export_part(p))
-    # flag: pole up out of the right hand, cloth to the side
-    inv, pb = posed_to_rest(arm, "hand.R", [(0, flag_wave(0.0))], None)   # frame 0 of flag_wave
-    hand = (pb.head + pb.tail) / 2
-    up = (pb.tail - pb.head).normalized()            # the raised hand points up (wrist -> fingers)
-    p = bp.Part("Flag", "hand.R")
-    p.ring_tube(hand - up * 0.3, hand + up * 2.05, 0.017, 0.014, "FlagPole", 5)
-    out = up.cross(Vector((0, 1, 0))).normalized()
-    if out.x < 0:
-        out = -out
-    W, H, nx, ny = 1.55, 1.0, 12, 7
+    # flag: on its own bone, built in rest space — pole straight up from the grip, cloth hoisted along the
+    # top of the pole and pointing +X (the flag bone turns it so it trails the circling tip)
+    g0 = Vector(GRIP)
+    up = Vector((0, 0, 1))
+    out = Vector((1, 0, 0))
+    p = bp.Part("Flag", "flag")
+    p.ring_tube(g0 - up * 0.25, g0 + up * FLAG_POLE, 0.02, 0.016, "FlagPole", 6)
+    nx, ny = 14, 9
     p.uv_over = {}
     idx = p.mi("FlagCloth")
+    top = FLAG_POLE - 0.03
     for back in (False, True):                      # two sheets so both sides show
         grid = []
         for j in range(ny + 1):
             row = []
             for i in range(nx + 1):
-                q = hand + up * (2.02 - H * j / ny) + out * (W * i / nx)
+                q = g0 + up * (top - FLAG_H * j / ny) + out * (0.02 + FLAG_W * i / nx)
                 v = p.bm.verts.new(q)
                 p.uv_over[v] = (round(i / nx, 3), round(j / ny, 3))
                 row.append(v)
@@ -504,13 +568,8 @@ def held_items(arm):
                 quad = (grid[j][i], grid[j + 1][i], grid[j + 1][i + 1], grid[j][i + 1])
                 f = p.bm.faces.new(tuple(reversed(quad)) if back else quad)
                 f.material_index = idx
-    # the cloth waves along one fixed direction (both sides share it)
-    p.n_over = {"FlagCloth": (inv.to_3x3() @ up.cross(out)).normalized()}
-    for v in p.bm.verts:
-        v.co = inv @ v.co
-    flag = export_part(p)
-    # cloth uv: u from the pole outwards, v top to bottom — recompute from the grid order
-    chunks.append(flag)
+    p.n_over = {"FlagCloth": Vector((0, 1, 0))}
+    chunks.append(export_part(p))
     arm.animation_data.action = None
     return chunks
 
@@ -554,5 +613,68 @@ def main():
     print("WROTE", OUT, os.path.getsize(OUT) // 1024, "KB, frames", len(sit_amount))
 
 
+def flag_preview():
+    """Render the flag clip at a few phases from the front-left and the side -> design/3d/fans/flag_poses.png"""
+    bp.reset()
+    bp.mats()
+    for name in PARTS:
+        if name not in bp.MATS:
+            bp.MATS[name] = bp.material(name, (0.5, 0.5, 0.5))
+    bp.MATS["FlagCloth"] = bp.material("FlagCloth", (0.1, 0.45, 0.2))
+    bp.MATS["Shirt"] = bp.material("Shirt2", (0.1, 0.45, 0.2))
+    arm = bp.armature()
+    hide = {"Coat", "Scarf", "Cap", "Beanie", "Glasses", "Sunglasses", "BeardStubble", "BeardFull", "Goatee",
+            "Moustache", "HeldScarf", "TwirlScarf"}
+    objs = []
+    for q in body_parts("man"):
+        drop = [f for f in q.bm.faces if {v: k for k, v in q.mat_index.items()}[f.material_index] in hide]
+        bmesh.ops.delete(q.bm, geom=drop, context="FACES")
+        objs.append(q.build(arm))
+    # the flag mesh, as in held_items
+    g0, up, out = Vector(GRIP), Vector((0, 0, 1)), Vector((1, 0, 0))
+    p = bp.Part("Flag", "flag")
+    p.ring_tube(g0 - up * 0.25, g0 + up * FLAG_POLE, 0.02, 0.016, "FlagPole", 6)
+    p.box(g0 + up * (FLAG_POLE - 0.03 - FLAG_H / 2) + out * (FLAG_W / 2 + 0.02), (FLAG_W, 0.01, FLAG_H), "FlagCloth")
+    objs.append(p.build(arm))
+    key_clip(arm, flag_timeline(40), flag=True)
+    add_flag_ik(arm)
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 8
+    scene.cycles.device = "CPU"
+    scene.render.resolution_x, scene.render.resolution_y = 300, 420
+    world = bpy.data.worlds.new("W")
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs[0].default_value = (0.6, 0.65, 0.7, 1)
+    scene.world = world
+    sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
+    sun.data.energy = 3.0
+    sun.rotation_euler = Euler((math.radians(50), 0, math.radians(-30)))
+    bpy.context.collection.objects.link(sun)
+    cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
+    cam.data.lens = 28
+    bpy.context.collection.objects.link(cam)
+    scene.camera = cam
+    out_dir = os.path.join(bp.ROOT, "design", "3d", "fans")
+    os.makedirs(out_dir, exist_ok=True)
+    files = []
+    close = "--close" in sys.argv
+    look = Vector((0, 0, 1.25)) if close else Vector((0, 0, 2.0))
+    views = (("front", (0.9, -2.4, 1.6)), ("side", (2.6, -0.3, 1.5))) if close else (("front", (2.2, -6.5, 2.4)), ("side", (7.0, 0.0, 2.4)))
+    for view, pos in views:
+        cam.location = pos
+        cam.rotation_euler = (look - Vector(pos)).to_track_quat("-Z", "Y").to_euler()
+        for k, f in enumerate((0, 10, 20, 30)):
+            scene.frame_set(f)
+            path = f"/tmp/_flag_{view}_{k}.png"
+            scene.render.filepath = path
+            bpy.ops.render.render(write_still=True)
+            files.append(path)
+    print("FLAGPREVIEW", " ".join(files))
+
+
 if __name__ == "__main__":
-    main()
+    if "--flag-preview" in sys.argv:
+        flag_preview()
+    else:
+        main()

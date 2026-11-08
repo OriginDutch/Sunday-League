@@ -70,6 +70,9 @@ func _init():
 	root.add_child(cam)
 	cam.position = Vector3(0, 2.6, 7.5)
 	cam.look_at(Vector3(0, 1.2, -1.8))
+	if OS.get_environment("CAM") == "flag":       # close on the hard core
+		cam.position = Vector3(3.0, 2.2, 5.5)
+		cam.look_at(Vector3(3.0, 2.4, -1.5))
 	cam.fov = 50
 func _process(d):
 	t += d

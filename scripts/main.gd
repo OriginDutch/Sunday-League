@@ -333,6 +333,8 @@ func _ready() -> void:
 				# dev: --club-colours=primaryhex,secondaryhex  (demo of the club colours upgrade)
 				var cc: PackedStringArray = arg.trim_prefix("--club-colours=").split(",")
 				bs.set_club_colours(Color(cc[0]), Color(cc[1]))
+	if "--fps" in args:
+		_toggle_fps()
 	if "--pad-test" in args:
 		# dev: drive a match with fake controller events and print what happens
 		while club.squad.size() < ClubState.SQUAD_SIZE:
@@ -1132,7 +1134,75 @@ func _restart() -> void:
 
 # ================================================================== human input
 
+# ------------------------------------------------------------------ fps overlay (F8; F9 = vsync on/off)
+
+var _fps_layer: CanvasLayer
+var _fps_label: Label
+var _fps_t := 0.0
+
+
+func _toggle_fps() -> void:
+	if _fps_layer == null:
+		_fps_layer = CanvasLayer.new()
+		_fps_layer.layer = 100
+		add_child(_fps_layer)
+		var p := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0.6)
+		sb.set_corner_radius_all(4)
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top = 6
+		sb.content_margin_bottom = 6
+		p.add_theme_stylebox_override("panel", sb)
+		# top right, under the hub's top bar and clear of the match score chip
+		p.anchor_left = 1.0
+		p.anchor_right = 1.0
+		p.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		p.offset_right = -16
+		p.offset_top = 130
+		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_fps_label = Label.new()
+		_fps_label.add_theme_font_size_override("font_size", 15)
+		_fps_label.add_theme_color_override("font_color", Color(1, 1, 1))
+		p.add_child(_fps_label)
+		_fps_layer.add_child(p)
+		_fps_layer.visible = false
+	_fps_layer.visible = not _fps_layer.visible
+	_fps_t = 0.0
+
+
+func _fps_tick(delta: float) -> void:
+	if _fps_layer == null or not _fps_layer.visible:
+		return
+	_fps_t -= delta
+	if _fps_t > 0.0:
+		return
+	_fps_t = 0.25
+	var fps := Performance.get_monitor(Performance.TIME_FPS)
+	var tris := Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
+	var calls := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+	var fans := 0
+	if grounds != null:
+		for c in grounds.crowds:
+			fans += c.fan_count()
+	var vs := DisplayServer.window_get_vsync_mode() != DisplayServer.VSYNC_DISABLED
+	_fps_label.text = "%d fps  ·  %.1f ms\n%.1f M triangles  ·  %d draw calls\n%d fans  ·  vsync %s (F9)" % [
+		fps, 1000.0 / maxf(fps, 1.0), tris / 1000000.0, calls, fans, "on" if vs else "off"]
+
+
+func _process(delta: float) -> void:
+	_fps_tick(delta)
+
+
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var key := (event as InputEventKey).keycode
+		if key == KEY_F8:
+			_toggle_fps()
+		elif key == KEY_F9:
+			var on := DisplayServer.window_get_vsync_mode() != DisplayServer.VSYNC_DISABLED
+			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED if on else DisplayServer.VSYNC_ENABLED)
 	# which device is in charge: a pad as soon as you use it, keyboard/mouse back when you touch those
 	var was := pad_active
 	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:

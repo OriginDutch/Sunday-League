@@ -258,6 +258,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   4. **Shared vertices (indexed mesh):** flat shading via derivatives allows it, ~3× less vertex work.
   5. **A crowd budget:** detail drops before the fps does.
   Detail-in-textures (normal maps) doesn't fit the low-poly look — the geometry *is* the style.
+- **FPS overlay (Marcel, 2026-11-08: couldn't find Godot's Monitors tab → "bouw maar in"):** **F8** anywhere shows fps, ms per frame, triangles, draw calls, fans drawn and vsync state (top right); **F9** turns vsync on/off (to see the real headroom). Dev flag `--fps` starts with it on. Listed in the F1 cheat panel.
 - **Saves (Marcel, 2026-11-07):** saves don't matter yet — old saves may simply reset. **Marcel says when a save starts to matter.**
 - **Currency:** stays **£** in-game; the sign is just a sign (Marcel). Model numbers in € are used as-is.
 - **Sections vs slots (Marcel, 2026-11-07):** move from the 40 small slots to the **~11.5 m sections** of the stand POC (benches/chairs look odd otherwise) — work out what fits in 11.5 m. Also think about the **edges: ad boards, fences/rails, facilities, player dugouts** and similar. Proposal (Claude): 9 sections per long side, 5 per short side; per section 10 m seating + 1.2 m aisle = 5 benches or 20 chairs in a row (20 seats); pitchside layer with ad board + barrier (rope → fence → rail); dugouts fixed in front of the middle section of the main side.

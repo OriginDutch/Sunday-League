@@ -135,9 +135,19 @@ void vertex() {
 		float wave = sin(now * 7.0 - v_uv.x * 6.0 + ph) * 0.2 + sin(now * 11.0 - v_uv.x * 9.0 + v_uv.y * 3.0 + ph) * 0.06;
 		rest += NORMAL * wave * v_uv.x;
 	}
-	vec4 p0 = bone_mat(row0, bone) * vec4(rest, 1.0);
-	vec4 p1 = bone_mat(row1, bone) * vec4(rest, 1.0);
-	vec3 pos = mix(p0.xyz, p1.xyz, w);
+	// the flag cloth drags behind the pole: the further from the pole, the older the frame it follows
+	int c0 = row0;
+	int c1 = row1;
+	float cw = w;
+	if (part == 20 && !in_intro) {
+		float fc = mod(f - v_uv.x * 7.0 - v_uv.y * 1.5, float(len));
+		c0 = base + int(floor(fc));
+		c1 = base + (int(floor(fc)) + 1) % len;
+		cw = fract(fc);
+	}
+	vec4 p0 = bone_mat(c0, bone) * vec4(rest, 1.0);
+	vec4 p1 = bone_mat(c1, bone) * vec4(rest, 1.0);
+	vec3 pos = mix(p0.xyz, p1.xyz, cw);
 	// small people on a seat: lift them so they sit on it instead of in it
 	float sit0 = texelFetch(anim, ivec2(bones * 3, row0), 0).x;
 	float sit1 = texelFetch(anim, ivec2(bones * 3, row1), 0).x;

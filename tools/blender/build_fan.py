@@ -144,7 +144,10 @@ def beards(p):
 
 # ------------------------------------------------------------------ animation clips
 
-def P(rots, up=0.0, fwd=0.0, side=0.0):
+STAND_FWD = 0.32     # standing up you step forward off the seat (into the leg room), not through it
+
+
+def P(rots, up=0.0, fwd=STAND_FWD, side=0.0):
     return (rots, up, fwd, side)
 
 
@@ -274,16 +277,16 @@ def scarf_twirl(ph):
 
 
 def flag_wave(ph):
-    """Big sweeps from side to side over the head, the body twisting along."""
+    """Figure-8 over the head: side to side once, up and down twice per loop; the body twists along."""
     s = math.sin(ph)
-    c = math.cos(ph)
+    s2 = math.sin(2 * ph)
     r = stand()
-    r["spine"] = (-3, s * 10, s * 7)
-    r["chest"] = (-3, s * 8, s * 5)
-    r["head"] = (-10, -s * 8, 0)
-    r["upperarm.R"] = (-150 + 10 * c, 0, -(10 + 55 * (s + 1) * 0.5))
-    r["forearm.R"] = (-25 - 15 * c, 0, 0)
-    r["hand.R"] = (0, 0, -s * 15)
+    r["spine"] = (-4, s * 12, s * 6)
+    r["chest"] = (-4, s * 10, s * 4)
+    r["head"] = (-12, -s * 10, 0)
+    r["upperarm.R"] = (-148 + 22 * s2, 0, -(38 + 48 * s))
+    r["forearm.R"] = (-28 - 22 * s2, 0, 0)
+    r["hand.R"] = (0, 0, -s * 22)
     r["upperarm.L"] = (-110 + 15 * s, 0, -12)
     r["forearm.L"] = (-60, 0, 0)
     return P(r)
@@ -315,7 +318,7 @@ def stand_up_tl():
     both(b, "shin", 70)
     both(b, "upperarm", -30, 0, 8)
     both(b, "forearm", -40)
-    return [(0, P(a, SIT_UP, SIT_FWD)), (8, P(b, -0.22, -0.06)), (16, P(stand()))]
+    return [(0, P(a, SIT_UP, SIT_FWD)), (8, P(b, -0.22, 0.14)), (16, P(stand()))]
 
 
 def sit_down_tl():
@@ -334,7 +337,7 @@ CLIPS = [  # name, timeline, loop
     ("fist_pump", loop(14, fist_pump, 2), True),
     ("scarf_up", loop(48, scarf_up, 6), True),
     ("scarf_twirl", loop(16, scarf_twirl, 1), True),
-    ("flag_wave", loop(32, flag_wave, 4), True),
+    ("flag_wave", loop(40, flag_wave, 2), True),
     ("despair_sit", loop(48, despair_sit, 6), True),
     ("despair_stand", loop(48, despair_stand, 6), True),
 ]

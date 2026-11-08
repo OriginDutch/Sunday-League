@@ -3194,17 +3194,20 @@ func _place_camera() -> void:
 
 ## Stands on the West (camera) side: hide what sticks up above the camera's sight line to the near
 ## touchline (Marcel, option B: "only what really blocks the view"). See stand_clip.gdshader.
+const STAND_CAP := 3.0   # West side in a match: nothing higher than this is drawn (Marcel, option 2)
+
+
 func _set_stand_clip(on: bool) -> void:
 	var touch := HALF_W + 0.3
 	if "--clip-test" in OS.get_cmdline_user_args():
-		RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, 0.4, 1.0, 0.0))   # dev: force a clip in the hub
+		RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, 0.4, 1.0, STAND_CAP))   # dev: force a clip in the hub
 		return
 	var cz := camera.global_position.z if camera != null else 0.0
 	if not on or cz <= touch + 1.0:
 		RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, 0.0, 0.0, 0.0))
 		return
 	var slope := camera.global_position.y / (cz - touch)
-	RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, slope, 1.0, 0.25))
+	RenderingServer.global_shader_parameter_set("stand_clip", Vector4(touch, slope, 1.0, STAND_CAP))
 	if Engine.get_physics_frames() % 120 == 0 and "--clip-debug" in OS.get_cmdline_user_args():
 		print("CLIP ", Vector4(touch, slope, 1.0, 0.25), " cam ", camera.global_position, " get ", RenderingServer.global_shader_parameter_get("stand_clip"))
 

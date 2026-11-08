@@ -164,12 +164,17 @@ void vertex() {
 	float sit1 = texelFetch(anim, ivec2(bones * 3, row1), 0).x;
 	float s = length(MODEL_MATRIX[1].xyz);
 	pos.y += seat_height * (1.0 - s) / s * mix(sit0, sit1, w);
+	// West side in a match: fans who'd stick out above the cap aren't drawn at all (no cut-off heads)
+	vec3 origin = MODEL_MATRIX[3].xyz;
+	if (stand_clip.z > 0.5 && origin.z > stand_clip.x && origin.y + 1.5 > stand_clip.w) {
+		show = false;
+	}
 	VERTEX = show ? pos : vec3(0.0);
 }
 
 void fragment() {
 	vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	if (stand_clip.z > 0.5 && wp.z > stand_clip.x && wp.y > (wp.z - stand_clip.x) * stand_clip.y + stand_clip.w) {
+	if (stand_clip.z > 0.5 && wp.z > stand_clip.x && wp.y > (wp.z - stand_clip.x) * stand_clip.y + 0.25) {
 		discard;
 	}
 	NORMAL = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));

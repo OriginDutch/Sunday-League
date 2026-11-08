@@ -363,32 +363,18 @@ def build_section(rows, tunnel=False, x0=0.0, left=None, right=None):
         box(f"CladRib{k}", 0.05, 0.04, fh - 3.25, (x, fy - 0.0, 3.25 + (fh - 3.25) / 2), M["cladding"])
     box("RearBand", W, 0.34, 0.18, (0, fy, 3.25), M["trim"])
     # windows (offices / bar under the stand) and one entrance with a canopy per section
-    for wx in (-4.3, -2.5):
+    for wx in (-4.3, -2.5, 2.5, 4.3):
         box(f"Window{wx}", 1.2, 0.05, 1.0, (wx, fy + 0.16, 1.9), M["glass"])
         box(f"WindowSill{wx}", 1.35, 0.12, 0.08, (wx, fy + 0.2, 1.36), M["concrete"])
     box("EntranceDoor", 1.6, 0.05, 2.3, (0, fy + 0.16, 1.15), M["dark"])
     box("EntranceCanopy", 2.4, 1.0, 0.1, (0, fy + 0.65, 2.65), M["trim"])
     box("EntranceSign", 1.2, 0.05, 0.3, (0, fy + 0.17, 2.85), M["fascia"])
-    # stair core to the rear walkway (fans go up here and down the gangways to their row)
-    sc_x0, sc_x1 = 1.6, 4.9
-    sc_w = sc_x1 - sc_x0
-    sc_cx = (sc_x0 + sc_x1) / 2
-    sc_d = 3.2
-    sc_h = top_z + 0.4 + 2.9
-    box("StairBrick", sc_w, sc_d, 3.2, (sc_cx, fy + sc_d / 2, 1.6), M["brick_rear"])
-    box("StairClad", sc_w - 0.1, sc_d - 0.1, sc_h - 3.2, (sc_cx, fy + sc_d / 2, 3.2 + (sc_h - 3.2) / 2), M["cladding"])
-    box("StairBand", sc_w + 0.04, sc_d + 0.04, 0.18, (sc_cx, fy + sc_d / 2, 3.25), M["trim"])
-    box("StairCap", sc_w + 0.12, sc_d + 0.12, 0.2, (sc_cx, fy + sc_d / 2, sc_h + 0.1), M["trim"])
-    box("StairDoor", 1.4, 0.05, 2.3, (sc_cx, fy + sc_d + 0.01, 1.15), M["dark"])
-    box("StairCanopy", 2.0, 0.8, 0.1, (sc_cx, fy + sc_d + 0.4, 2.6), M["trim"])
-    n_slits = max(1, int((sc_h - 4.0) / 2.4))
-    for k in range(n_slits):
-        z = 4.2 + k * 2.4
-        box(f"StairSlit{k}", 0.35, 0.04, 1.6, (sc_cx, fy + sc_d + 0.02, z + 0.8), M["glass"])
+    # stairs to the rear walkway are inside the stand, behind the facade (Marcel 2026-11-09: no towers)
     for s in (-1, 1):
         cyl(f"Downpipe{s}", 0.06, roof_z(roof_back_y) - 0.2, (s * (HW - 0.15), fy + 0.2, (roof_z(roof_back_y) - 0.2) / 2), M["gutter"], seg=8)
     # upper window band in the cladding
-    box("UpperWindows", 2.8, 0.04, 0.6, (-3.4, fy + 0.0, min(fh - 1.0, 5.5)), M["glass"])
+    for ux in (-3.4, 3.4):
+        box(f"UpperWindows{ux}", 2.8, 0.04, 0.6, (ux, fy + 0.0, min(fh - 1.0, 5.5)), M["glass"])
 
     # ---- side screens: full at an open end; none between equal neighbours; between unequal ones only
     # the strip between the lower and the higher roof, drawn by the taller section (Marcel 2026-11-08)

@@ -384,21 +384,109 @@ func pass_to(receiver: Player) -> void:
 
 ## Long ball through the air into the receiver's run.
 func _lob_to(receiver: Player, run: Vector3) -> void:
+	air_pass_to(receiver, run, 20.0, 0.9, 2.3, "shoot")
+
+
+## A ball through the air into a moving receiver's run. `mps` = metres per second of flight
+## (lower = higher ball), clamped to [tmin, tmax] seconds.
+func air_pass_to(receiver: Player, run: Vector3, mps: float, tmin: float, tmax: float, anim := "pass") -> void:
 	var t := 1.0
 	var target := receiver.position
 	for i in 4:   # refine flight time against the moving target
 		target = receiver.position + run * t
 		target.x = clampf(target.x, -Main.HALF_L + 1.0, Main.HALF_L - 1.0)
 		target.z = clampf(target.z, -Main.HALF_W + 1.0, Main.HALF_W - 1.0)
-		t = clampf(Util.flat_dist(position, target) / 20.0, 0.9, 2.3)
+		t = clampf(Util.flat_dist(position, target) / mps, tmin, tmax)
+	air_ball_to(target, t, receiver, anim)
+
+
+## Kick the ball so it comes down at `target` after `t` seconds.
+func air_ball_to(target: Vector3, t: float, receiver: Player = null, anim := "pass") -> void:
 	var to := Util.flat(target - position)
 	var vh := to.length() / t * (1.0 + Ball.AIR_DRAG * t * 0.5)   # compensate air drag
-	var vy := 0.5 * Ball.GRAVITY * t + (Ball.RADIUS - Ball.RADIUS) / t
+	var vy := 0.5 * Ball.GRAVITY * t
 	face_towards(to)
-	play_once("shoot", 1.1)
+	play_once(anim, 1.1)
 	main.ball.kick(to.normalized() * vh + Vector3.UP * vy, self, receiver)
-	main.ball.pass_meet = target
+	main.ball.pass_meet = Vector3(target.x, 0, target.z)
 	main.ball.pass_lob = true
+
+
+func _run_of(receiver: Player) -> Vector3:
+	var run := receiver.vel
+	if receiver.is_human or receiver.team == 0 and main.controlled == receiver:
+		run = receiver.desired_move * Player.SPEED
+	return run * Main.PASS_LEAD
+
+
+## Half-high pass (A A): over a leg, quicker than a lob.
+func lofted_pass_to(receiver: Player) -> void:
+	air_pass_to(receiver, _run_of(receiver), 22.0, 0.6, 1.0, "pass")   # top ~1–2.75 m
+
+
+## High lob / long ball (X).
+func lob_pass_to(receiver: Player) -> void:
+	air_pass_to(receiver, _run_of(receiver), 18.0, 1.0, 1.7, "shoot")   # top ~3–8 m
+
+
+## A cross into the box (X from the flank): to a teammate's run, or to `spot` when nobody's there.
+func cross_to(receiver: Player, spot: Vector3) -> void:
+	if receiver != null:
+		air_pass_to(receiver, _run_of(receiver), 20.0, 0.9, 1.4, "shoot")   # top ~2–5 m
+	else:
+		air_ball_to(spot, clampf(Util.flat_dist(position, spot) / 20.0, 0.9, 1.4), null, "shoot")
+
+
+## Through-ball into the space ahead of the receiver. style: ground (Y), lofted (Y Y), lob (LB+Y).
+func through_to(receiver: Player, style: String) -> void:
+	var fwd := Vector3(attack_dir, 0, 0)
+	var rv := Util.flat(receiver.vel)
+	var dir := fwd
+	if rv.length() > 1.0:
+		dir = (fwd + rv.normalized() * 0.6).normalized()
+	var lead: float = {"ground": 9.0, "lofted": 8.0}.get(style, 13.0)
+	var target := receiver.position + dir * lead
+	target.x = clampf(target.x, -Main.HALF_L + 3.0, Main.HALF_L - 3.0)
+	target.z = clampf(target.z, -Main.HALF_W + 1.5, Main.HALF_W - 1.5)
+	var run_t := Util.flat_dist(receiver.position, target) / Player.SPRINT
+	var d := Util.flat_dist(position, target)
+	match style:
+		"lofted":
+			air_ball_to(target, clampf(d / 20.0, 0.7, 1.2), receiver, "pass")
+		"lob":
+			air_ball_to(target, clampf(maxf(run_t, d / 18.0), 1.0, 1.7), receiver, "shoot")
+		_:
+			var to := Util.flat(target - position)
+			var v0 := clampf(pass_speed_for(d, maxf(run_t, 0.4)), 8.0, MAX_PASS_SPEED)
+			face_towards(to)
+			play_once("pass", 1.2)
+			main.ball.kick(to.normalized() * v0 + Vector3.UP * 0.4, self, receiver)
+			main.ball.pass_meet = Vector3(target.x, 0, target.z)
+	main.ball.pass_through = true
+
+
+## Into space along a direction when nobody is there to receive it (air: lofted/lob kinds).
+func air_ball_towards(point: Vector3, mps: float, tmin: float, tmax: float, anim := "pass") -> void:
+	var to := Util.flat(point - position)
+	if to.length() > 35.0:
+		point = position + to.normalized() * 35.0
+	air_ball_to(point, clampf(Util.flat_dist(position, point) / mps, tmin, tmax), null, anim)
+
+
+## Chip shot (LB+B / Ctrl+RMB): a high, slower ball that drops under the bar at `target`.
+func chip_at(target: Vector3, power: float) -> void:
+	main.stats["shots"][team] += 1
+	var to := Util.flat(target - position)
+	var d := to.length()
+	var dir := to.normalized()
+	var spread := 0.02 + 0.04 * power
+	dir = dir.rotated(Vector3.UP, randf_range(-spread, spread))
+	var t := clampf(d / lerpf(14.0, 20.0, power), 0.8, 1.4)
+	var vh := d / t * (1.0 + Ball.AIR_DRAG * t * 0.5)
+	var vy := (2.1 - Ball.RADIUS + 0.5 * Ball.GRAVITY * t * t) / t   # comes down just under the bar
+	face_towards(dir)
+	play_once("shoot", 1.0)
+	main.ball.kick(dir * vh + Vector3.UP * vy, self, null)
 
 
 func pass_towards(point: Vector3) -> void:
@@ -515,9 +603,9 @@ func _ai_outfield(delta: float) -> void:
 		wants_sprint = run_mode != "hold" or Util.flat_dist(position, spot) > 6.0
 		return
 
-	if b.pass_target == self and b.pass_meet != Vector3.INF and Util.flat_dist(position, b.position) > 6.0:
+	if b.pass_target == self and b.pass_meet != Vector3.INF and Util.flat_dist(position, b.position) > 6.0 and not (b.pass_through and b.past_meet()):
 		# ground pass: come towards the ball rather than wait for it. lob: get under it.
-		var meet := b.pass_meet if b.pass_lob else b.pass_meet.lerp(Util.flat(b.position), 0.35)
+		var meet := b.pass_meet if (b.pass_lob or b.pass_through) else b.pass_meet.lerp(Util.flat(b.position), 0.35)
 		desired_move = _seek(meet, 1.0)
 		wants_sprint = Util.flat_dist(position, meet) > 2.0
 		return

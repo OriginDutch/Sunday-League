@@ -335,6 +335,12 @@ func _ready() -> void:
 				bs.set_club_colours(Color(cc[0]), Color(cc[1]))
 	if "--fps" in args:
 		_toggle_fps()
+	if "--pass-test2" in args:
+		# dev: every pass type with fake pad buttons; prints the ball's flight and who gets it
+		while club.squad.size() < ClubState.SQUAD_SIZE:
+			club.recruit(0)
+		start_friendly()
+		_pt2 = 0.0
 	if "--pad-test" in args:
 		# dev: drive a match with fake controller events and print what happens
 		while club.squad.size() < ClubState.SQUAD_SIZE:
@@ -448,6 +454,103 @@ func _po_test_tick(delta: float) -> void:
 		_po_shot("hub_board")
 		print("PO TEST playoff state: done=%s summary=%s outcome=%s" % [club.playoff_done(), club._playoff_summary(), str(club.expected_outcome())])
 		get_tree().quit()
+
+
+var _pt2 := -1.0
+var _pt2_i := -1
+var _pt2_log := {}
+# [name, buttons to press (time offsets), stick, ball carrier spot (attacking +x), carrier role]
+const PT2 := [
+	["A ground", [[0.0, JOY_BUTTON_A]], Vector2(1, 0), Vector3(-5, 0, 0), "CM", 20.0],
+	["A A lofted", [[0.0, JOY_BUTTON_A], [0.08, JOY_BUTTON_A]], Vector2(1, 0), Vector3(-5, 0, 0), "CM", 20.0],
+	["X lob", [[0.0, JOY_BUTTON_X]], Vector2(1, 0), Vector3(-25, 0, 0), "CB", 20.0],
+	["X cross", [[0.0, JOY_BUTTON_X]], Vector2(0, -1), Vector3(38, 0, 28), "RW", 40.0],
+	["Y through", [[0.0, JOY_BUTTON_Y]], Vector2(1, 0), Vector3(5, 0, 0), "CM", 25.0],
+	["Y Y lofted through", [[0.0, JOY_BUTTON_Y], [0.08, JOY_BUTTON_Y]], Vector2(1, 0), Vector3(5, 0, 0), "CM", 25.0],
+	["LB+Y over the top", [[0.0, -2], [0.1, JOY_BUTTON_Y]], Vector2(1, 0), Vector3(5, 0, 0), "CM", 25.0],
+	["LB+B chip", [[0.0, -2], [0.1, -3], [0.55, -4]], Vector2(1, 0), Vector3(30, 0, 3), "ST", 0.0],
+]
+
+
+func _pt2_tick(delta: float) -> void:
+	if state != "play" and _pt2_i < 0:
+		return
+	_pt2 += delta
+	if _pt2_i < 0 or _pt2 > 4.0:
+		if _pt2_i >= 0:
+			var l: Dictionary = _pt2_log
+			print("PT2 %-20s kick %s  max height %.2f  flight %.2fs  lands/first touch x=%.1f z=%.1f  next owner %s" % [PT2[_pt2_i][0],
+				l.get("kick", "?"), l.get("maxh", 0.0), l.get("ft", 0.0), l.get("land", Vector3.ZERO).x, l.get("land", Vector3.ZERO).z, l.get("owner", "nobody")])
+		_pt2_i += 1
+		if _pt2_i >= PT2.size():
+			print("PT2 done")
+			get_tree().quit()
+			return
+		_pt2 = 0.0
+		_pt2_log = {}
+		var sc: Array = PT2[_pt2_i]
+		# we attack +x for the test; opponents sent back to their own half, ours spread out
+		var flip := home[0].attack_dir
+		var carrier: Player = home[{"CB": 2, "CM": 5, "ST": 9, "RW": 10}[sc[4]]]
+		for q in players:
+			q.vel = Vector3.ZERO
+			q.position = q.home_pos
+			q.stun = 0.0
+		for q in home:
+			if q.role != "GK":
+				q.position = q.home_pos + Vector3(float(sc[5]) * flip, 0, 0)
+		for q in away:
+			q.position = Vector3(q.home_pos.x, 0, q.home_pos.z)
+		carrier.position = Vector3(sc[3].x * flip, 0, sc[3].z)
+		for q in away:
+			q.stun = 0.0 if "--pt2-live" in OS.get_cmdline_user_args() else 4.5   # frozen: measure the pass itself
+			var off := Util.flat(q.position - carrier.position)
+			if off.length() < 6.0:
+				q.position = carrier.position + (off.normalized() if off.length() > 0.1 else Vector3(1, 0, 0)) * 6.0
+		ball.reset_to(carrier.position)
+		_give_ball(carrier)
+		controlled = carrier
+		pending_pass = {}
+		pad_active = true
+		_pad_ev(-1, true, JOY_AXIS_LEFT_X, sc[2].x * flip)
+		_pad_ev(-1, true, JOY_AXIS_LEFT_Y, sc[2].y)
+		return
+	var sc2: Array = PT2[_pt2_i]
+	for ev in sc2[1]:
+		var at: float = 0.3 + float(ev[0])
+		if _pt2 - delta < at and _pt2 >= at:
+			match int(ev[1]):
+				-2:
+					_pad_ev(JOY_BUTTON_LEFT_SHOULDER, true)
+				-3:
+					_pad_ev(JOY_BUTTON_B, true)
+				-4:
+					_pad_ev(JOY_BUTTON_B, false)
+					_pad_ev(JOY_BUTTON_LEFT_SHOULDER, false)
+				_:
+					_pad_ev(int(ev[1]), true)
+					_pad_ev(int(ev[1]), false)
+	if _pt2 > 0.9 and _pt2 < 1.2 and Input.is_joy_button_pressed(0, JOY_BUTTON_LEFT_SHOULDER):
+		_pad_ev(JOY_BUTTON_LEFT_SHOULDER, false)
+	if ball.owner_player == null and not _pt2_log.has("kick"):
+		_pt2_log["kick"] = "%.2fs" % (_pt2 - 0.3)
+		_pt2_log["t0"] = _pt2
+		print("PT2   kicked by %s vel %s pos %s" % ["us" if ball.last_touch != null and ball.last_touch.team == 0 else "them", str(ball.vel.snapped(Vector3(0.1,0.1,0.1))), str(ball.position.snapped(Vector3(0.1,0.1,0.1)))])
+	if _pt2_log.has("kick") and _pt2_i == 5 and int(_pt2 * 60) % 10 == 0 and "--pt2-trace" in OS.get_cmdline_user_args():
+		print("PT2     t=%.2f ball %s vel %s ST %s target %s state %s" % [_pt2 - float(_pt2_log["t0"]), str(ball.position.snapped(Vector3(0.1,0.1,0.1))), str(ball.vel.snapped(Vector3(0.1,0.1,0.1))), "%s v=%.1f dm=%s spr=%s hum=%s ctl=%s" % [str(home[9].position.snapped(Vector3(0.1,0.1,0.1))), home[9].vel.length(), str(home[9].desired_move.snapped(Vector3(0.1,0.1,0.1))), home[9].wants_sprint, home[9].is_human, home.find(controlled)], str(ball.pass_target == home[9]), state])
+	if _pt2_log.has("kick") and not _pt2_log.has("owner"):
+		_pt2_log["maxh"] = maxf(float(_pt2_log.get("maxh", 0.0)), ball.position.y)
+		if ball.position.y > 0.3:
+			_pt2_log["air"] = true
+		if (_pt2_log.get("air", false) and ball.position.y <= Ball.RADIUS + 0.02 and not _pt2_log.has("land")) or ball.owner_player != null:
+			if not _pt2_log.has("land"):
+				_pt2_log["land"] = ball.position * Vector3(home[0].attack_dir, 1, 1)
+				_pt2_log["ft"] = _pt2 - float(_pt2_log["t0"])
+		if ball.owner_player != null:
+			var o := ball.owner_player
+			_pt2_log["owner"] = "%s #%d" % ["us" if o.team == 0 else "THEM", team_list(o.team).find(o)]
+			if not _pt2_log.has("land"):
+				_pt2_log["land"] = ball.position * Vector3(home[0].attack_dir, 1, 1)
 
 
 func _pass_test() -> void:
@@ -802,6 +905,8 @@ func _physics_process(delta: float) -> void:
 		return
 	if _pad_test >= 0.0:
 		_pad_test_tick(delta)
+	if _pt2 >= 0.0:
+		_pt2_tick(delta)
 	match state:
 		"kickoff":
 			state_timer -= delta
@@ -1663,9 +1768,9 @@ func _update_hint() -> void:
 		hint_label.text = ("Penalty: LS left/right aims · hold B for power, release to shoot · Start pause" if pad_active else
 			"Penalty: aim with the mouse · hold RMB for power, release to shoot · Esc quit")
 		return
-	hint_label.text = ("LS move (sprint by default) · LT walk · A pass · hold B shoot · X tackle · LB switch · RS zoom · Start pause"
+	hint_label.text = ("LS move · LT walk · A pass (A A high) · X lob/cross · Y through (Y Y high, LB+Y over the top) · hold B shoot (LB+B chip) · no ball: X tackle, LB switch · Start pause"
 		if pad_active else
-		"WASD move (sprint by default) · Shift walk · LMB pass · hold RMB shoot · Space tackle · Q switch · R restart · Esc quit")
+		"WASD move · Shift walk · LMB pass · MMB high pass · E lob/cross · F through (Ctrl high, Shift over the top) · hold RMB shoot (Ctrl chip) · Space tackle · Q switch · Esc quit")
 
 
 ## Controller buttons in a match (FIFA-like, Xbox): A pass · B shoot (hold for power) · X tackle ·
@@ -1687,23 +1792,31 @@ func _pad_button(b: InputEventJoypadButton) -> void:
 			_pen_button(b.pressed)
 		return
 	var live := (state == "play" or state == "restart") and controlled != null
+	var lb := Input.is_joy_button_pressed(pad_device, JOY_BUTTON_LEFT_SHOULDER)
 	match b.button_index:
 		JOY_BUTTON_A:
 			if b.pressed and live and controlled.has_ball():
-				_human_pass()
+				_queue_pass("ground")
 		JOY_BUTTON_B:
 			if b.pressed and live and controlled.has_ball():
 				charging = true
 				charge = 0.0
+				chip_shot = lb
 			elif not b.pressed and charging:
 				charging = false
 				if live and controlled.has_ball():
 					_human_shoot()
 		JOY_BUTTON_X:
-			if b.pressed and state == "play" and controlled != null and not controlled.has_ball():
+			if b.pressed and live and controlled.has_ball():
+				_queue_pass("lob")
+			elif b.pressed and state == "play" and controlled != null and not controlled.has_ball():
 				controlled.start_tackle()
+		JOY_BUTTON_Y:
+			if b.pressed and live and controlled.has_ball():
+				_queue_pass("through_lob" if lb else "through")
 		JOY_BUTTON_LEFT_SHOULDER:
-			if b.pressed and (state == "play" or state == "restart"):
+			# with the ball LB is a modifier (LB+Y, LB+B), without it switches player
+			if b.pressed and (state == "play" or state == "restart") and not (controlled != null and controlled.has_ball()):
 				_manual_switch()
 
 
@@ -1778,6 +1891,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				if state == "play" and controlled != null and not controlled.has_ball():
 					controlled.start_tackle()
+			KEY_E:
+				if _can_pass():
+					_do_pass("lob")
+			KEY_F:
+				if _can_pass():
+					_do_pass("through_lofted" if k.ctrl_pressed else ("through_lob" if k.shift_pressed else "through"))
 			KEY_Q:
 				if state == "play" or state == "restart":
 					_manual_switch()
@@ -1813,10 +1932,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 			if controlled.has_ball():
 				_human_pass()
+		elif mb.button_index == MOUSE_BUTTON_MIDDLE and mb.pressed:
+			if controlled.has_ball():
+				_do_pass("lofted")
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
 			if mb.pressed and controlled.has_ball():
 				charging = true
 				charge = 0.0
+				chip_shot = mb.ctrl_pressed
 			elif not mb.pressed and charging:
 				charging = false
 				if controlled.has_ball():
@@ -1833,6 +1956,7 @@ func _update_human(delta: float) -> void:
 		if absf(rs) > 0.3:
 			match_zoom = clampf(match_zoom * (1.0 + rs * delta * 1.2), 0.5, 1.8)
 	q_time += delta
+	_pending_pass_tick(delta)
 	_auto_switch()
 	if controlled == null:
 		return
@@ -1859,10 +1983,15 @@ func _update_human(delta: float) -> void:
 
 	if RECEIVE_ASSIST and ball.pass_target == controlled and ball.owner_player == null:
 		# a pass is coming: run to where it was played (like the AI does), your input waits until you have it
-		var meet := ball.pass_meet if ball.pass_meet != Vector3.INF else Util.flat(ball.position)
-		if not ball.pass_lob and Util.flat_dist(controlled.position, ball.position) > 6.0:
+		var meet := ball.pass_meet if (ball.pass_meet != Vector3.INF and not ball.past_meet()) else Util.flat(ball.position + ball.vel * 0.3)
+		var near := Util.flat_dist(controlled.position, ball.position) <= 6.0
+		if ball.pass_lob or ball.pass_through:
+			# air ball / through-ball: get to where it comes down; only go for the ball itself once it's low and close
+			if near and ball.position.y < 1.2:
+				meet = Util.flat(ball.position + ball.vel * 0.15)
+		elif not near:
 			meet = meet.lerp(Util.flat(ball.position), 0.35)
-		elif Util.flat_dist(controlled.position, ball.position) <= 6.0:
+		else:
 			meet = Util.flat(ball.position + ball.vel * 0.15)
 		var to_meet := Util.flat(meet - controlled.position)
 		controlled.desired_move = to_meet.limit_length(1.0) if to_meet.length() > 0.3 else Vector3.ZERO
@@ -1911,6 +2040,133 @@ func _human_pass() -> void:
 		controlled.pass_towards(aim_point)
 
 
+# ------------------------------------------------------------------ pass types (GDD §7, Marcel 2026-11-08)
+# Pad, FIFA layout: A pass (A A half-high), X lob / cross, Y through-ball (Y Y half-high, LB+Y over the top),
+# LB+B chip. Every pad pass has a short wind-up in which a second tap upgrades it (FIFA-style).
+# Mouse/keyboard stay instant: LMB pass, MMB half-high, E lob/cross, F through (Ctrl+F half-high,
+# Shift+F over the top), Ctrl+RMB chip.
+
+const PASS_WINDUP := 0.18        # seconds between pressing a pass (pad) and the kick; the double-tap window
+var pending_pass := {}           # {kind, t, by}
+var chip_shot := false
+
+
+func _can_pass() -> bool:
+	return (state == "play" or state == "restart") and controlled != null and controlled.has_ball()
+
+
+func _queue_pass(kind: String) -> void:
+	if not pending_pass.is_empty() and pending_pass["by"] == controlled:
+		if pending_pass["kind"] == "ground" and kind == "ground":
+			pending_pass["kind"] = "lofted"
+		elif pending_pass["kind"] == "through" and kind == "through":
+			pending_pass["kind"] = "through_lofted"
+		return
+	pending_pass = {"kind": kind, "t": PASS_WINDUP, "by": controlled}
+
+
+func _pending_pass_tick(delta: float) -> void:
+	if pending_pass.is_empty():
+		return
+	var by: Player = pending_pass["by"]
+	if by != controlled or not by.has_ball() or (state != "play" and state != "restart"):
+		pending_pass = {}
+		return
+	pending_pass["t"] -= delta
+	if pending_pass["t"] <= 0.0:
+		var kind: String = pending_pass["kind"]
+		pending_pass = {}
+		_do_pass(kind)
+
+
+## Flank in the opponent's half: a lob becomes a cross into the box.
+func _in_cross_zone(p: Player) -> bool:
+	return p.position.x * p.attack_dir > 0.0 and absf(p.position.z) > BOX_HALF_W - 4.0
+
+
+func _do_pass(kind: String) -> void:
+	var p := controlled
+	if p.restart_kind == "throw-in":
+		_human_pass()   # throw-ins are thrown, whatever the button
+		return
+	var aim := Util.flat(aim_point - p.position)
+	var mate: Player = null
+	match kind:
+		"ground":
+			_human_pass()
+			return
+		"lofted":
+			mate = _pass_target_in_cone(p, aim)
+			if mate != null:
+				p.lofted_pass_to(mate)
+			else:
+				p.air_ball_towards(aim_point, 22.0, 0.6, 1.0)
+		"lob":
+			if _in_cross_zone(p) and p.role != "GK":
+				mate = _cross_target(p)
+				p.cross_to(mate, Vector3((HALF_L - 9.0) * p.attack_dir, 0, -signf(p.position.z) * 2.0))
+			else:
+				mate = _pass_target_in_cone(p, aim, 60.0)
+				if mate != null:
+					p.lob_pass_to(mate)
+				else:
+					p.air_ball_towards(aim_point, 18.0, 1.0, 1.7, "shoot")
+		"through", "through_lofted", "through_lob":
+			mate = _through_target(p, aim)
+			var style: String = {"through": "ground", "through_lofted": "lofted", "through_lob": "lob"}[kind]
+			if mate != null:
+				p.through_to(mate, style)
+			elif style == "ground":
+				p.pass_towards(aim_point)
+			else:
+				p.air_ball_towards(aim_point, 20.0 if style == "lofted" else 18.0, 0.7 if style == "lofted" else 1.0, 1.1 if style == "lofted" else 1.7)
+	if mate != null and mate.role != "GK":
+		controlled = mate
+	switch_cooldown = 0.3
+	print("[%s] PASS %s by #%d -> %s" % [_clock_text(), kind, home.find(p), "space" if mate == null else "#%d" % home.find(mate)])
+
+
+## Cross: the teammate in (or running into) the box nearest the penalty spot.
+func _cross_target(p: Player) -> Player:
+	var spot := Vector3((HALF_L - 11.0) * p.attack_dir, 0, 0)
+	var best: Player = null
+	var best_d := INF
+	for m in team_list(p.team):
+		if m == p or m.role == "GK":
+			continue
+		var depth := m.position.x * p.attack_dir
+		if depth < HALF_L - BOX_DEPTH - 6.0 or absf(m.position.z) > BOX_HALF_W + 2.0:
+			continue
+		var d := Util.flat_dist(m.position, spot)
+		if d < best_d:
+			best_d = d
+			best = m
+	return best
+
+
+## Through-ball: a teammate roughly the way you aim, preferring the ones further forward.
+func _through_target(p: Player, aim: Vector3) -> Player:
+	if aim.length() < 0.01:
+		return null
+	var best: Player = null
+	var best_score := -INF
+	for m in team_list(p.team):
+		if m == p or m.role == "GK":
+			continue
+		var to := Util.flat(m.position - p.position)
+		var d := to.length()
+		if d < 3.0 or d > 45.0:
+			continue
+		var ang := aim.angle_to(to)
+		if ang > deg_to_rad(45.0):
+			continue
+		var s := -ang * 6.0 + (m.position.x - p.position.x) * p.attack_dir * 0.06 - d * 0.03
+		if s > best_score:
+			best_score = s
+			best = m
+	return best
+
+
 func _human_shoot() -> void:
 	var p := controlled
 	if p.role == "GK" or p.restart_kind == "corner":
@@ -1920,6 +2176,10 @@ func _human_shoot() -> void:
 		p.pass_towards(aim_point)
 		return
 	var gp := goal_aim_point(p)
+	if chip_shot:
+		chip_shot = false
+		p.chip_at(gp if gp != Vector3.INF else aim_point, charge)
+		return
 	if gp != Vector3.INF:
 		p.shoot_at(gp, charge, shot_height(charge), 1.0)
 	else:
@@ -1943,7 +2203,7 @@ func shot_height(power: float) -> float:
 	return lerpf(0.35, 1.5, power)
 
 
-func _pass_target_in_cone(p: Player, aim: Vector3) -> Player:
+func _pass_target_in_cone(p: Player, aim: Vector3, max_d := 32.0) -> Player:
 	if aim.length() < 0.01:
 		return null
 	var best: Player = null
@@ -1953,7 +2213,7 @@ func _pass_target_in_cone(p: Player, aim: Vector3) -> Player:
 			continue
 		var to := Util.flat(mate.position - p.position)
 		var d := to.length()
-		if d < 1.5 or d > 32.0:
+		if d < 1.5 or d > max_d:
 			continue
 		var ang := aim.angle_to(to)
 		if ang > deg_to_rad(40.0):

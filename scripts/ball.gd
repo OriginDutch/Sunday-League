@@ -18,6 +18,7 @@ var last_touch: Player = null
 var pass_target: Player = null    # intended receiver of the last pass
 var pass_meet := Vector3.INF      # where passer and receiver are supposed to meet
 var pass_lob := false             # last pass went through the air
+var pass_through := false         # last pass was played into space: the receiver runs onto it
 var time_since_kick := 99.0
 var hold_time := 0.0               # how long the current owner has had it
 var _last_owner: Player = null
@@ -55,6 +56,17 @@ func reset_to(pos: Vector3) -> void:
 	time_since_kick = 99.0
 
 
+## The ball has already gone past the point where its receiver was meant to meet it (through-balls
+## and lobs that run on after landing): the receiver should chase it instead of waiting there.
+func past_meet() -> bool:
+	if pass_meet == Vector3.INF:
+		return false
+	var v := Vector3(vel.x, 0, vel.z)
+	if v.length() < 0.5:
+		return true
+	return Vector3(pass_meet.x - position.x, 0, pass_meet.z - position.z).dot(v) < 0.0
+
+
 func flat_speed() -> float:
 	return Vector2(vel.x, vel.z).length()
 
@@ -70,6 +82,7 @@ func kick(v: Vector3, by: Player, receiver: Player = null) -> void:
 	pass_target = receiver
 	pass_meet = Vector3.INF
 	pass_lob = false
+	pass_through = false
 	time_since_kick = 0.0
 	if by != null:
 		by.touch_cooldown = 0.3

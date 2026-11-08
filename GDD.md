@@ -592,6 +592,28 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - Not tested with a real controller (none here) — Marcel tests.
   - **Marcel tested (2026-11-08): "Controller voelt best goed!!"** Later: more passing options, e.g. **Y = lob pass**.
 
+### Pass types (2026-11-08)
+- **Marcel's choices:** the real FIFA layout ("fifa knoppen kennen we") instead of Claude's first proposal; power is automatic for now; **no error margin yet** (comes with player ratings); cross and chip shot in; headers not yet (next step).
+- **Double tap like FIFA (Marcel chose this over Claude's advice, "ik laat weten of het écht slecht voelt"):** every pad pass has a short wind-up (`PASS_WINDUP` 0.18 s) between pressing and the kick; a second tap in that window upgrades it. Tunable/revertible if it feels sluggish.
+- **Pad (Xbox):**
+
+  | Button | Pass |
+  |---|---|
+  | A | ground pass |
+  | A A | lofted ground pass (half-high, top ~1–3 m) |
+  | X | lob (top ~3–8 m); **from the flank in their half (outside the box width) a cross** to the teammate in/near the box closest to the penalty spot (or into the box if nobody's there) |
+  | Y | through-ball along the ground, into the space ahead of the most forward teammate in the aim direction |
+  | Y Y | lofted through-ball (half-high) |
+  | LB + Y | through-ball over the top (high) |
+  | LB + B (hold) | chip shot: high, slower, drops just under the bar |
+
+  Without the ball X = tackle and LB = switch player, as before; with the ball LB is the modifier.
+- **Mouse/keyboard (Marcel: controller is the standard, keyboard combos Claude's choice):** instant, no wind-up. LMB pass · **middle mouse** lofted pass · **E** lob/cross · **F** through-ball · **Ctrl+F** lofted through · **Shift+F** over the top · **Ctrl + hold RMB** chip.
+- Receivers run onto through-balls; once a through-ball has gone past the meeting point they chase it. Your own receiver waits under a high ball instead of running at it while it's overhead.
+- Throw-ins stay throws whatever button. The AI doesn't use the new pass types yet (open: should it?).
+- Ball gravity is 22 (not 9.81), so heights are set by flight time: 0.7 s ≈ 1.3 m, 1.0 s ≈ 2.8 m, 1.4 s ≈ 5.4 m.
+- Dev: `-- --pass-test2 --menu-skip` plays every pass type with fake pad buttons and prints height, flight and who gets it (opponents frozen; `--pt2-live` lets them play).
+
 ### Finances tab + bottom-tier economy (2026-11-08)
 - **Marcel's choices:** this step = the Finances tab **plus** the first real money flows for the bottom division (not the whole pyramid yet). The tab shows **this season's in/out per category, a per-match ledger, cash over time and what's coming up**. The club gets **small running costs** from day one. **Mock-up first**, then build.
 - Mock-up: `design/ui-noticeboard/mockups/S_Finances.dc.html` (generator `generators/finances.py`, local render `design/ui-noticeboard/finances_preview.png`). Example club halfway a Non-League 3 season.

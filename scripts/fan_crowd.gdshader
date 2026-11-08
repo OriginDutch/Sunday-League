@@ -16,6 +16,7 @@ uniform int clip_desync[16];       // 1 = idle loop: every fan its own phase/spe
 uniform int clip_scarf_up = 9;
 uniform int clip_scarf_twirl = 10;
 uniform int clip_flag = 11;
+uniform int clip_flag_cw = 12;
 uniform vec3 club_a : source_color = vec3(0.1, 0.55, 0.25);
 uniform vec3 club_b : source_color = vec3(0.95, 0.95, 0.95);
 uniform vec3 skin_pal[8];
@@ -53,7 +54,8 @@ void vertex() {
 	int intro = (clips & 31) - 1;
 	int lp = clips >> 5;
 	int mask = int(round(INSTANCE_CUSTOM.z));
-	float seed = hash(float(INSTANCE_ID) + 0.37);
+	// seed from the fan's position: INSTANCE_ID repeats across the per-variant MultiMeshes
+	float seed = hash(dot(MODEL_MATRIX[3].xyz, vec3(12.9898, 4.1414, 78.233)) + 0.37);
 	float t = max(0.0, now - INSTANCE_CUSTOM.y);
 
 	// --- which frame
@@ -96,7 +98,7 @@ void vertex() {
 	else if (part == 16) show = has(mask, 10);                           // moustache
 	else if (part == 17) show = has(mask, 2) && cur == clip_scarf_up;
 	else if (part == 18) show = has(mask, 2) && cur == clip_scarf_twirl;
-	else if (part == 19 || part == 20) show = has(mask, 11) && cur == clip_flag;
+	else if (part == 19 || part == 20) show = has(mask, 11) && (cur == clip_flag || cur == clip_flag_cw);
 	else if (part == 4) show = !has(mask, 15);                           // hair under a cap/beanie
 
 	// --- colours
@@ -127,20 +129,24 @@ void vertex() {
 	else if (part == 20) { col = club_a; v_kind = 2; }
 	v_col = col;
 
-	// --- flag cloth waves
+	// --- flag cloth: a thin sheet that bends — slow billow, travelling waves and flutter, all growing
+	// towards the free edge (u = 0 at the pole, 1 at the end; v = 0 top, 1 bottom)
 	vec3 rest = VERTEX;
 	if (part == 20) {
 		float ph = seed * 6.2831;
-		// travelling waves along the cloth, stronger away from the pole, plus a bit of flutter
-		float wave = sin(now * 6.0 - v_uv.x * 5.0 + ph) * 0.22 + sin(now * 10.0 - v_uv.x * 8.0 + v_uv.y * 3.0 + ph) * 0.07;
-		rest += NORMAL * wave * v_uv.x;
+		float u = v_uv.x;
+		float billow = sin(now * 2.3 + ph) * 0.28 * u * u * (0.6 + 0.4 * sin(v_uv.y * 3.1416));
+		float wave = sin(now * 6.5 - u * 6.0 + v_uv.y * 1.5 + ph) * 0.26 * u
+			+ sin(now * 11.0 - u * 10.0 + v_uv.y * 4.0 + ph * 2.0) * 0.08 * u;
+		rest += NORMAL * (billow + wave);
+		rest.y -= 0.22 * u * u * (0.7 + 0.3 * v_uv.y);          // the free end sags a little
 	}
 	// the flag cloth drags behind the pole: the further from the pole, the older the frame it follows
 	int c0 = row0;
 	int c1 = row1;
 	float cw = w;
 	if (part == 20 && !in_intro) {
-		float fc = mod(f - v_uv.x * 3.0 - v_uv.y * 0.8, float(len));
+		float fc = mod(f - (v_uv.x * v_uv.x * 6.0 + v_uv.x * 1.5 + v_uv.y * 1.2), float(len));
 		c0 = base + int(floor(fc));
 		c1 = base + (int(floor(fc)) + 1) % len;
 		cw = fract(fc);

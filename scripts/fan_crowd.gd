@@ -13,6 +13,7 @@ const WOMEN := 0.15          # Marcel: ~15% women, ~12% children
 const CHILDREN := 0.12
 const HC_STANDING := 0.6     # hard core: share that always stands
 const GLASSES := 0.12
+const FLAG_GAP := 2.6        # metres between flag wavers (no poles in each other's way, room to swing)
 
 const SKIN := [Color(0.98, 0.84, 0.72), Color(0.94, 0.76, 0.62), Color(0.85, 0.64, 0.48), Color(0.72, 0.52, 0.38),
 	Color(0.58, 0.40, 0.28), Color(0.45, 0.30, 0.21), Color(0.33, 0.22, 0.16), Color(0.9, 0.7, 0.56)]
@@ -93,7 +94,7 @@ func setup(seats: Array, opts: Dictionary) -> void:
 	for c in d["clips"]:
 		rows.append(int(d["clips"][c]["row"]))
 		lens.append(int(d["clips"][c]["frames"]))
-		desync.append(1 if c in ["sit_idle", "stand_idle", "flag_wave", "scarf_up"] else 0)
+		desync.append(1 if c in ["sit_idle", "stand_idle", "flag_wave", "flag_wave_cw", "scarf_up"] else 0)
 	for k in range(rows.size(), 16):
 		rows.append(0); lens.append(1); desync.append(0)
 	_mat.set_shader_parameter("clip_row", rows)
@@ -102,6 +103,7 @@ func setup(seats: Array, opts: Dictionary) -> void:
 	_mat.set_shader_parameter("clip_scarf_up", clip["scarf_up"])
 	_mat.set_shader_parameter("clip_scarf_twirl", clip["scarf_twirl"])
 	_mat.set_shader_parameter("clip_flag", clip["flag_wave"])
+	_mat.set_shader_parameter("clip_flag_cw", clip["flag_wave_cw"])
 	var club_b: Color = opts.get("club_b", Color(0.95, 0.95, 0.95))
 	_mat.set_shader_parameter("club_a", club_a)
 	_mat.set_shader_parameter("club_b", club_b)
@@ -125,6 +127,7 @@ func setup(seats: Array, opts: Dictionary) -> void:
 		if not groups.has(key):
 			groups[key] = []
 		groups[key].append(fan)
+	_space_flags(groups)
 	for key in groups:
 		var list: Array = groups[key]
 		var parts: PackedStringArray = key.split("/")
@@ -146,6 +149,26 @@ func setup(seats: Array, opts: Dictionary) -> void:
 			_fans.append(fan)
 			_apply(fan, -1, fan["base"], -100.0)
 	_mat.set_shader_parameter("now", 0.0)
+
+
+## Flag wavers too close to another one put their flag away (they stand and clap instead).
+func _space_flags(groups: Dictionary) -> void:
+	var kept: Array[Vector3] = []
+	for key in groups:
+		for fan in groups[key]:
+			if not fan["flag"]:
+				continue
+			var ok := true
+			for q in kept:
+				if (q - fan["pos"]).length() < FLAG_GAP:
+					ok = false
+					break
+			if ok:
+				kept.append(fan["pos"])
+			else:
+				fan["flag"] = false
+				fan["mask"] = int(fan["mask"]) & ~(1 << Bit.FLAG)
+				fan["base"] = clip["clap_stand"]
 
 
 func _roll(rng: RandomNumberGenerator, seat: Dictionary, temp: String, flag_chance: float, club_a: Color) -> Dictionary:
@@ -213,7 +236,7 @@ func _roll(rng: RandomNumberGenerator, seat: Dictionary, temp: String, flag_chan
 	var pal := skin | (hc << 3) | ((rng.randi() % TROUSERS.size()) << 7) | ((rng.randi() % COATS.size()) << 10) | ((rng.randi() % COATS.size()) << 13) | (shirt << 16)
 	var base := "stand_idle" if standing else "sit_idle"
 	if flag:
-		base = "flag_wave"
+		base = "flag_wave" if rng.randf() < 0.5 else "flag_wave_cw"
 	elif standing and hard:
 		var q := rng.randf()
 		base = "clap_stand" if q < 0.15 else ("scarf_up" if scarf and q < 0.3 else "stand_idle")
@@ -257,8 +280,9 @@ func react(kind: String) -> void:
 				if fan["scarf"] and randf() < 0.45:
 					cheer = "scarf_up" if randf() < 0.5 else "scarf_twirl"
 				if fan["flag"]:
-					cheer = "flag_wave"
-				_cheer(fan, clip[cheer], t + randf_range(0.0, 0.6))
+					cheer = ""
+				if cheer != "":
+					_cheer(fan, clip[cheer], t + randf_range(0.0, 0.6))
 			_settle_at = t + 9.0
 		"chance", "save":
 			for fan in _fans:

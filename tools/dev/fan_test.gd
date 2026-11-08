@@ -65,7 +65,7 @@ func _init():
 	root.add_child(grass)
 	crowd = FanCrowd.new()
 	root.add_child(crowd)
-	crowd.setup(seats, {"club_a": Color(0.1, 0.55, 0.25), "club_b": Color(0.96, 0.96, 0.96), "temperature": temp, "flag_chance": 0.12})
+	crowd.setup(seats, {"club_a": Color(0.1, 0.55, 0.25), "club_b": Color(0.96, 0.96, 0.96), "temperature": temp, "flag_chance": 0.25})
 	var cam := Camera3D.new()
 	root.add_child(cam)
 	cam.position = Vector3(0, 2.6, 7.5)

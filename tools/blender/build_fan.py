@@ -312,13 +312,15 @@ def flag_wave(ph):
     return P(r)
 
 
-def flag_timeline(n=40):
-    return [(f, flag_wave(2 * math.pi * f / n)) for f in range(n + 1)]
+def flag_timeline(n=40, sign=1):
+    """sign 1 = counter-clockwise (seen from above), -1 = clockwise."""
+    return [(f, flag_wave(sign * 2 * math.pi * f / n)) for f in range(n + 1)]
 
 
-def key_flag(arm, frame, ph):
+def key_flag(arm, frame, ph, sign=1):
     """The flag bone's rotation for this frame: pole along flag_dir, cloth trailing the motion."""
     d, m = flag_dir(ph)
+    m = m * sign
     t = -(m - d * m.dot(d)).normalized()             # cloth points away from where the tip goes
     side = d.cross(t).normalized()
     # rest: pole = +Z, cloth = +X (armature space)
@@ -396,13 +398,15 @@ CLIPS = [  # name, timeline, loop
     ("scarf_up", loop(48, scarf_up, 6), True),
     ("scarf_twirl", loop(16, scarf_twirl, 1), True),
     ("flag_wave", flag_timeline(40), True),
+    ("flag_wave_cw", flag_timeline(40, -1), True),
     ("despair_sit", loop(48, despair_sit, 6), True),
     ("despair_stand", loop(48, despair_stand, 6), True),
 ]
 SITTING = {"sit_idle", "sit_clap", "despair_sit"}
 
 
-def key_clip(arm, timeline, flag=False):
+def key_clip(arm, timeline, flag=0):
+    """flag: 0 = no flag, 1 / -1 = flag circling counter-clockwise / clockwise."""
     act = bpy.data.actions.new("clip")
     arm.animation_data_create()
     arm.animation_data.action = act
@@ -410,7 +414,7 @@ def key_clip(arm, timeline, flag=False):
     for f, pose in timeline:
         bp.pose_key(arm, f, *pose)
         if flag:
-            key_flag(arm, f, 2 * math.pi * f / n)
+            key_flag(arm, f, flag * 2 * math.pi * f / n, flag)
     return act
 
 
@@ -431,8 +435,8 @@ def bake(arm):
     clips, mats, sit_amount = {}, [], []
     row = 0
     for name, tl, is_loop in CLIPS:
-        key_clip(arm, tl, flag=(name == "flag_wave"))
-        if name == "flag_wave":
+        key_clip(arm, tl, flag={"flag_wave": 1, "flag_wave_cw": -1}.get(name, 0))
+        if name.startswith("flag_wave"):
             add_flag_ik(arm)
         last = tl[-1][0]
         n = last if is_loop else last + 1        # loops: the last key equals the first, skip it
@@ -448,7 +452,7 @@ def bake(arm):
             else:
                 s = 0.0
             sit_amount.append(round(s, 3))
-        if name == "flag_wave":
+        if name.startswith("flag_wave"):
             remove_ik(arm)
         clips[name] = {"row": row, "frames": n, "loop": is_loop}
         row += n
@@ -549,7 +553,7 @@ def held_items(arm):
     out = Vector((1, 0, 0))
     p = bp.Part("Flag", "flag")
     p.ring_tube(g0 - up * 0.25, g0 + up * FLAG_POLE, 0.02, 0.016, "FlagPole", 6)
-    nx, ny = 14, 9
+    nx, ny = 16, 10
     p.uv_over = {}
     idx = p.mi("FlagCloth")
     top = FLAG_POLE - 0.03
@@ -636,7 +640,7 @@ def flag_preview():
     p.ring_tube(g0 - up * 0.25, g0 + up * FLAG_POLE, 0.02, 0.016, "FlagPole", 6)
     p.box(g0 + up * (FLAG_POLE - 0.03 - FLAG_H / 2) + out * (FLAG_W / 2 + 0.02), (FLAG_W, 0.01, FLAG_H), "FlagCloth")
     objs.append(p.build(arm))
-    key_clip(arm, flag_timeline(40), flag=True)
+    key_clip(arm, flag_timeline(40), flag=1)
     add_flag_ik(arm)
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"

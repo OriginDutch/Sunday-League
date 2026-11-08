@@ -2119,7 +2119,7 @@ func _do_pass(kind: String) -> void:
 			elif style == "ground":
 				p.pass_towards(aim_point)
 			else:
-				p.air_ball_towards(aim_point, 20.0 if style == "lofted" else 18.0, 0.7 if style == "lofted" else 1.0, 1.1 if style == "lofted" else 1.7)
+				p.air_ball_towards(aim_point, 20.0 if style == "lofted" else 18.0, 0.6 if style == "lofted" else 1.0, 0.8 if style == "lofted" else 1.7)
 	if mate != null and mate.role != "GK":
 		controlled = mate
 	switch_cooldown = 0.3

@@ -452,7 +452,7 @@ func through_to(receiver: Player, style: String) -> void:
 	var d := Util.flat_dist(position, target)
 	match style:
 		"lofted":
-			air_ball_to(target, clampf(d / 20.0, 0.7, 1.2), receiver, "pass")
+			air_ball_to(target, clampf(d / 20.0, 0.6, 0.8), receiver, "pass")   # top max ~2 m (Marcel)
 		"lob":
 			air_ball_to(target, clampf(maxf(run_t, d / 18.0), 1.0, 1.7), receiver, "shoot")
 		_:

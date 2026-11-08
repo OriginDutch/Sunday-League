@@ -225,7 +225,23 @@ func _ready() -> void:
 		if _ui_demo:
 			while club.squad.size() < ClubState.SQUAD_SIZE:
 				club.recruit(0)
+		for a in args:
+			if a.begins_with("--temp="):
+				club.temperature = a.trim_prefix("--temp=")     # dev: crowd clothing cold / mild / sunny
+		if "--crowd-max" in args:
+			# dev (fps test): bleachers everywhere, two hard-core ends, sold out
+			cheat_max_stadium()
+			for sec in [18, 19, 20, 23, 24]:
+				club.hardcore[str(sec)] = true
+			club.fans = club.seats() + 1200
 		start_friendly()
+		if "--crowd-max" in args:
+			var shown := 0
+			var flags := 0
+			for c in grounds.crowds:
+				shown += c.fan_count()
+				flags += c.flag_count()
+			print("CROWD MAX: %d fans drawn (%d seats, %d flags), temperature %s" % [shown, club.seats(), flags, club.temperature])
 		if "--shot-test" in args:
 			_shot_test_begin()
 	else:
@@ -373,7 +389,7 @@ func start_friendly() -> void:
 		return   # season over: the hub offers the next season instead
 	var opp: Dictionary = club.league.teams[fx["opponent"]]
 	opponent_name = opp["name"]
-	match_home = fx["home"]
+	match_home = fx["home"] or "--crowd-max" in OS.get_cmdline_user_args()
 	match_opp_strength = float(opp["str"])
 	placing_item = ""
 	grounds.show_markers(false)
@@ -431,6 +447,16 @@ func cheat_view_away() -> String:
 	var fans := grounds.use_away(t["name"], float(t["str"]))
 	grounds.spawn_crowd(fans)
 	return t["name"]
+
+
+## Dev cheat (fps test): open bleachers, 7 rows, on every section, finished now.
+func cheat_max_stadium() -> void:
+	club.builds.clear()
+	for sec in Grounds.section_count():
+		club.sections[str(sec)] = {"stage": "bleachers", "rows": ClubState.BLEACHER_ROWS[-1]}
+		for k in ClubState.SPOTS_PER_SECTION:
+			club.slots.erase(str(sec * ClubState.SPOTS_PER_SECTION + k))
+	grounds.rebuild_furniture()
 
 
 func cheat_view_home() -> void:
@@ -547,6 +573,9 @@ func _hub_click() -> void:
 	if club.place(placing_item, hover_slot):
 		grounds.rebuild_furniture()
 		club.save()
+	if placing_item == "hardcore":            # keep toggling sections until Esc / right click
+		hub.refresh()
+		return
 	_cancel_placing()
 
 
@@ -605,8 +634,12 @@ func _hub_test() -> void:
 				club.league.play_round(res["goals_for"], res["goals_against"])
 			hub.refresh()
 			print("SIM week %d round %d pos %d" % [club.league.current_week(), club.league.round_idx, club.league.position_of(0)])
-	print("CROWD standing figures: %d, seated (MultiMesh): %d (seats %d)" % [grounds.fans.size(),
-		grounds.seated_crowd.multimesh.instance_count if grounds.seated_crowd != null else 0, club.seats()])
+	var shown := 0
+	var flags := 0
+	for c in grounds.crowds:
+		shown += c.fan_count()
+		flags += c.flag_count()
+	print("CROWD fans drawn: %d (flags %d), seats %d" % [shown, flags, club.seats()])
 
 
 # ================================================================== loop

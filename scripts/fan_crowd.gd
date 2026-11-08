@@ -50,6 +50,18 @@ var _settle_at := -1.0
 var _settle_kind := ""
 
 
+func fan_count() -> int:
+	return _fans.size()
+
+
+func flag_count() -> int:
+	var n := 0
+	for f in _fans:
+		if f["flag"]:
+			n += 1
+	return n
+
+
 static func load_data() -> Dictionary:
 	if _data.is_empty():
 		var f := FileAccess.open(DATA_PATH, FileAccess.READ)

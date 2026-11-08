@@ -307,7 +307,7 @@ func _hint() -> void:
 	var row := _hbox(10)
 	var txt := "WASD move · wheel zoom · Q/E rotate · R/F tilt · hold right mouse to look · F1 cheats"
 	if main.placing_item != "":
-		txt = ("Click a section to build" if main.placing_item in ClubState.SECTION_ITEMS else "Click a free spot") + " · right click or Esc to cancel"
+		txt = ("Click sections to switch hard core on / off" if main.placing_item == "hardcore" else ("Click a section to build" if main.placing_item in ClubState.SECTION_ITEMS else "Click a free spot")) + " · right click or Esc to cancel"
 	var l := Kit.label(txt, false, 15, 500, Kit.c("muted"))
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(l)
@@ -580,7 +580,7 @@ func _stadium_tab() -> void:
 	var b: VBoxContainer = s["body"]
 	b.add_child(_spread(Kit.heading("Build", 34), Kit.label("Esc to stop building", false, 14, 500, Kit.c("muted"))))
 	var tabs := _hbox(4)
-	for cat in [["Seating", "seat"], ["Stands", "stadium"]]:
+	for cat in [["Seating", "seat"], ["Stands", "stadium"], ["Fans", "fans"]]:
 		var tb := Kit.nav_item(cat[0], cat[1], cat[0] == stand_cat)
 		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var cname: String = cat[0]
@@ -594,7 +594,10 @@ func _stadium_tab() -> void:
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 14)
 	grid.add_theme_constant_override("v_separation", 14)
-	if stand_cat == "Seating":
+	if stand_cat == "Fans":
+		grid.add_child(_shop_card("hardcore", "Hard core", "fans", "%d section%s" % [club.hardcore.size(), "" if club.hardcore.size() == 1 else "s"],
+			"Free · click sections on / off", "Flags, scarves, songs. Standing, mostly."))
+	elif stand_cat == "Seating":
 		grid.add_child(_shop_card("chair", "Chair", "seat", "+1 seat", "Instant · up to %d per spot" % ClubState.MAX_CHAIRS_PER_SLOT, "Folding. Mostly."))
 		grid.add_child(_shop_card("bench", "Bench", "seat", "+%d seats" % ClubState.BENCH_SEATS, "Instant", "Seats four. Five if you're friendly."))
 	else:
@@ -820,6 +823,14 @@ func _cheats() -> void:
 			bd["finish"] = float(bd["finish"]) - 1.0
 		club.complete_builds()
 		main.grounds.rebuild_furniture())
+	var cr := _hbox(6)
+	_cheat(cr, "Weather: %s" % club.temperature, func() -> void:
+		club.temperature = {"mild": "cold", "cold": "sunny", "sunny": "mild"}[club.temperature])
+	_cheat(cr, "Max stadium", func() -> void:
+		main.cheat_max_stadium())
+	_cheat(cr, "Sell out", func() -> void:
+		club.fans = club.seats() + 1200)
+	b.add_child(cr)
 	_cheat(b, "Squad full (11)", func() -> void:
 		while club.squad.size() < ClubState.SQUAD_SIZE:
 			club.recruit(0))
@@ -1134,6 +1145,8 @@ func update_preview(item: String, idx: int, screen_pos: Vector2) -> void:
 
 
 func _preview_card(item: String, idx: int) -> Control:
+	if item == "hardcore":
+		return _hardcore_card(idx)
 	var sec_item := item in ClubState.SECTION_ITEMS
 	var names := {"chair": "Chair", "bench": "Bench", "bleachers": "Open bleachers", "bleachers_rush": "Open bleachers (rush)",
 		"rows": "+2 rows", "rows_rush": "+2 rows (rush)"}
@@ -1172,6 +1185,21 @@ func _preview_card(item: String, idx: int) -> Control:
 		b.add_child(Kit.label("Stack up to 4 per spot. They don't match. Nobody minds." if item == "chair" else "Seats four. Five if you're friendly.",
 			true, 19, 400, Kit.c("pen"), true))
 	b.add_child(Kit.label("Left click to build · right click or Esc to cancel", false, 14, 500, Kit.c("muted")))
+	Kit.pin(s["root"], 200)
+	return s["root"]
+
+
+func _hardcore_card(idx: int) -> Control:
+	var on := club.is_hardcore(idx)
+	var s := Kit.sheet("plain_card", 400, 0.6, Vector4(24, 24, 24, 20), 12)
+	var b: VBoxContainer = s["body"]
+	b.add_child(Kit.heading("Hard core", 34))
+	b.add_child(Kit.label(_side_name(idx), false, 16, 500, Kit.c("muted")))
+	b.add_child(_line("Now", "Hard core" if on else "Regular", Kit.c("ok") if on else null))
+	b.add_child(_adds("fans", "Click to make it %s" % ("a regular section" if on else "hard core"), Kit.c("ink")))
+	b.add_child(Kit.label("More club colours, scarves and flags; a lot of them stand. Free, and you can switch it back any time.",
+		true, 19, 400, Kit.c("pen"), true))
+	b.add_child(Kit.label("Left click to switch · right click or Esc to stop", false, 14, 500, Kit.c("muted")))
 	Kit.pin(s["root"], 200)
 	return s["root"]
 

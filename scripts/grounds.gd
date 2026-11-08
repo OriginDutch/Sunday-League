@@ -10,8 +10,9 @@ const SEAT_OFFSET := 4.0          # metres behind the line to the seat row
 const BOARD_OFFSET := 1.4         # ad boards, closest to the pitch
 const ROPE_OFFSET := 2.2          # rope barrier
 const STAND_OFFSET := 3.0         # standing (non-paying) fans, between rope and seats
-const MAX_STANDING_FANS := 220     # standing fans are separate figures (seated ones: all of them, MultiMesh)
-const SeatedCrowd = preload("res://scripts/seated_crowd.gd")
+const FanCrowd = preload("res://scripts/fan_crowd.gd")
+const STANDING_SPACING := 0.6     # standing fans along the touchlines and behind the goals, two rows
+const FLAG_CHANCE := 0.03         # per hard-core place (Marcel: starting value), grows with the crowd
 const CHAIR_OFFSETS := [-0.75, -0.25, 0.25, 0.75]   # seat positions within a spot
 const END_EXTRA := 2.5          # sections behind the goals sit further back (clear of the nets)
 const DUGOUT_SECTION := 4         # middle section of the far (main) side
@@ -33,9 +34,8 @@ var active_slots: Dictionary = {}   # the furniture on show: yours, or the home 
 var away_mode := false
 var markers: Array[MeshInstance3D] = []
 var section_markers: Array[MeshInstance3D] = []
-var fans: Array[Fan] = []
-var seated_crowd: MultiMeshInstance3D = null
-var _seat_spots: Array = []       # positions of seated fans (for chant bubbles)
+var crowds: Array = []            # FanCrowd nodes (home crowd, travelling fans)
+var _seat_spots: Array = []       # positions of all fans (for chant bubbles)
 var free_mat: StandardMaterial3D
 var hover_mat: StandardMaterial3D
 
@@ -158,7 +158,19 @@ func show_markers(on: bool, item: String = "", hover: int = -1) -> void:
 		markers[i].material_override = hover_mat if i == hover and not sec_item else free_mat
 	for i in section_markers.size():
 		section_markers[i].visible = sec_item and state.can_build(item, i)
-		section_markers[i].material_override = hover_mat if i == hover and sec_item else free_mat
+		var m := free_mat
+		if item == "hardcore" and state.is_hardcore(i):
+			m = _hard_mat()
+		section_markers[i].material_override = hover_mat if i == hover and sec_item else m
+
+
+var _hard_m: StandardMaterial3D
+
+
+func _hard_mat() -> StandardMaterial3D:
+	if _hard_m == null:
+		_hard_m = Util.mat(Color(Main.HOME_SHIRT, 0.7), true)
+	return _hard_m
 
 
 func rebuild_furniture() -> void:
@@ -454,7 +466,7 @@ func seat_list() -> Array:
 		for o in offsets:
 			var ox: float = o
 			var local := Vector3(ox, 0.0, 0).rotated(Vector3.UP, yaw)
-			out.append({"pos": base + local, "yaw": yaw})
+			out.append({"pos": base + local, "yaw": yaw, "sec": i / ClubState.SPOTS_PER_SECTION})
 	if not away_mode:
 		for key in state.sections:
 			var sec := int(key)
@@ -465,72 +477,80 @@ func seat_list() -> Array:
 				for i in ClubState.BLEACHER_SEATS_PER_ROW:
 					var x := -4.75 + i * 0.5
 					var p := section_point(sec, x, BL_FIRST_D + r * BL_TREAD) + Vector3(0, BL_FIRST_H + r * BL_RISE - 0.45, 0)
-					out.append({"pos": p, "yaw": yaw})
+					out.append({"pos": p, "yaw": yaw, "sec": sec})
 	return out
 
 
 ## attendance = fans of the club whose ground this is; travelling = your fans at an away ground
-## (they stand together behind the near touchline).
+## (they stand together behind the near touchline). Every fan is drawn (crowd v2, scripts/fan_crowd.gd):
+## the seats fill first, the rest stands along the touchlines and behind the goals.
 func spawn_crowd(attendance: int, travelling: int = 0) -> void:
 	clear_crowd()
 	var seats := seat_list()
 	seats.shuffle()
 	var seated := mini(attendance, seats.size())
-	if seated > 0:
-		var ours := not away_mode
-		var club_shirt := Main.HOME_SHIRT if ours else Main.AWAY_SHIRT
-		var shirts := [club_shirt, club_shirt, club_shirt, Color(0.95, 0.95, 0.95), Color(0.2, 0.25, 0.35),
-			Color(0.55, 0.15, 0.15) if ours else Color(0.15, 0.45, 0.25), Color(0.85, 0.75, 0.3)]
-		var used := seats.slice(0, seated)
-		seated_crowd = SeatedCrowd.new()
-		crowd_root.add_child(seated_crowd)
-		seated_crowd.setup(used, shirts, ours)
-		for u in used:
-			_seat_spots.append(u["pos"])
-	var visible_count := seated + mini(attendance - seated, MAX_STANDING_FANS)
-	for i in mini(travelling, 60):
-		var spot := Vector3(randf_range(-14.0, 14.0), 0, Main.HALF_W + STAND_OFFSET + randf_range(-0.4, 0.6))
-		_add_fan(false, spot, PI, true)
-	# the rest stands along the far touchline in little groups, for free
-	var standing := visible_count - seated
-	var groups := maxi(1, int(ceil(standing / 5.0)))
-	var placed := 0
-	for g in groups:
-		var side := -1.0 if (g % 3 != 2 or away_mode) else 1.0
-		var gx := randf_range(-45.0, 45.0)
-		if side < 0.0 and absf(gx) < DUGOUT_CLEAR_X:
-			gx = signf(gx + 0.01) * randf_range(DUGOUT_CLEAR_X, 45.0)
-		var center := Vector3(gx, 0, side * (Main.HALF_W + STAND_OFFSET))
-		var size := mini(randi_range(2, 6), standing - placed)
-		for k in size:
-			var spot := center + Vector3(randf_range(-1.2, 1.2), 0, randf_range(-0.5, 0.5))
-			_add_fan(false, spot, 0.0 if side < 0.0 else PI)
-			placed += 1
-		if placed >= standing:
-			break
+	var ours := not away_mode
+	var places := []
+	for k in seated:
+		var st: Dictionary = seats[k]
+		var hard := ours and state.is_hardcore(int(st.get("sec", -1)))
+		places.append({"pos": st["pos"], "yaw": st["yaw"], "hard": hard, "standing": false})
+	var standing_spots := _standing_spots(away_mode)
+	standing_spots.shuffle()
+	for k in mini(attendance - seated, standing_spots.size()):
+		places.append(standing_spots[k])
+	if not places.is_empty():
+		_crowd(places, ours, attendance)
+	if travelling > 0:
+		var near := []
+		for k in mini(travelling, 120):
+			var x := (k / 2 - 30) * STANDING_SPACING + randf_range(-0.1, 0.1)
+			near.append({"pos": Vector3(x, 0, Main.HALF_W + STAND_OFFSET + (k % 2) * 0.5), "yaw": PI, "hard": false, "standing": true})
+		_crowd(near, true, travelling)
+	for pl in places:
+		_seat_spots.append(pl["pos"])
 
 
-func _add_fan(is_seated: bool, spot: Vector3, yaw: float, travelling: bool = false) -> void:
-	var f := Fan.new()
-	crowd_root.add_child(f)
-	var ours := not away_mode or travelling
-	f.supports_us = ours
-	var club_shirt := Main.HOME_SHIRT if ours else Main.AWAY_SHIRT
-	var shirts := [club_shirt, club_shirt, Color(0.95, 0.95, 0.95), Color(0.2, 0.25, 0.35),
-		Color(0.55, 0.15, 0.15) if ours else Color(0.15, 0.45, 0.25), Color(0.85, 0.75, 0.3)]
-	var skins := [Color(0.98, 0.82, 0.68), Color(0.87, 0.67, 0.5), Color(0.6, 0.42, 0.3), Color(0.42, 0.28, 0.2)]
-	f.setup(is_seated, spot, yaw, shirts.pick_random(), skins.pick_random())
-	fans.append(f)
+func _crowd(places: Array, ours: bool, attendance: int) -> void:
+	var c := FanCrowd.new()
+	crowd_root.add_child(c)
+	c.setup(places, {
+		"club_a": Main.HOME_SHIRT if ours else Main.AWAY_SHIRT, "club_b": Color(0.96, 0.96, 0.96), "ours": ours,
+		"temperature": state.temperature, "flag_chance": FLAG_CHANCE * clampf(1.0 + attendance / 5000.0, 1.0, 3.0)})
+	crowds.append(c)
+
+
+## Free standing places: two rows between the rope and the seats on every side, not in front of the
+## dugouts, not where bleachers stand.
+func _standing_spots(away: bool) -> Array:
+	var out := []
+	var sides := [[-1.0, Main.HALF_L], [1.0, Main.HALF_L]]
+	for side in sides:
+		var z: float = side[0] * (Main.HALF_W + STAND_OFFSET)
+		var x := -Main.HALF_L + 1.0
+		while x < Main.HALF_L - 1.0:
+			if not (side[0] < 0.0 and absf(x) < DUGOUT_CLEAR_X) and not (away and side[0] > 0.0 and absf(x) < 20.0):
+				for row in 2:
+					var zz: float = z + side[0] * row * 0.5
+					out.append({"pos": Vector3(x + randf_range(-0.08, 0.08), 0, zz), "yaw": 0.0 if side[0] < 0.0 else PI,
+						"hard": false, "standing": true})
+			x += STANDING_SPACING
+	for end in [-1.0, 1.0]:
+		var xx: float = end * (Main.HALF_L + STAND_OFFSET)
+		var z2 := -Main.HALF_W + 1.0
+		while z2 < Main.HALF_W - 1.0:
+			for row in 2:
+				out.append({"pos": Vector3(xx + end * row * 0.5, 0, z2 + randf_range(-0.08, 0.08)), "yaw": -end * PI * 0.5,
+					"hard": false, "standing": true})
+			z2 += STANDING_SPACING
+	return out
 
 
 func clear_crowd() -> void:
-	if seated_crowd != null:
-		seated_crowd.queue_free()
-		seated_crowd = null
+	for c in crowds:
+		c.queue_free()
+	crowds.clear()
 	_seat_spots.clear()
-	for f in fans:
-		f.queue_free()
-	fans.clear()
 
 
 const CHANTS_IDLE := ["COME ON YOU GREENS!", "WHO ARE YA?!", "SUNDAY LEAGUE, SUNDAY LEAGUE!",
@@ -549,25 +569,19 @@ var bubbles: Array[Label3D] = []
 
 
 func react(kind: String) -> void:
-	for f in fans:
-		f.react(kind)
-	if seated_crowd != null:
-		seated_crowd.react(kind)
+	for c in crowds:
+		c.react(kind)
 	if CHANTS.has(kind) and (kind in ["goal_for", "goal_against", "offside"] or randf() < 0.4):
 		var lines: Array = CHANTS[kind]
-		for i in mini(3, maxi(1, (fans.size() + _seat_spots.size()) / 15)):
+		for i in mini(3, maxi(1, _seat_spots.size() / 15)):
 			chant(lines.pick_random())
 
 
 ## A speech bubble above a random fan.
 func chant(text: String) -> void:
-	if fans.is_empty() and _seat_spots.is_empty():
+	if _seat_spots.is_empty():
 		return
-	var at: Vector3
-	if not _seat_spots.is_empty() and (fans.is_empty() or randf() < float(_seat_spots.size()) / (_seat_spots.size() + fans.size())):
-		at = _seat_spots.pick_random()
-	else:
-		at = (fans.pick_random() as Fan).position
+	var at: Vector3 = _seat_spots.pick_random()
 	var l := Label3D.new()
 	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -585,7 +599,7 @@ func chant(text: String) -> void:
 
 
 func _process(delta: float) -> void:
-	if fans.is_empty() and _seat_spots.is_empty():
+	if _seat_spots.is_empty():
 		return
 	chant_timer -= delta
 	if chant_timer <= 0.0:

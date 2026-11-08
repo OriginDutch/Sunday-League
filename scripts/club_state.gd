@@ -32,7 +32,7 @@ const ROW_UPGRADE_WEEKS := 0.5            # extra rows within a stage: half the 
 const DEMOLITION_WEEKS := 1.0             # stage jump: clear the old furniture first
 const RUSH_COST := 1.5                    # rush build: +50% cost...
 const RUSH_TIME := 0.75                   # ...for 75% of the build time
-const SECTION_ITEMS := ["bleachers", "bleachers_rush", "rows", "rows_rush"]
+const SECTION_ITEMS := ["bleachers", "bleachers_rush", "rows", "rows_rush", "hardcore"]   # hardcore: free toggle, no build
 const SAVE_VERSION := 3             # v2 = sections, v3 = league; older saves start a new game
 const CLUB_NAME := "Your club"     # placeholder until the player can name the club
 
@@ -60,6 +60,11 @@ var fans_carry := 0.0               # fractional fan growth carried over
 var league: LeagueScript                  # your division: fixtures, results, table
 var sections: Dictionary = {}       # section index (String) -> {"stage": "bleachers", "rows": n}
 var builds: Array = []              # [{"sec", "stage", "rows", "finish" (absolute week), "start"}]
+## Hard-core sections (Marcel, 2026-11-08): free, as many as you like, purely visual for now —
+## flags, scarves, club wear and a share always standing. Keys are section numbers as strings.
+var hardcore := {}
+## Crowd clothing until weather exists: "cold" / "mild" / "sunny" (dev cheat cycles it).
+var temperature := "mild"
 
 
 static func new_game() -> ClubState:
@@ -141,6 +146,8 @@ func bleacher_rows(sec: int) -> int:
 
 ## Section items: "bleachers" on a section without a stand; "rows" adds the next row step.
 func can_build(item: String, sec: int) -> bool:
+	if item == "hardcore":
+		return sec >= 0
 	if sec < 0 or is_building(sec):
 		return false
 	if item.begins_with("bleachers"):
@@ -152,6 +159,8 @@ func can_build(item: String, sec: int) -> bool:
 
 
 func build_cost(item: String, sec: int = -1) -> int:
+	if item == "hardcore":
+		return 0
 	var places := BLEACHER_ROWS[0] * BLEACHER_SEATS_PER_ROW
 	if item.begins_with("rows"):
 		places = 2 * BLEACHER_SEATS_PER_ROW
@@ -164,6 +173,8 @@ func build_cost(item: String, sec: int = -1) -> int:
 
 
 func build_weeks(item: String, sec: int = -1) -> float:
+	if item == "hardcore":
+		return 0.0
 	var w := BLEACHER_WEEKS if item.begins_with("bleachers") else ROW_UPGRADE_WEEKS
 	if item.ends_with("_rush"):
 		w *= RUSH_TIME
@@ -237,6 +248,9 @@ func price_of(item: String) -> int:
 
 
 func place(item: String, slot: int) -> bool:
+	if item == "hardcore":
+		toggle_hardcore(slot)
+		return true
 	if item in SECTION_ITEMS:
 		return start_build(item, slot)
 	var key := str(slot)
@@ -310,6 +324,17 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int, 
 	}
 
 
+func is_hardcore(sec: int) -> bool:
+	return hardcore.has(str(sec))
+
+
+func toggle_hardcore(sec: int) -> void:
+	if hardcore.has(str(sec)):
+		hardcore.erase(str(sec))
+	else:
+		hardcore[str(sec)] = true
+
+
 # ------------------------------------------------------------------ save / load
 
 func to_dict() -> Dictionary:
@@ -318,6 +343,7 @@ func to_dict() -> Dictionary:
 		"candidates": candidates, "slots": slots, "record": record,
 		"matches_played": matches_played, "fans_carry": fans_carry,
 		"league": league.to_dict(), "sections": sections, "builds": builds,
+		"hardcore": hardcore, "temperature": temperature,
 	}
 
 
@@ -339,6 +365,8 @@ static func from_dict(d: Dictionary) -> ClubState:
 	s.sections = d.get("sections", {})
 	for k in s.sections:
 		s.sections[k]["rows"] = int(s.sections[k]["rows"])
+	s.hardcore = d.get("hardcore", {})
+	s.temperature = String(d.get("temperature", "mild"))
 	s.builds = d.get("builds", [])
 	for b in s.builds:
 		b["sec"] = int(b["sec"])

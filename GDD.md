@@ -258,7 +258,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   4. **Shared vertices (indexed mesh):** flat shading via derivatives allows it, ~3× less vertex work.
   5. **A crowd budget:** detail drops before the fps does.
   Detail-in-textures (normal maps) doesn't fit the low-poly look — the geometry *is* the style.
-- **FPS test (Marcel, 2026-11-08, RX 9070 XT):** Max stadium + sold out (~5,000 fans) — from **144 fps to ~105–108 fps**: "not bad". With vsync off: **122–126 fps** (~8 ms per frame). → ~9.5 ms per frame; the crowd plan stays parked until stadiums grow past ~5,000 (an average PC would be around half that fps).
+- **FPS test (Marcel, 2026-11-08, RX 9070 XT):** Max stadium + sold out (~5,000 fans) — from **144 fps to ~105–108 fps**: "not bad". With vsync off: **122–126 fps** (~8 ms per frame) — **fully zoomed out, so the whole stadium in view: the worst case**. → ~9.5 ms per frame; the crowd plan stays parked until stadiums grow past ~5,000 (an average PC would be around half that fps).
 - **FPS overlay (Marcel, 2026-11-08: couldn't find Godot's Monitors tab → "bouw maar in"):** **` (the key left of 1)** anywhere shows fps, ms per frame, triangles, draw calls, fans drawn and vsync state (top right); **Shift+`** turns vsync on/off (to see the real headroom). Was F8/F9 — but F8 stops the game when it runs inside the Godot editor (Marcel: "F8 sluit de game :D"). Dev flag `--fps` starts with it on. Listed in the F1 cheat panel.
 - **Saves (Marcel, 2026-11-07):** saves don't matter yet — old saves may simply reset. **Marcel says when a save starts to matter.**
 - **Currency:** stays **£** in-game; the sign is just a sign (Marcel). Model numbers in € are used as-is.

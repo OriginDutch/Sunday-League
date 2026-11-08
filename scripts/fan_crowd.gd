@@ -93,7 +93,7 @@ func setup(seats: Array, opts: Dictionary) -> void:
 	for c in d["clips"]:
 		rows.append(int(d["clips"][c]["row"]))
 		lens.append(int(d["clips"][c]["frames"]))
-		desync.append(1 if c in ["sit_idle", "stand_idle"] else 0)
+		desync.append(1 if c in ["sit_idle", "stand_idle", "flag_wave", "scarf_up"] else 0)
 	for k in range(rows.size(), 16):
 		rows.append(0); lens.append(1); desync.append(0)
 	_mat.set_shader_parameter("clip_row", rows)

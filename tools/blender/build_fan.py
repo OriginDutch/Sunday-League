@@ -274,14 +274,18 @@ def scarf_twirl(ph):
 
 
 def flag_wave(ph):
+    """Big sweeps from side to side over the head, the body twisting along."""
     s = math.sin(ph)
+    c = math.cos(ph)
     r = stand()
-    r["spine"] = (0, 0, s * 4)
-    r["upperarm.R"] = (-135, 0, -(25 + 30 * s))
-    r["forearm.R"] = (-35, 0, 0)
-    r["hand.R"] = (0, 0, 0)
-    r["upperarm.L"] = (-60, 0, -10)
-    r["forearm.L"] = (-70, 0, 0)
+    r["spine"] = (-3, s * 10, s * 7)
+    r["chest"] = (-3, s * 8, s * 5)
+    r["head"] = (-10, -s * 8, 0)
+    r["upperarm.R"] = (-150 + 10 * c, 0, -(10 + 55 * (s + 1) * 0.5))
+    r["forearm.R"] = (-25 - 15 * c, 0, 0)
+    r["hand.R"] = (0, 0, -s * 15)
+    r["upperarm.L"] = (-110 + 15 * s, 0, -12)
+    r["forearm.L"] = (-60, 0, 0)
     return P(r)
 
 
@@ -471,15 +475,15 @@ def held_items(arm):
         v.co = inv @ v.co
     chunks.append(export_part(p))
     # flag: pole up out of the right hand, cloth to the side
-    inv, pb = posed_to_rest(arm, "hand.R", [(0, flag_wave(0.0))], None)
+    inv, pb = posed_to_rest(arm, "hand.R", [(0, flag_wave(0.0))], None)   # frame 0 of flag_wave
     hand = (pb.head + pb.tail) / 2
-    up = (pb.head - pb.tail).normalized()
+    up = (pb.tail - pb.head).normalized()            # the raised hand points up (wrist -> fingers)
     p = bp.Part("Flag", "hand.R")
-    p.ring_tube(hand - up * 0.15, hand + up * 1.55, 0.014, 0.012, "FlagPole", 5)
+    p.ring_tube(hand - up * 0.3, hand + up * 2.05, 0.017, 0.014, "FlagPole", 5)
     out = up.cross(Vector((0, 1, 0))).normalized()
     if out.x < 0:
         out = -out
-    W, H, nx, ny = 1.1, 0.7, 8, 5
+    W, H, nx, ny = 1.55, 1.0, 12, 7
     p.uv_over = {}
     idx = p.mi("FlagCloth")
     for back in (False, True):                      # two sheets so both sides show
@@ -487,7 +491,7 @@ def held_items(arm):
         for j in range(ny + 1):
             row = []
             for i in range(nx + 1):
-                q = hand + up * (1.53 - H * j / ny) + out * (W * i / nx)
+                q = hand + up * (2.02 - H * j / ny) + out * (W * i / nx)
                 v = p.bm.verts.new(q)
                 p.uv_over[v] = (round(i / nx, 3), round(j / ny, 3))
                 row.append(v)

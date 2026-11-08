@@ -131,7 +131,9 @@ void vertex() {
 	vec3 rest = VERTEX;
 	if (part == 20) {
 		float ph = seed * 6.2831;
-		rest += NORMAL * (sin(now * 6.0 + v_uv.x * 5.0 + ph) * 0.11 + sin(now * 9.3 + v_uv.y * 4.0 + ph) * 0.03) * v_uv.x;
+		// travelling waves along the cloth, stronger away from the pole, plus a bit of flutter
+		float wave = sin(now * 7.0 - v_uv.x * 6.0 + ph) * 0.2 + sin(now * 11.0 - v_uv.x * 9.0 + v_uv.y * 3.0 + ph) * 0.06;
+		rest += NORMAL * wave * v_uv.x;
 	}
 	vec4 p0 = bone_mat(row0, bone) * vec4(rest, 1.0);
 	vec4 p1 = bone_mat(row1, bone) * vec4(rest, 1.0);

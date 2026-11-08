@@ -64,6 +64,11 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Play-offs:** **3rd–7th** of a division plus the **18th of the division above** fight for one last promotion/relegation spot. That makes 3 up / 3 down in total. Roughly the Dutch system, without period titles.
 - **Per division the lines can be switched off:** the bottom division (Non-League 3) has no relegation and no 18th-place play-off; the top division (Premier Division) has no promotion and no 3rd–7th play-offs. Later: European places as extra lines on the table.
 - Open: play-off format (bracket, one or two legs, home advantage).
+- **Next step chosen (2026-11-08, Marcel let Claude pick between promotion/relegation and a better stand tier): promotion/relegation.** Marcel's answers:
+  - Play-off format: Marcel sends a screenshot (pending).
+  - **Difficulty: the same in every division for now** (until the player system exists).
+  - **Money per division from the economy model's game column** (ticket, spend per visitor, sponsor, prize money, costs).
+  - **Promotion requirements now, as simple seat counts** (Claude proposes numbers, Marcel approves).
 
 ### Cups & Europe
 

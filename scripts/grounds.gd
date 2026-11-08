@@ -10,7 +10,8 @@ const SEAT_OFFSET := 4.0          # metres behind the line to the seat row
 const BOARD_OFFSET := 1.4         # ad boards, closest to the pitch
 const ROPE_OFFSET := 2.2          # rope barrier
 const STAND_OFFSET := 3.0         # standing (non-paying) fans, between rope and seats
-const MAX_VISIBLE_FANS := 220
+const MAX_STANDING_FANS := 220     # standing fans are separate figures (seated ones: all of them, MultiMesh)
+const SeatedCrowd = preload("res://scripts/seated_crowd.gd")
 const CHAIR_OFFSETS := [-0.75, -0.25, 0.25, 0.75]   # seat positions within a spot
 const END_EXTRA := 2.5          # sections behind the goals sit further back (clear of the nets)
 const DUGOUT_SECTION := 4         # middle section of the far (main) side
@@ -33,6 +34,8 @@ var away_mode := false
 var markers: Array[MeshInstance3D] = []
 var section_markers: Array[MeshInstance3D] = []
 var fans: Array[Fan] = []
+var seated_crowd: MultiMeshInstance3D = null
+var _seat_spots: Array = []       # positions of seated fans (for chant bubbles)
 var free_mat: StandardMaterial3D
 var hover_mat: StandardMaterial3D
 
@@ -472,11 +475,19 @@ func spawn_crowd(attendance: int, travelling: int = 0) -> void:
 	clear_crowd()
 	var seats := seat_list()
 	seats.shuffle()
-	var visible_count := mini(attendance, MAX_VISIBLE_FANS)
-	var seated := mini(visible_count, seats.size())
-	for i in seated:
-		var s: Dictionary = seats[i]
-		_add_fan(true, s["pos"], s["yaw"])
+	var seated := mini(attendance, seats.size())
+	if seated > 0:
+		var ours := not away_mode
+		var club_shirt := Main.HOME_SHIRT if ours else Main.AWAY_SHIRT
+		var shirts := [club_shirt, club_shirt, club_shirt, Color(0.95, 0.95, 0.95), Color(0.2, 0.25, 0.35),
+			Color(0.55, 0.15, 0.15) if ours else Color(0.15, 0.45, 0.25), Color(0.85, 0.75, 0.3)]
+		var used := seats.slice(0, seated)
+		seated_crowd = SeatedCrowd.new()
+		crowd_root.add_child(seated_crowd)
+		seated_crowd.setup(used, shirts, ours)
+		for u in used:
+			_seat_spots.append(u["pos"])
+	var visible_count := seated + mini(attendance - seated, MAX_STANDING_FANS)
 	for i in mini(travelling, 60):
 		var spot := Vector3(randf_range(-14.0, 14.0), 0, Main.HALF_W + STAND_OFFSET + randf_range(-0.4, 0.6))
 		_add_fan(false, spot, PI, true)
@@ -513,6 +524,10 @@ func _add_fan(is_seated: bool, spot: Vector3, yaw: float, travelling: bool = fal
 
 
 func clear_crowd() -> void:
+	if seated_crowd != null:
+		seated_crowd.queue_free()
+		seated_crowd = null
+	_seat_spots.clear()
 	for f in fans:
 		f.queue_free()
 	fans.clear()
@@ -536,17 +551,23 @@ var bubbles: Array[Label3D] = []
 func react(kind: String) -> void:
 	for f in fans:
 		f.react(kind)
+	if seated_crowd != null:
+		seated_crowd.react(kind)
 	if CHANTS.has(kind) and (kind in ["goal_for", "goal_against", "offside"] or randf() < 0.4):
 		var lines: Array = CHANTS[kind]
-		for i in mini(2, maxi(1, fans.size() / 15)):
+		for i in mini(3, maxi(1, (fans.size() + _seat_spots.size()) / 15)):
 			chant(lines.pick_random())
 
 
 ## A speech bubble above a random fan.
 func chant(text: String) -> void:
-	if fans.is_empty():
+	if fans.is_empty() and _seat_spots.is_empty():
 		return
-	var f: Fan = fans.pick_random()
+	var at: Vector3
+	if not _seat_spots.is_empty() and (fans.is_empty() or randf() < float(_seat_spots.size()) / (_seat_spots.size() + fans.size())):
+		at = _seat_spots.pick_random()
+	else:
+		at = (fans.pick_random() as Fan).position
 	var l := Label3D.new()
 	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -555,7 +576,7 @@ func chant(text: String) -> void:
 	l.pixel_size = 0.012
 	l.modulate = Color(1, 1, 0.85)
 	l.no_depth_test = true
-	l.position = f.position + Vector3(randf_range(-0.3, 0.3), 2.6, 0)
+	l.position = at + Vector3(randf_range(-0.3, 0.3), 2.6, 0)
 	crowd_root.add_child(l)
 	var tw := l.create_tween()
 	tw.tween_property(l, "position:y", l.position.y + 1.2, 2.6)
@@ -564,7 +585,7 @@ func chant(text: String) -> void:
 
 
 func _process(delta: float) -> void:
-	if fans.is_empty():
+	if fans.is_empty() and _seat_spots.is_empty():
 		return
 	chant_timer -= delta
 	if chant_timer <= 0.0:

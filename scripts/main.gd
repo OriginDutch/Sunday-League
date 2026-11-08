@@ -605,7 +605,8 @@ func _hub_test() -> void:
 				club.league.play_round(res["goals_for"], res["goals_against"])
 			hub.refresh()
 			print("SIM week %d round %d pos %d" % [club.league.current_week(), club.league.round_idx, club.league.position_of(0)])
-	print("CROWD fans spawned: %d (seats %d)" % [grounds.fans.size(), club.seats()])
+	print("CROWD standing figures: %d, seated (MultiMesh): %d (seats %d)" % [grounds.fans.size(),
+		grounds.seated_crowd.multimesh.instance_count if grounds.seated_crowd != null else 0, club.seats()])
 
 
 # ================================================================== loop

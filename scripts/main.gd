@@ -341,11 +341,113 @@ func _ready() -> void:
 			club.recruit(0)
 		start_friendly()
 		_pad_test = 0.0
+	if "--playoff-test" in args:
+		_playoff_test_setup()
 	if "--quick-friendly" in args:
 		# dev: play a 2x3s friendly with nobody at the controls, then show the summary
 		start_friendly()
 		time_left = 3.0
 		_quick = true
+
+
+# dev: `-- --playoff-test --menu-skip`: a new club finishes 3rd–7th, loses the first play-off leg 0–1,
+# then the second leg is forced level -> extra time -> penalties (your kicks auto-taken). Screenshots in /tmp/po_*.png.
+var _po_test := -1.0
+var _po_flags := {}
+
+
+func _playoff_test_setup() -> void:
+	seed(11)
+	club = ClubState.new_game()
+	grounds.state = club
+	while club.squad.size() < ClubState.SQUAD_SIZE:
+		club.recruit(0)
+	club.slots["0"] = "chairs:4"
+	club.slots["1"] = "chairs:4"
+	club.slots["2"] = "chairs:4"
+	grounds.rebuild_furniture()
+	var w := 0
+	while not club.league.season_over():
+		var r: Vector2i = [Vector2i(3, 0), Vector2i(1, 1), Vector2i(0, 2), Vector2i(2, 1)][w % 4]
+		club.league.play_round(r.x, r.y)
+		w += 1
+	club.end_season_money()
+	print("PO TEST finished %d, seats %d, in play-offs: %s" % [club.league.position_of(0), club.seats(), not club.playoff.is_empty()])
+	var pf := club.playoff_fixture()
+	if pf.is_empty():
+		print("PO TEST not in the play-offs, stopping")
+		get_tree().quit()
+		return
+	if int(pf["leg"]) == 0:
+		club.apply_match(0, 1, 3, pf["home"], pf["opponent"]["name"])
+		club.record_playoff_leg(pf["tie"], 0, 1)
+	start_friendly()
+	print("PO TEST second leg vs %s, ctx %s" % [opponent_name, str(match_ctx)])
+	_po_test = 0.0
+
+
+func _po_shot(name: String) -> void:
+	if _po_flags.has(name):
+		return
+	_po_flags[name] = true
+	if DisplayServer.get_name() == "headless":
+		print("PO TEST (headless, no shot) ", name)
+		return
+	var img := get_viewport().get_texture().get_image()
+	img.save_png("/tmp/po_%s.png" % name)
+	print("PO TEST shot ", name)
+
+
+func _po_test_tick(delta: float) -> void:
+	_po_test += delta
+	if mode == "match" and half == 1 and state == "play" and not _po_flags.has("skip1"):
+		_po_flags["skip1"] = true
+		var fl: Array = match_ctx["first_leg"]
+		score = [int(fl[1]) - int(fl[0]) + 1, 1]   # level on aggregate
+		half = 2
+		time_left = 0.5
+	if mode == "match" and half >= 3 and state == "play":
+		if not _po_flags.has("et%d" % half):
+			_po_flags["et%d" % half] = true
+			time_left = 1.5
+		elif time_left < 1.0:
+			_po_shot("extratime")
+	if mode == "match" and state == "penalties" and "--po-skip" in OS.get_cmdline_user_args() and pens["phase"] == "aim":
+		# dev: jump to the end of the shootout (rendering it is slow here): we win 4–3
+		pens["goals"] = [4, 3]
+		pens["taken"] = [5, 5]
+		pens["winner"] = 0
+		pens["phase"] = "done"
+		pens["timer"] = 2.9
+		msg_label.text = "WE WIN ON PENALTIES  4 - 3"
+	if mode == "match" and state == "penalties":
+		var tmr: float = pens["timer"]
+		if pens["human"] and pens["phase"] == "aim":
+			if tmr > 0.8 and not charging and not _po_flags.has("press%d" % pens["taken"][0]):
+				_po_flags["press%d" % pens["taken"][0]] = true
+				_pen_button(true)
+			elif charging and charge > 0.55:
+				_po_shot("pen_aim")
+				_pen_button(false)
+				pens["z"] = randf_range(-3.3, 3.3)
+		if pens["phase"] == "flight" and tmr > 0.2:
+			_po_shot("pen_flight")
+		if pens["phase"] == "result" and tmr > 0.6:
+			_po_shot("pen_result_" + str(pens["outcome"]))
+		if pens["phase"] == "done" and tmr > 1.0:
+			_po_shot("pen_done")
+	if mode == "summary":
+		if not _po_flags.has("sum_t"):
+			_po_flags["sum_t"] = _po_test
+		elif _po_test - float(_po_flags["sum_t"]) > 1.0:
+			_po_shot("summary")
+			if not _po_flags.has("hub"):
+				_po_flags["hub"] = _po_test
+				back_to_hub()
+	if _po_flags.has("hub") and _po_test - float(_po_flags["hub"]) > 1.5:
+		_po_shot("hub_board")
+		print("PO TEST playoff state: done=%s summary=%s outcome=%s" % [club.playoff_done(), club._playoff_summary(), str(club.expected_outcome())])
+		get_tree().quit()
 
 
 func _pass_test() -> void:
@@ -401,9 +503,19 @@ func _enter_hub() -> void:
 ## The next league match (GDD calendar). Kept under the old name: dev flags call it too.
 func start_friendly() -> void:
 	var fx: Dictionary = club.league.next_fixture()
+	match_ctx = {}
+	pens = {}
+	var opp: Dictionary
 	if fx.is_empty():
-		return   # season over: the hub offers the next season instead
-	var opp: Dictionary = club.league.teams[fx["opponent"]]
+		# season over: your next play-off leg, if you're in them (otherwise the hub offers the next season)
+		fx = club.playoff_fixture()
+		if fx.is_empty():
+			return
+		opp = fx["opponent"]
+		match_ctx = fx.duplicate()
+		match_ctx["kind"] = "playoff"
+	else:
+		opp = club.league.teams[fx["opponent"]]
 	opponent_name = opp["name"]
 	match_home = fx["home"] or "--crowd-max" in OS.get_cmdline_user_args()
 	match_opp_strength = float(opp["str"])
@@ -430,6 +542,7 @@ func start_friendly() -> void:
 	hub.hide_summary()
 	hud_layer.visible = true
 	_start_kickoff(first_kickoff_team)
+	_update_hint()
 
 
 func back_to_hub() -> void:
@@ -442,6 +555,20 @@ func back_to_hub() -> void:
 func cheat_result(gf: int, ga: int) -> void:
 	var fx: Dictionary = club.league.next_fixture()
 	if fx.is_empty():
+		var pf := club.playoff_fixture()
+		if pf.is_empty():
+			return
+		var ps := club.apply_match(gf, ga, 3, pf["home"], pf["opponent"]["name"])
+		var won_after = null
+		if pf.has("first_leg") and int(pf["first_leg"][0]) + gf == int(pf["first_leg"][1]) + ga:
+			won_after = randf() < 0.5   # cheat: a level tie goes to a coin flip
+		club.record_playoff_leg(pf["tie"], gf, ga, won_after, "pens" if won_after != null else "")
+		ps["playoff"] = _playoff_info(pf, gf, ga, won_after, [], false)
+		ps["season_over"] = true
+		club.save()
+		mode = "summary"
+		hub.show_hub(false)
+		hub.show_summary(ps, pf["opponent"]["name"])
 		return
 	var opp: Dictionary = club.league.teams[fx["opponent"]]
 	var summary := club.apply_match(gf, ga, 3, fx["home"], opp["name"])
@@ -484,8 +611,10 @@ func cheat_view_home() -> void:
 
 
 func next_season() -> void:
-	club.league.start_new_season()
-	club.start_season_money()
+	if not club.playoff_done():
+		return   # your play-offs come first
+	var rep := club.start_next_season()
+	print("SEASON CHANGE ", rep)
 	club.complete_builds()   # the 10-week off-season passes
 	club.save()
 	grounds.rebuild_furniture()
@@ -707,6 +836,8 @@ func _physics_process(delta: float) -> void:
 				_end_of_half()
 		"shottest":
 			_shot_test_step(delta)
+		"penalties":
+			_pen_tick(delta)
 
 	if state == "play" or state == "restart":
 		_update_human(delta)
@@ -1052,29 +1183,42 @@ func _call_offside(p: Player) -> void:
 # ---- halves -------------------------------------------------------------------
 
 func _end_of_half() -> void:
-	sfx.whistle_times(2 if half == 1 else 3)
-	if half == 1:
+	var to_extra := half == 2 and _needs_extra_time()
+	if half == 1 or half == 3 or to_extra:
+		sfx.whistle_times(2)
 		state = "halftime"
 		state_timer = 2.5
-		msg_label.text = "HALF TIME  %d - %d" % [score[0], score[1]]
+		var what := "HALF TIME"
+		if to_extra:
+			what = "EXTRA TIME"
+		elif half == 3:
+			what = "EXTRA TIME, HALF TIME"
+		msg_label.text = "%s  %d - %d" % [what, score[0], score[1]]
 		ball.owner_player = null
 		charging = false
-		print("HALF TIME %d - %d" % [score[0], score[1]])
+		print("%s %d - %d" % [what, score[0], score[1]])
+	elif half == 4 and _needs_extra_time():
+		sfx.whistle_times(3)
+		_start_shootout()
 	else:
+		sfx.whistle_times(3)
 		_full_time()
 
 
 var _quick := false
 
 
+## Next half: 2nd half, or extra time (two halves of a third of a normal half, GDD §6).
 func _second_half() -> void:
-	half = 2
-	time_left = 3.0 if _quick else SettingsScript.half_seconds()
-	# switch sides
-	for p in players:
-		p.attack_dir = -p.attack_dir
-		p.home_pos = Vector3(-p.home_pos.x, 0, -p.home_pos.z)
-	_start_kickoff(1 - first_kickoff_team)
+	half += 1
+	var hs := SettingsScript.half_seconds()
+	time_left = 3.0 if _quick else (hs if half <= 2 else hs / 3.0)
+	# switch sides at half time and at the break in extra time (not before extra time)
+	if half != 3:
+		for p in players:
+			p.attack_dir = -p.attack_dir
+			p.home_pos = Vector3(-p.home_pos.x, 0, -p.home_pos.z)
+	_start_kickoff(1 - first_kickoff_team if half % 2 == 0 else first_kickoff_team)
 
 
 func _goal(scoring_team: int) -> void:
@@ -1110,6 +1254,23 @@ func _full_time() -> void:
 	# friendly done: pay, grow, autosave, show summary
 	var ent: int = score[0] + score[1] + stats["saves"][0] + stats["saves"][1] + stats["steals"][0] + stats["steals"][1]
 	var summary := club.apply_match(score[0], score[1], ent, match_home, opponent_name)
+	if match_ctx.get("kind", "") == "playoff":
+		var won_after = null
+		var how := ""
+		if not pens.is_empty():
+			won_after = int(pens["winner"]) == 0
+			how = "pens"
+		elif half >= 3:
+			how = "et"
+		club.record_playoff_leg(match_ctx["tie"], score[0], score[1], won_after, how)
+		summary["playoff"] = _playoff_info(match_ctx, score[0], score[1], won_after,
+			[] if pens.is_empty() else pens["goals"], half >= 3)
+		summary["season_over"] = true
+		club.save()
+		mode = "summary"
+		name_label.visible = false
+		hub.show_summary(summary, opponent_name)
+		return
 	summary["round_results"] = club.league.play_round(score[0], score[1])
 	summary["position"] = club.league.position_of(0)
 	summary["season_over"] = club.league.season_over()
@@ -1123,13 +1284,286 @@ func _full_time() -> void:
 
 func _restart() -> void:
 	score = [0, 0]
-	if half == 2:
+	if half == 2 or half == 3:
 		for p in players:
 			p.attack_dir = -p.attack_dir
 			p.home_pos = Vector3(-p.home_pos.x, 0, -p.home_pos.z)
 	half = 1
 	time_left = SettingsScript.half_seconds()
 	_start_kickoff(first_kickoff_team)
+
+
+# ================================================================== play-offs: extra time and penalties (GDD §6)
+
+const PEN_SPOT := 11.0           # penalty spot, metres from the goal line
+const PEN_DIVE_Z := 2.3          # a diving keeper ends up this far from the middle
+const PEN_REACH_DIVE := 1.15     # ...and reaches this far from there (the corners stay out of reach)
+const PEN_REACH_STAY := 0.95     # a keeper who stays in the middle
+const PEN_ERROR := 1.3           # penalty shots are a bit less accurate than open-play shots, more so with power
+var match_ctx := {}              # {} = league match; play-off leg: {kind "playoff", tie, leg, round, home, opponent, first_leg [us, them]}
+var pens := {}                   # penalty shootout state ({} = none)
+
+
+## Second leg level on aggregate (after 90 minutes, or after extra time)?
+func _needs_extra_time() -> bool:
+	if match_ctx.get("kind", "") != "playoff" or not match_ctx.has("first_leg"):
+		return false
+	var fl: Array = match_ctx["first_leg"]
+	return int(fl[0]) + score[0] == int(fl[1]) + score[1]
+
+
+func _pen_height(power: float) -> float:
+	return lerpf(0.3, 2.1, power)
+
+
+## Shootout: alternate kicks at the far goal, best of five, then sudden death. You aim and shoot your
+## own kicks (hold RMB / B for power, release); keepers on both sides guess at random (Marcel: keeping is chance).
+func _start_shootout() -> void:
+	state = "penalties"
+	charging = false
+	ball.owner_player = null
+	var spots := {}
+	var order := [[], []]
+	for t in 2:
+		var list := team_list(t)
+		var outs: Array = []
+		for i in list.size():
+			if list[i].role != "GK":
+				outs.append(i)
+		# most attacking players take the first kicks
+		outs.sort_custom(func(a: int, b: int) -> bool:
+			return list[a].home_pos.x * list[a].attack_dir > list[b].home_pos.x * list[b].attack_dir)
+		order[t] = outs
+	var i := 0
+	for p in players:
+		p.vel = Vector3.ZERO
+		p.desired_move = Vector3.ZERO
+		p.tackle_timer = 0.0
+		p.restart_kind = ""
+		p.stun = 0.0
+		if p.role == "GK":
+			continue
+		# the rest wait arm in arm in the centre circle (well, near enough)
+		var a := lerpf(-1.25, 1.25, float(i) / 19.0)
+		p.position = Vector3(cos(a) * 8.5, 0, sin(a) * 8.5)
+		p.face_towards(Vector3(1, 0, 0))
+		spots[p.get_instance_id()] = p.position
+		i += 1
+	pens = {"goals": [0, 0], "taken": [0, 0], "kicker_team": randi() % 2, "order": order, "spots": spots,
+		"phase": "", "timer": 0.0, "winner": -1, "human": false, "aim_z": 0.0}
+	msg_label.text = "PENALTIES"
+	print("PENALTIES  %s first" % ("we kick" if pens["kicker_team"] == 0 else "they kick"))
+	_pen_setup_kick()
+
+
+func _pen_setup_kick() -> void:
+	var t: int = pens["kicker_team"]
+	var list := team_list(t)
+	var order: Array = pens["order"][t]
+	var shooter: Player = list[order[int(pens["taken"][t]) % order.size()]]
+	var keeper: Player = team_list(1 - t)[0]
+	var spot := Vector3(HALF_L - PEN_SPOT, 0, 0)
+	# last kicker back to the circle, the other keeper out of the way
+	if pens.has("shooter"):
+		var last: Player = pens["shooter"]
+		last.position = pens["spots"][last.get_instance_id()]
+		last.face_towards(Vector3(1, 0, 0))
+	var waiting: Player = team_list(t)[0]
+	waiting.position = Vector3(HALF_L - 20.0, 0, -10.0)
+	waiting.face_towards(Vector3(1, 0, 0))
+	ball.reset_to(spot)
+	shooter.position = spot + Vector3(-2.2, 0, -0.5)
+	shooter.vel = Vector3.ZERO
+	shooter.face_towards(Vector3(1, 0, 0.2))
+	keeper.position = Vector3(HALF_L - 0.4, 0, 0)
+	keeper.vel = Vector3.ZERO
+	keeper.face_towards(Vector3(-1, 0, 0))
+	pens["shooter"] = shooter
+	pens["keeper"] = keeper
+	pens["phase"] = "aim"
+	pens["timer"] = 0.0
+	pens["outcome"] = ""
+	pens["aim_z"] = 0.0
+	pens["human"] = t == 0 and not autoplay
+	_update_hint()
+	charge = 0.0
+	charging = false
+	if pens["human"]:
+		controlled = shooter
+		msg_label.text = "YOUR PENALTY"
+	else:
+		pens["ai_z"] = randf_range(-1.0, 1.0) * (GOAL_W * 0.5 - 0.5)
+		pens["ai_power"] = randf_range(0.35, 0.85)
+		msg_label.text = "THEIR PENALTY"
+
+
+func _pen_button(pressed: bool) -> void:
+	if not pens.get("human", false) or pens.get("phase", "") != "aim":
+		return
+	if pressed:
+		charging = true
+		charge = 0.0
+	elif charging:
+		charging = false
+		pens["power"] = charge
+		pens["z"] = pens["aim_z"]
+		pens["phase"] = "runup"
+		pens["timer"] = 0.0
+		msg_label.text = ""
+
+
+func _pen_aim_z() -> float:
+	var shooter: Player = pens["shooter"]
+	var z: float = pens["aim_z"]
+	if pad_active:
+		z = _pad_stick().x * (GOAL_W * 0.5 + 0.3)
+	else:
+		var gp := _mouse_ground_point()
+		var dir := Util.flat(gp - shooter.position)
+		if dir.x > 0.3:
+			z = shooter.position.z + dir.z * (HALF_L - shooter.position.x) / dir.x
+	return clampf(z, -GOAL_W * 0.5 - 1.5, GOAL_W * 0.5 + 1.5)
+
+
+func _pen_tick(delta: float) -> void:
+	pens["timer"] += delta
+	var shooter: Player = pens["shooter"]
+	var keeper: Player = pens["keeper"]
+	var timer: float = pens["timer"]
+	match pens["phase"]:
+		"aim":
+			if pens["human"]:
+				pens["aim_z"] = _pen_aim_z()
+				shooter.face_towards(Vector3(HALF_L, 0, pens["aim_z"]) - shooter.position)
+				if charging:
+					charge = minf(charge + delta / 0.9, 1.0)
+			elif timer > 1.6:
+				pens["power"] = pens["ai_power"]
+				pens["z"] = pens["ai_z"]
+				pens["phase"] = "runup"
+				pens["timer"] = 0.0
+				msg_label.text = ""
+		"runup":
+			# a few steps up to the ball, then the kick; the keeper picks a side as it's struck
+			var spot := Vector3(HALF_L - PEN_SPOT, 0, 0)
+			var from := spot + Vector3(-2.2, 0, -0.5)
+			var to := spot + Vector3(-0.7, 0, 0)
+			shooter.position = from.lerp(to, clampf(timer / 0.4, 0.0, 1.0))
+			shooter.vel = (to - from) / 0.4
+			if timer >= 0.4:
+				shooter.vel = Vector3.ZERO
+				var power: float = pens["power"]
+				shooter.shoot_at(Vector3(HALF_L, 0, pens["z"]), power, _pen_height(power), PEN_ERROR)
+				var dive := randi() % 3 - 1
+				pens["dive"] = dive
+				if dive != 0:
+					# facing -x the keeper's right is -z
+					keeper.play_once("dive_left" if dive > 0 else "dive_right", 1.15)
+				pens["phase"] = "flight"
+				pens["timer"] = 0.0
+		"flight":
+			var dive: int = pens["dive"]
+			keeper.position.z = move_toward(keeper.position.z, dive * PEN_DIVE_Z, delta * 7.5)
+			var prev_x := ball.position.x
+			ball.step(delta)
+			if prev_x < keeper.position.x and ball.position.x >= keeper.position.x:
+				var reach := PEN_REACH_DIVE if dive != 0 else PEN_REACH_STAY
+				var top := 1.9 if dive != 0 else 2.25
+				var dz := absf(ball.position.z - dive * PEN_DIVE_Z)
+				if dz < reach and ball.position.y < top:
+					ball.vel = Vector3(-absf(ball.vel.x) * 0.3, 2.0, ball.vel.z * 0.2 + dive * 1.5)
+					_pen_result("saved")
+				elif absf(ball.position.z) < GOAL_W * 0.5 - Ball.RADIUS and ball.position.y < GOAL_H - Ball.RADIUS:
+					_pen_result("goal")
+				else:
+					_pen_result("miss")
+			elif timer > 2.5:
+				_pen_result("miss")   # it never got there
+		"result":
+			ball.step(delta)
+			keeper.position.z = move_toward(keeper.position.z, int(pens["dive"]) * PEN_DIVE_Z, delta * 7.5)
+			if timer > 2.0:
+				var w := _pen_decided()
+				if w >= 0:
+					pens["winner"] = w
+					pens["phase"] = "done"
+					pens["timer"] = 0.0
+					var g: Array = pens["goals"]
+					msg_label.text = "%s ON PENALTIES  %d - %d" % ["WE WIN" if w == 0 else "THEY WIN", g[0], g[1]]
+					sfx.whistle_times(3)
+					print("PENALTIES %d - %d  winner %d" % [g[0], g[1], w])
+					if w == 0:
+						for p in home:
+							p.celebrate(3.0)
+				else:
+					pens["kicker_team"] = 1 - int(pens["kicker_team"])
+					_pen_setup_kick()
+		"done":
+			if timer > 3.0:
+				_full_time()
+
+
+func _pen_result(outcome: String) -> void:
+	var t: int = pens["kicker_team"]
+	pens["outcome"] = outcome
+	pens["phase"] = "result"
+	pens["timer"] = 0.0
+	pens["taken"][t] += 1
+	if outcome == "goal":
+		pens["goals"][t] += 1
+	var good := (outcome == "goal") == (t == 0)
+	msg_label.text = {"goal": "GOAL!", "saved": "SAVED!", "miss": "MISSED!"}[outcome]
+	if outcome == "goal" or good:
+		_crowd("goal_for" if good else "goal_against")
+	if outcome == "goal":
+		sfx.whistle()
+	print("PEN team %d %s  (%d - %d)" % [t, outcome, pens["goals"][0], pens["goals"][1]])
+
+
+## Winning team, or -1 while it's still open. First five each (stops early once one side can't
+## catch up), then sudden death in pairs.
+func _pen_decided() -> int:
+	var g: Array = pens["goals"]
+	var n: Array = pens["taken"]
+	if int(n[0]) < 5 or int(n[1]) < 5:
+		for t in 2:
+			if int(g[t]) > int(g[1 - t]) + (5 - int(n[1 - t])):
+				return t
+		return -1
+	if n[0] == n[1] and g[0] != g[1]:
+		return 0 if int(g[0]) > int(g[1]) else 1
+	return -1
+
+
+## What the post-match card says about a play-off leg.
+func _playoff_info(ctx: Dictionary, gf: int, ga: int, won_after, pen_goals: Array, after_et: bool) -> Dictionary:
+	var rnd := int(ctx["round"])
+	var info := {"title": ClubState.round_name(rnd, ctx["tie"]), "leg": int(ctx["leg"]) + 1}
+	var staying_up := not club.playoff.is_empty() and int(club.playoff["div"]) < club.division()
+	if not ctx.has("first_leg"):
+		info["line"] = "First leg %d–%d. Second leg %s." % [gf, ga, "at home" if not ctx["home"] else "away"]
+		return info
+	var a := int(ctx["first_leg"][0]) + gf
+	var b := int(ctx["first_leg"][1]) + ga
+	var won: bool = a > b if a != b else bool(won_after)
+	info["aggregate"] = [a, b]
+	info["won"] = won
+	var how := ""
+	if not pen_goals.is_empty():
+		how = " (%d–%d on penalties)" % [pen_goals[0], pen_goals[1]]
+	elif after_et:
+		how = " (after extra time)"
+	var line := ""
+	if won and rnd == 3:
+		line = "Won the play-off final%s — we stay up!" % how if staying_up else "Won the play-off final%s — promotion!" % how
+	elif won:
+		line = "Through to the %s%s." % [ClubState.round_name(rnd + 1, "").to_lower().replace("play-off ", ""), how]
+	elif staying_up:
+		line = "Out%s. We go down." % how
+	else:
+		line = "Out of the play-offs%s." % how
+	info["line"] = "Aggregate %d–%d. %s" % [a, b, line]
+	return info
 
 
 # ================================================================== human input
@@ -1194,6 +1628,8 @@ func _fps_tick(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_fps_tick(delta)
+	if _po_test >= 0.0:
+		_po_test_tick(delta)
 
 
 func _input(event: InputEvent) -> void:
@@ -1223,6 +1659,10 @@ func _input(event: InputEvent) -> void:
 func _update_hint() -> void:
 	if hint_label == null:
 		return
+	if state == "penalties":
+		hint_label.text = ("Penalty: LS left/right aims · hold B for power, release to shoot · Start pause" if pad_active else
+			"Penalty: aim with the mouse · hold RMB for power, release to shoot · Esc quit")
+		return
 	hint_label.text = ("LS move (sprint by default) · LT walk · A pass · hold B shoot · X tackle · LB switch · RS zoom · Start pause"
 		if pad_active else
 		"WASD move (sprint by default) · Shift walk · LMB pass · hold RMB shoot · Space tackle · Q switch · R restart · Esc quit")
@@ -1241,6 +1681,10 @@ func _pad_button(b: InputEventJoypadButton) -> void:
 		_toggle_pause()
 		return
 	if paused:
+		return
+	if state == "penalties":
+		if b.button_index == JOY_BUTTON_B:
+			_pen_button(b.pressed)
 		return
 	var live := (state == "play" or state == "restart") and controlled != null
 	match b.button_index:
@@ -1359,6 +1803,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			match_zoom = clampf(match_zoom * 1.1, 0.5, 1.8)
+			return
+		if state == "penalties":
+			if mb.button_index == MOUSE_BUTTON_RIGHT:
+				_pen_button(mb.pressed)
 			return
 		if (state != "play" and state != "restart") or controlled == null:
 			return
@@ -2325,6 +2773,12 @@ func _build_camera() -> void:
 
 
 func _update_camera(delta: float) -> void:
+	if state == "penalties" or (state == "fulltime" and not pens.is_empty()):
+		# behind the penalty taker, looking at the goal
+		var gx := HALF_L
+		camera.position = camera.position.lerp(Vector3(gx - PEN_SPOT - 9.0, 4.6, 0.0) if mode == "match" else camera.position, clampf(delta * 3.0, 0.0, 1.0))
+		camera.look_at(Vector3(gx, 1.0, 0.0), Vector3.UP)
+		return
 	# look ahead towards the goal the ball carrier is attacking
 	var lead := 0.0
 	var holder := ball.owner_player
@@ -2397,7 +2851,7 @@ func _build_indicators() -> void:
 
 func _update_indicators() -> void:
 	var human := controlled != null and not autoplay and state == "play"
-	name_label.visible = controlled != null and not autoplay and mode == "match" and controlled.display_name != ""
+	name_label.visible = controlled != null and not autoplay and mode == "match" and controlled.display_name != "" and state != "penalties"
 	if name_label.visible:
 		name_label.text = controlled.display_name
 		name_label.position = controlled.position + Vector3(0, 2.6, 0)
@@ -2405,6 +2859,12 @@ func _update_indicators() -> void:
 	pass_ring.visible = false
 	aim_pivot.visible = false
 	goal_marker.visible = false
+	if state == "penalties" and pens.get("human", false) and pens.get("phase", "") == "aim":
+		ring.visible = true
+		ring.position = Vector3(controlled.position.x, 0.03, controlled.position.z)
+		goal_marker.visible = true
+		goal_marker.position = Vector3(HALF_L, _pen_height(charge), float(pens["aim_z"]))
+		return
 	if not human:
 		return
 	ring.position = Vector3(controlled.position.x, 0.03, controlled.position.z)
@@ -2626,8 +3086,12 @@ func _update_hud() -> void:
 	var r: int = score[1] if us_left else score[0]
 	score_label.text = "%d – %d" % [l, r]
 	var t := int(ceil(time_left))
-	hud_half.text = "1st half" if half == 1 else "2nd half"
+	hud_half.text = ["1st half", "2nd half", "Extra time", "Extra time"][clampi(half - 1, 0, 3)]
 	hud_clock.text = "%d:%02d" % [t / 60, t % 60]
+	if not pens.is_empty():
+		var pg: Array = pens["goals"]
+		hud_half.text = "Penalties"
+		hud_clock.text = "%d – %d" % [pg[0] if us_left else pg[1], pg[1] if us_left else pg[0]]
 	hud_msg_note.visible = msg_label.text != ""
 	hud_toast.visible = toast_timer > 0.0
 	hud_power.visible = charging
@@ -2637,4 +3101,4 @@ func _update_hud() -> void:
 
 func _clock_text() -> String:
 	var t := int(ceil(time_left))
-	return "%s %d:%02d" % ["1st" if half == 1 else "2nd", t / 60, t % 60]
+	return "%s %d:%02d" % [["1st", "2nd", "ET1", "ET2"][clampi(half - 1, 0, 3)], t / 60, t % 60]

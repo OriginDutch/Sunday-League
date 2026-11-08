@@ -20,6 +20,17 @@ var rounds: Array = []              # [{week, matches: [[home, away], ...], resu
 var round_idx := 0                  # next round to play
 var season := 1
 var last_finish := 0                # your position last season (0 = none yet)
+var extra_week := 0                 # play-off round you're in after the season (weeks 43–45)
+
+
+## Your division from the pyramid: you + the 19 other clubs (shared dicts with the pyramid).
+static func create_with(club_name: String, others: Array) -> RefCounted:
+	var l = load("res://scripts/league.gd").new()
+	l.teams.append({"name": club_name, "str": 1.0})
+	for t in others.slice(0, TEAMS - 1):
+		l.teams.append(t)
+	l.make_fixtures()
+	return l
 
 
 static func create(club_name: String) -> RefCounted:
@@ -128,7 +139,7 @@ func season_over() -> bool:
 
 func current_week() -> int:
 	if season_over():
-		return SEASON_WEEKS
+		return SEASON_WEEKS + extra_week
 	return int(rounds[round_idx]["week"])
 
 
@@ -238,7 +249,7 @@ func start_new_season() -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"teams": teams, "rounds": rounds, "round_idx": round_idx, "season": season, "last_finish": last_finish}
+	return {"teams": teams, "rounds": rounds, "round_idx": round_idx, "season": season, "last_finish": last_finish, "extra_week": extra_week}
 
 
 static func from_dict(d: Dictionary) -> RefCounted:
@@ -248,6 +259,7 @@ static func from_dict(d: Dictionary) -> RefCounted:
 	l.round_idx = int(d.get("round_idx", 0))
 	l.season = int(d.get("season", 1))
 	l.last_finish = int(d.get("last_finish", 0))
+	l.extra_week = int(d.get("extra_week", 0))
 	# JSON turns ints into floats: normalise what we index with
 	for rd in l.rounds:
 		rd["week"] = int(rd["week"])

@@ -1,6 +1,7 @@
 class_name Hub
 extends CanvasLayer
 const LeagueScript = preload("res://scripts/league.gd")
+const PyramidScript = preload("res://scripts/pyramid.gd")
 const Kit = preload("res://scripts/ui_kit.gd")
 const SettingsScript = preload("res://scripts/settings.gd")
 ## Between-match screens in the Clubhouse Noticeboard style (GDD §10e, design/ui-noticeboard/):
@@ -194,7 +195,7 @@ func _top_bar() -> void:
 		["cash", "£%s" % _money(club.money), "Cash", null],
 		["seat", str(club.seats()), "Seats", null],
 		["shirt", "%d / %d" % [club.squad.size(), ClubState.SQUAD_SIZE], "Squad", Kit.c("danger") if short else null],
-		["record", _ordinal(lg.position_of(0)), "League", null],
+		["record", _ordinal(lg.position_of(0)), club.division_name(), null],
 		["clock", "Wk %d" % lg.current_week(), "Season %d" % lg.season, null],
 	]
 	var rots := [-1.0, 0.8, -0.4, 1.0, -0.8, 0.5, -0.6]
@@ -284,6 +285,8 @@ func _strip() -> void:
 func _ticker_text() -> String:
 	var lg: LeagueScript = club.league
 	if lg.season_over():
+		if not club.playoff_done():
+			return "Play-offs! The chairman has ironed his lucky tie."
 		return "Season %d is over — we finished %s. The chairman wants a word about next year." % [lg.season, _ordinal(lg.position_of(0))]
 	if club.squad.size() < ClubState.SQUAD_SIZE:
 		return "We need %d more players before the ref will start the game." % (ClubState.SQUAD_SIZE - club.squad.size())
@@ -349,17 +352,76 @@ func _club_tab() -> void:
 	var lg: LeagueScript = club.league
 	var m := Kit.sheet("card", 440, 0.9, Vector4(24, 24, 24, 18), 14)
 	var mb: VBoxContainer = m["body"]
-	if lg.season_over():
-		mb.add_child(_spread(Kit.heading("Season %d over" % lg.season, 36), Kit.caps("League")))
+	var pf: Dictionary = club.playoff_fixture() if lg.season_over() else {}
+	if not pf.is_empty():
+		# your next play-off leg (GDD §6)
+		var staying := int(club.playoff["div"]) < club.division()
+		mb.add_child(_spread(Kit.heading(ClubState.round_name(pf["round"], pf["tie"]).replace("Play-off ", "Play-off\n"), 36),
+			Kit.caps(club.division_name(int(club.playoff["div"])))))
+		var sub := "Week %d · %s leg · %s" % [lg.current_week(), "1st" if int(pf["leg"]) == 0 else "2nd", "home" if pf["home"] else "away"]
+		mb.add_child(Kit.label(sub, false, 15, 500, Kit.c("muted")))
+		var opp_name: String = pf["opponent"]["name"]
+		var us_name := ClubState.CLUB_NAME
+		var teams_pf := GridContainer.new()
+		teams_pf.columns = 3
+		teams_pf.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		teams_pf.add_child(_team(us_name if pf["home"] else opp_name, "crest_home" if pf["home"] else "crest_away", pf["home"]))
+		var vs_pf := Kit.label("vs", true, 32, 700, Kit.c("pen"))
+		vs_pf.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vs_pf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		vs_pf.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		teams_pf.add_child(vs_pf)
+		teams_pf.add_child(_team(opp_name if pf["home"] else us_name, "crest_away" if pf["home"] else "crest_home", not pf["home"]))
+		mb.add_child(teams_pf)
+		if pf.has("first_leg"):
+			mb.add_child(Kit.label("First leg: %d–%d to %s. Level after this one: extra time, then penalties." % [
+				maxi(pf["first_leg"][0], pf["first_leg"][1]), mini(pf["first_leg"][0], pf["first_leg"][1]),
+				"us" if pf["first_leg"][0] > pf["first_leg"][1] else ("them" if pf["first_leg"][0] < pf["first_leg"][1] else "nobody")],
+				true, 18, 400, Kit.c("muted"), true))
+		else:
+			mb.add_child(Kit.label("Win and we stay up. Lose and we go down." if staying else "Two legs. The winner of the final goes up.",
+				true, 18, 400, Kit.c("muted"), true))
+		var pp := Kit.primary("Play %s" % ("1st leg" if int(pf["leg"]) == 0 else "2nd leg"), "play")
+		pp.disabled = club.squad.size() < ClubState.SQUAD_SIZE
+		pp.pressed.connect(_on_play)
+		mb.add_child(pp)
+	elif lg.season_over():
+		mb.add_child(_spread(Kit.heading("Season %d over" % lg.season, 36), Kit.caps(club.division_name())))
 		mb.add_child(Kit.label("We finished %s." % _ordinal(lg.position_of(0)), false, 20, 600, Kit.c("ink")))
-		mb.add_child(Kit.label("The summer is ten weeks of the chairman measuring things.", true, 19, 400, Kit.c("muted"), true))
+		var eo := club.expected_outcome()
+		var po_line := club._playoff_summary()
+		if po_line != "":
+			mb.add_child(Kit.label(po_line + ".", false, 18, 600, Kit.c("ink")))
+		match eo["outcome"]:
+			"promoted":
+				mb.add_child(Kit.label("Promoted to %s!" % club.division_name(eo["to"]), true, 26, 700, Kit.c("ok")))
+			"relegated":
+				mb.add_child(Kit.label("Relegated to %s." % club.division_name(eo["to"]), true, 24, 700, Kit.c("danger")))
+			_:
+				if eo["denied"]:
+					mb.add_child(Kit.label("Not enough seats: %s needs %d, we have %d. Our place goes to the next club." % [
+						club.division_name(club.division() + 1), club.seats_needed_up(), club.seats()], true, 19, 600, Kit.c("danger"), true))
+				else:
+					mb.add_child(Kit.label("Another year in %s." % club.division_name(), true, 19, 400, Kit.c("muted"), true))
 		var ns := Kit.primary("Start season %d" % (lg.season + 1), "play")
 		ns.pressed.connect(_on_play)
 		mb.add_child(ns)
 		mb.add_child(Kit.label("Skips the %d-week off-season" % LeagueScript.OFFSEASON_WEEKS, false, 14, 500, Kit.c("muted")))
 	else:
 		var fx: Dictionary = lg.next_fixture()
-		mb.add_child(_spread(Kit.heading("Next Match"), Kit.caps("League")))
+		mb.add_child(_spread(Kit.heading("Next Match"), Kit.caps(club.division_name())))
+		var rp: Dictionary = club.last_report
+		if not rp.is_empty() and int(rp["season"]) == lg.season - 1 and lg.round_idx == 0:
+			var rtxt := "Welcome to %s." % club.division_name()
+			if rp["outcome"] == "promoted":
+				rtxt = "Promoted! Welcome to %s." % club.division_name()
+			elif rp["outcome"] == "relegated":
+				rtxt = "Relegated. %s it is." % club.division_name()
+			elif rp.get("denied", false):
+				rtxt = "No promotion: not enough seats. Still %s." % club.division_name()
+			else:
+				rtxt = "Another season in %s." % club.division_name()
+			mb.add_child(Kit.label(rtxt, true, 20, 700, Kit.c("pen"), true))
 		mb.add_child(Kit.label("Week %d · round %d of %d · %s" % [fx["week"], fx["round"], lg.rounds.size(), "home" if fx["home"] else "away"],
 			false, 15, 500, Kit.c("muted")))
 		var opp: String = lg.teams[fx["opponent"]]["name"]
@@ -508,7 +570,7 @@ func _on_play() -> void:
 	if away_viewing != "":
 		away_viewing = ""
 		main.cheat_view_home()
-	if club.league.season_over():
+	if club.league.season_over() and club.playoff_done():
 		main.next_season()
 	else:
 		main.start_friendly()
@@ -532,7 +594,7 @@ func _full_table() -> void:
 	close.pressed.connect(func() -> void:
 		table_open = false
 		refresh())
-	b.add_child(_spread(Kit.heading("League table — Season %d" % lg.season, 36), close))
+	b.add_child(_spread(Kit.heading("%s — Season %d" % [club.division_name(), lg.season], 36), close))
 	b.add_child(Kit.label("Week %d of %d" % [lg.current_week(), LeagueScript.SEASON_WEEKS], false, 15, 500, Kit.c("muted")))
 	var W := [40, 0, 40, 40, 40, 40, 52, 52]
 	b.add_child(Kit.rule())
@@ -545,11 +607,16 @@ func _full_table() -> void:
 		b.add_child(_row([str(i + 1), r["name"], str(r["p"]), str(r["w"]), str(r["d"]), str(r["l"]),
 			("+%d" % gd) if gd > 0 else ("−%d" % -gd if gd < 0 else "0"), str(r["pts"])], W, 15, 700 if ours else 500,
 			Kit.c("ink"), ours))
-		# zone lines (GDD §6): this is the bottom division, so only promotion and the play-offs apply
-		if i == 1:
-			b.add_child(_zone_line("Promotion ↑"))
-		elif i == 6:
+		# zone lines (GDD §6): the bottom division has no relegation, the top one no promotion
+		var dv := club.division()
+		if i == 1 and PyramidScript.has_promotion(dv):
+			b.add_child(_zone_line("Promotion ↑  (needs %d seats)" % club.seats_needed_up()))
+		elif i == 6 and PyramidScript.has_promotion(dv):
 			b.add_child(_zone_line("Play-offs ↑ (3rd–7th + 18th of the division above)"))
+		elif i == 16 and PyramidScript.has_relegation(dv):
+			b.add_child(_zone_line("18th: play-offs against the division below"))
+		elif i == 17 and PyramidScript.has_relegation(dv):
+			b.add_child(_zone_line("Relegation ↓"))
 	Kit.pin(s["root"], 360)
 	board.add_child(s["root"])
 	s["root"].anchor_left = 0.5
@@ -935,6 +1002,8 @@ func _cash_card(season: int) -> void:
 	chart.points = pts
 	chart.marks = marks
 	chart.weeks = LeagueScript.SEASON_WEEKS
+	for p in pts:
+		chart.weeks = maxi(chart.weeks, int(p.x))   # play-off weeks 43–45
 	b.add_child(chart)
 	Kit.tape(s["root"], Vector2(360, -14), 2)
 	_at(s["root"], 500, 652, 820)
@@ -952,15 +1021,24 @@ func _coming_up() -> void:
 		var opp: String = lg.teams[fx["opponent"]]["name"]
 		var subs := club.squad.size() * ClubState.SUBS_PER_PLAYER
 		if fx["home"]:
-			var cost := ClubState.PITCH_HIRE + ClubState.REFEREE_FEE + ClubState.KIT_WASHING
-			var est := mini(club.fans, club.seats()) * ClubState.TICKET_PRICE + club.fans * ClubState.TEA_PER_VISITOR + subs - cost
+			var cost := club.cost(ClubState.PITCH_HIRE) + club.cost(ClubState.REFEREE_FEE) + club.cost(ClubState.KIT_WASHING)
+			var est := mini(club.fans, club.seats()) * club.ticket_price() + club.fans * club.econ("spend") + subs - cost
 			b.add_child(_coming("stadium", "Next: %s (home)" % opp, "about %s (pitch, ref, kit −£%d)" % [_pounds(est, true), cost], Kit.c("ok")))
 		else:
-			var cost2 := ClubState.KIT_WASHING + ClubState.TRAVEL
+			var cost2 := club.cost(ClubState.KIT_WASHING) + club.cost(ClubState.TRAVEL)
 			b.add_child(_coming("stadium", "Next: %s (away)" % opp, "about %s (subs in, kit and travel −£%d)" % [_pounds(subs - cost2, true), cost2], Kit.c("ok")))
+	var pfc: Dictionary = club.playoff_fixture() if lg.season_over() else {}
+	if not pfc.is_empty():
+		b.add_child(_coming("stadium", "%s, %s leg: %s (%s)" % [ClubState.round_name(pfc["round"], pfc["tie"]),
+			"1st" if int(pfc["leg"]) == 0 else "2nd", pfc["opponent"]["name"], "home" if pfc["home"] else "away"], "week %d" % lg.current_week(), Kit.c("ok")))
+	if PyramidScript.has_promotion(club.division()):
+		var need := club.seats_needed_up()
+		var ok := club.seats() >= need
+		b.add_child(_coming("seat" if ok else "warn", "Promotion needs %d seats" % need,
+			"we have %d%s" % [club.seats(), "" if ok else " — we can't go up yet"], Kit.c("ok") if ok else Kit.c("danger")))
 	if club.prize_paid_season < lg.season:
-		b.add_child(_coming("cash", "Prize money", "%s at the end of the season" % _pounds(ClubState.PRIZE_MONEY, true), Kit.c("ok")))
-	b.add_child(_coming("warn", "Next season, week 1", "League fee −£%d · sponsor +£%d" % [ClubState.LEAGUE_FEE, ClubState.SPONSOR_PER_SEASON], Kit.c("danger")))
+		b.add_child(_coming("cash", "Prize money", "%s at the end of the season" % _pounds(club.econ("prize"), true), Kit.c("ok")))
+	b.add_child(_coming("warn", "Next season, week 1", "League fee −%s · sponsor +%s" % [_pounds(club.cost(ClubState.LEAGUE_FEE)), _pounds(club.econ("sponsor"))], Kit.c("danger")))
 	b.add_child(Kit.label("Nan says the urn needs replacing. Not yet, Nan.", true, 19, 400, Kit.c("note_muted"), true))
 	Kit.tape(n["root"], Vector2(130, -14), -3)
 	_at(n["root"], 44, 160, 360, true)
@@ -1451,7 +1529,7 @@ func _preview_card(item: String, idx: int) -> Control:
 		"rows", "rows_rush":
 			add_seats = 2 * ClubState.BLEACHER_SEATS_PER_ROW
 	b.add_child(_adds("seat", "+%d seat%s (%d → %d)" % [add_seats, "" if add_seats == 1 else "s", club.seats(), club.seats() + add_seats]))
-	b.add_child(_adds("cash", "+£%d per home match when filled" % (add_seats * ClubState.TICKET_PRICE)))
+	b.add_child(_adds("cash", "%s per home match when filled" % _pounds(add_seats * club.ticket_price(), true)))
 	if sec_item:
 		var w := club.build_weeks(item, idx)
 		var ready := club.ready_label({"finish": club.now() + w})
@@ -1584,8 +1662,11 @@ func show_summary(s: Dictionary, opponent: String) -> void:
 	var b: VBoxContainer = card["body"]
 	var res := {"W": "Full time — a win!", "D": "Full time — a draw", "L": "Full time — a loss"}
 	var tag := "League · now %s" % _ordinal(int(s["position"])) if s.has("position") else "Friendly"
-	if s.get("season_over", false):
+	if s.get("season_over", false) and not s.has("playoff"):
 		tag += " · season over"
+	var po: Dictionary = s.get("playoff", {})
+	if not po.is_empty():
+		tag = "%s · %s leg" % [po["title"], "1st" if int(po["leg"]) == 1 else "2nd"]
 	b.add_child(_spread(Kit.heading(res[s["result"]], 44), Kit.caps(tag)))
 	# score line: home team on the left
 	var line := _hbox(28)
@@ -1609,6 +1690,10 @@ func show_summary(s: Dictionary, opponent: String) -> void:
 	rh.add_child(rn)
 	line.add_child(rh)
 	b.add_child(line)
+	if not po.is_empty():
+		var pl := Kit.label(po["line"], true, 26, 700, Kit.c("pen") if po.get("won", true) else Kit.c("danger"), true)
+		pl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.add_child(pl)
 	b.add_child(Kit.rule())
 
 	var cols := _hbox(40)
@@ -1636,7 +1721,7 @@ func show_summary(s: Dictionary, opponent: String) -> void:
 		if v >= 0.0:
 			var lab: String = k
 			if k == "Tickets":
-				lab = "Tickets (%d × £%d)" % [s["seated"], ClubState.TICKET_PRICE]
+				lab = "Tickets (%d × %s)" % [s["seated"], _pounds(float(lines[k]) / int(s["seated"]) if int(s["seated"]) > 0 else club.ticket_price())]
 			mon.add_child(_sum_row(lab, _pounds(v, true), Kit.c("ok")))
 		else:
 			costs += v

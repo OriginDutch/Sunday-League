@@ -65,7 +65,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Per division the lines can be switched off:** the bottom division (Non-League 3) has no relegation and no 18th-place play-off; the top division (Premier Division) has no promotion and no 3rd–7th play-offs. Later: European places as extra lines on the table.
 - Open: play-off format (bracket, one or two legs, home advantage).
 - **Next step chosen (2026-11-08, Marcel let Claude pick between promotion/relegation and a better stand tier): promotion/relegation.** Marcel's answers:
-  - **Play-off format (Marcel, 2026-11-08): three rounds, every tie over two legs** (lower seed at home first, higher seed hosts the second leg):
+  - **Play-off format (Marcel, 2026-11-08): three rounds, every tie over two legs.** Built as in Marcel's screenshot: the first-named team hosts the first leg (A: 7th home first; C: winner A home first; D: the 18th home first; final: winner C home first). Open question to Marcel: should the higher seed always host the second leg instead (that changes C and the final when 4th/5th are in it)?
     - Round 1: **A = 7th v 4th**, **B = 6th v 5th**.
     - Round 2: **C = winner A v winner B**; **D = 18th (of the division above) v 3rd**.
     - Round 3 (final): **C v D**.
@@ -79,6 +79,15 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   - **Difficulty: the same in every division for now** (until the player system exists).
   - **Money per division from the economy model's game column** (ticket, spend per visitor, sponsor, prize money, costs).
   - **Promotion requirements now, as simple seat counts** (Claude proposes numbers, Marcel approves).
+- **Built (2026-11-08):**
+  - `scripts/pyramid.gd`: all 14 divisions with fictional clubs (pub teams in Non-League, town names from League 10 up). Other divisions' seasons are simulated from club strength when yours ends. Play-off bracket exactly as above; AI ties are simulated (two legs, extra time, penalties). Moves: top 2 eligible up, play-off winner up (unless it's the 18th of the division above: it stays there), 19th/20th down, 18th down unless it won the play-offs below. A club without enough seats is skipped (top 2 and play-offs).
+  - Your season: after the last league match the tables are fixed. 3rd–7th (with enough seats) → play-offs in weeks 43–45. 18th (not in Non-League 3) → you play in the division below's play-offs (as the "18" seed against their 3rd). "Start season N+1" only appears when your play-offs are over; then everyone moves and you start in your new division.
+  - **Extra time**: in a second leg that is level on aggregate after 2 halves. Two halves of a third of a half each; sides switch at the extra-time break. HUD says "Extra time".
+  - **Penalties** (still level after extra time): camera behind the taker at the far goal. Your kicks: aim with the mouse (pad: left stick left/right), hold RMB (pad: B) for power and release. More power = faster, higher and less accurate (full power can go over the bar). Their kicks: random spot and power. **Both keepers guess at random** (left / stay / right). A keeper who guesses right still can't reach the corners. Alternating, first five each (ends early when one side can't catch up), then sudden death. Kickers rotate, most attacking players first. Who kicks first is a coin toss.
+  - **Money per division** (`ClubState.DIV_ECON`): ticket, tea hut spend per visitor, sponsor, prize money, plus a cost factor on pitch hire / referee / kit / travel / league fee (Non-League 3 = 1×, Premier = ~25,400×). Match subs stay £1 per player.
+  - Hub: the division name in the stat bar and table title; zone lines per division (promotion with the seat requirement, play-offs, 18th, relegation); the Next Match card shows your play-off leg (first-leg score, what's at stake), then the expected outcome ("Promoted to …", "Not enough seats …", "Relegated to …") with "Start season N+1"; a welcome line in week 1 of the new season; Coming up shows the next play-off leg and "Promotion needs N seats". The post-match card shows the round, the leg and the aggregate ("Through to the final", "won 4–3 on penalties").
+  - Dev: `tools/dev/pyramid_test.gd` (headless: denied without seats, promotion, play-offs, relegation, save/load, 10 seasons in a row) and `-- --playoff-test --menu-skip` (forces a level second leg → extra time → penalties, screenshots in /tmp).
+  - Not yet: cup ties, away goals (not wanted), difficulty per division, a nicer shootout presentation (kick list with ticks/crosses).
 
 ### Cups & Europe
 

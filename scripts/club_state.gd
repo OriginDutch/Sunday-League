@@ -1,6 +1,7 @@
 class_name ClubState
 extends RefCounted
 const LeagueScript = preload("res://scripts/league.gd")
+const PyramidScript = preload("res://scripts/pyramid.gd")
 ## Everything about your club that persists between matches. Saved as JSON to user://save.json.
 
 const SAVE_PATH := "user://save.json"
@@ -24,6 +25,25 @@ const REFEREE_FEE := 5              # per home match
 const KIT_WASHING := 2              # per match
 const TRAVEL := 3                   # per away match
 const LEAGUE_FEE := 30              # per season, week 1
+## Money per division (Marcel, 2026-11-08: from the economy model's game column). Per division:
+## ticket £ per seated fan, spend £ per visitor (tea hut), sponsor + prize money per season, and a cost
+## factor on the bottom-tier costs above (model: ground running + travel/match costs, scaled with income).
+const DIV_ECON := [
+	{"ticket": 2.0, "spend": 1.0, "sponsor": 50, "prize": 1.70, "costs": 1.0},
+	{"ticket": 3.0, "spend": 1.5, "sponsor": 150, "prize": 10.0, "costs": 2.5},
+	{"ticket": 3.5, "spend": 2.0, "sponsor": 350, "prize": 25.0, "costs": 4.1},
+	{"ticket": 4.5, "spend": 2.5, "sponsor": 700, "prize": 50.0, "costs": 6.4},
+	{"ticket": 6.0, "spend": 3.5, "sponsor": 1500, "prize": 100.0, "costs": 13.1},
+	{"ticket": 8.0, "spend": 4.5, "sponsor": 3500, "prize": 250.0, "costs": 31.6},
+	{"ticket": 11.0, "spend": 5.5, "sponsor": 9000, "prize": 700.0, "costs": 55.5},
+	{"ticket": 14.0, "spend": 6.5, "sponsor": 22000, "prize": 2500.0, "costs": 122.5},
+	{"ticket": 17.0, "spend": 7.5, "sponsor": 55000, "prize": 15000.0, "costs": 283.0},
+	{"ticket": 20.0, "spend": 8.5, "sponsor": 150000, "prize": 60000.0, "costs": 634.6},
+	{"ticket": 22.0, "spend": 9.5, "sponsor": 700000, "prize": 450000.0, "costs": 1510.6},
+	{"ticket": 26.0, "spend": 11.0, "sponsor": 2000000, "prize": 1500000.0, "costs": 3355.0},
+	{"ticket": 32.0, "spend": 13.0, "sponsor": 6000000, "prize": 5000000.0, "costs": 8515.9},
+	{"ticket": 48.0, "spend": 16.0, "sponsor": 25000000, "prize": 30000000.0, "costs": 25401.0},
+]
 ## Ledger categories, in display order. New sources/expenses = a new name here + where it's booked.
 const INCOME_CATS := ["Tickets", "Tea hut", "Match subs", "Sponsor", "Prize money"]
 const EXPENSE_CATS := ["Pitch hire", "Referee", "Kit washing", "Travel", "League fee", "Building"]
@@ -72,6 +92,10 @@ var record := {"w": 0, "d": 0, "l": 0}
 var matches_played := 0
 var fans_carry := 0.0               # fractional fan growth carried over
 var league: LeagueScript                  # your division: fixtures, results, table
+var pyramid                         # all 14 divisions (scripts/pyramid.gd); pyramid.you = your division
+var season_end := {}                # set when the regular season ends: {season, tables: [rows per division], blocked}
+var playoff := {}                   # your play-offs: {div, bracket} (empty when you're not in them)
+var last_report := {}               # what happened at the last season change (promoted / relegated / ...)
 var sections: Dictionary = {}       # section index (String) -> {"stage": "bleachers", "rows": n}
 var builds: Array = []              # [{"sec", "stage", "rows", "finish" (absolute week), "start"}]
 ## Money ledger: every booking with its lines (category -> £, + in / - out), per match / season / build,
@@ -93,7 +117,8 @@ static func new_game() -> ClubState:
 	for i in START_SQUAD:
 		s.squad.append(Names.person())
 	s.refill_candidates()
-	s.league = LeagueScript.create(CLUB_NAME)
+	s.pyramid = PyramidScript.create()
+	s.league = LeagueScript.create_with(CLUB_NAME, s.pyramid.divisions[0])
 	s.cash_log.append({"season": 1, "week": 0, "cash": s.money})
 	s.start_season_money()
 	return s
@@ -294,13 +319,13 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int, 
 	var attendance := fans if home else 0
 	var seated := mini(attendance, seats())
 	var standing := attendance - seated
-	var revenue := seated * TICKET_PRICE
+	var revenue := seated * ticket_price()
 	var lines := {}
 	if home:
-		lines = {"Tickets": revenue, "Tea hut": attendance * TEA_PER_VISITOR, "Match subs": squad.size() * SUBS_PER_PLAYER,
-			"Pitch hire": -PITCH_HIRE, "Referee": -REFEREE_FEE, "Kit washing": -KIT_WASHING}
+		lines = {"Tickets": revenue, "Tea hut": attendance * econ("spend"), "Match subs": squad.size() * SUBS_PER_PLAYER,
+			"Pitch hire": -cost(PITCH_HIRE), "Referee": -cost(REFEREE_FEE), "Kit washing": -cost(KIT_WASHING)}
 	else:
-		lines = {"Match subs": squad.size() * SUBS_PER_PLAYER, "Kit washing": -KIT_WASHING, "Travel": -TRAVEL}
+		lines = {"Match subs": squad.size() * SUBS_PER_PLAYER, "Kit washing": -cost(KIT_WASHING), "Travel": -cost(TRAVEL)}
 	var cash_before := money
 
 	var result := "D"
@@ -359,6 +384,23 @@ func apply_match(goals_for: int, goals_against: int, entertainment_events: int, 
 
 # ------------------------------------------------------------------ money
 
+func division() -> int:
+	return pyramid.you if pyramid != null else 0
+
+
+func econ(key: String) -> float:
+	return float(DIV_ECON[clampi(division(), 0, DIV_ECON.size() - 1)][key])
+
+
+## A bottom-tier cost scaled to this division.
+func cost(base: int) -> int:
+	return int(round(base * econ("costs")))
+
+
+func ticket_price() -> float:
+	return econ("ticket")
+
+
 ## Books money in (+) / out (-) per category and keeps the ledger + cash log.
 func book(kind: String, title: String, lines: Dictionary, extra: Dictionary = {}) -> Dictionary:
 	var e := {"season": league.season, "week": league.current_week(), "kind": kind, "title": title, "lines": lines}
@@ -380,16 +422,17 @@ func start_season_money() -> void:
 	if finances_season >= league.season:
 		return
 	finances_season = league.season
-	book("season", "Season %d starts" % league.season, {"Sponsor": SPONSOR_PER_SEASON, "League fee": -LEAGUE_FEE},
+	book("season", "Season %d starts" % league.season, {"Sponsor": econ("sponsor"), "League fee": -cost(LEAGUE_FEE)},
 		{"note": SPONSOR_NAME})
 
 
-## After the last match: prize money (once per season).
+## After the last match: prize money (once per season), and the final tables / play-offs are fixed.
 func end_season_money() -> void:
 	if prize_paid_season >= league.season or not league.season_over():
 		return
+	on_regular_season_end()
 	prize_paid_season = league.season
-	book("season", "Season %d prize money" % league.season, {"Prize money": PRIZE_MONEY})
+	book("season", "Season %d prize money" % league.season, {"Prize money": econ("prize")})
 
 
 ## In/out per category for one season (all categories present, 0 when nothing happened).
@@ -430,6 +473,212 @@ static func entry_out(e: Dictionary) -> float:
 	return t
 
 
+# ------------------------------------------------------------------ promotion / relegation (GDD §6)
+
+func me() -> Dictionary:
+	return {"name": CLUB_NAME, "str": 1.0}
+
+
+func seats_needed_up() -> int:
+	var d := division()
+	return PyramidScript.SEATS_TO_ENTER[d + 1] if d < PyramidScript.TOP else 0
+
+
+func can_go_up() -> bool:
+	return division() < PyramidScript.TOP and seats() >= seats_needed_up()
+
+
+## Called once when your last league match is played: fixes every division's final table and sets up
+## your play-offs (as 3rd–7th, or as the 18th fighting to stay up in the division below's play-offs).
+func on_regular_season_end() -> void:
+	if not league.season_over() or int(season_end.get("season", 0)) == league.season:
+		return
+	var d := division()
+	var tables := []
+	for dd in PyramidScript.NAMES.size():
+		if dd == d:
+			var rows := []
+			for r in league.table():
+				rows.append(me() if r["team"] == 0 else league.teams[r["team"]])
+			tables.append(rows)
+		else:
+			tables.append(pyramid.simulate_table(dd))
+	var blocked := [] if can_go_up() else [CLUB_NAME]
+	season_end = {"season": league.season, "tables": tables, "blocked": blocked, "pos": league.position_of(0)}
+	playoff = {}
+	if d < PyramidScript.TOP:
+		var above18 = tables[d + 1][17]
+		var seeds := PyramidScript.playoff_seeds(tables[d], above18, blocked)
+		for k in seeds:
+			if seeds[k] != null and seeds[k]["name"] == CLUB_NAME:
+				playoff = {"div": d, "bracket": PyramidScript.bracket(seeds)}
+	if playoff.is_empty() and d > 0 and league.position_of(0) == 18:
+		var seeds2 := PyramidScript.playoff_seeds(tables[d - 1], me(), [])
+		playoff = {"div": d - 1, "bracket": PyramidScript.bracket(seeds2)}
+
+
+func _your_tie(br: Dictionary, rnd: int) -> String:
+	for k in br:
+		var t: Dictionary = br[k]
+		if int(t["round"]) != rnd:
+			continue
+		for c in t["teams"]:
+			if c != null and c["name"] == CLUB_NAME:
+				return k
+	return ""
+
+
+## Your next play-off leg, or {} when your play-offs are over. AI ties are simulated as they come up.
+## {tie, leg (0/1), home, opponent {name, str}, round, first_leg [us, them] (second leg only)}
+func playoff_fixture() -> Dictionary:
+	if playoff.is_empty():
+		return {}
+	var br: Dictionary = playoff["bracket"]
+	for rnd in [1, 2, 3]:
+		PyramidScript.advance(br)
+		var mine := _your_tie(br, rnd)
+		for k in br:
+			var t: Dictionary = br[k]
+			if int(t["round"]) == rnd and k != mine and t["winner"] == null and t["teams"][0] != null and t["teams"][1] != null:
+				PyramidScript.sim_tie(t)
+		if mine != "" and br[mine]["winner"] == null and br[mine]["teams"][0] != null and br[mine]["teams"][1] != null:
+			var t: Dictionary = br[mine]
+			var leg: int = t["legs"].size()
+			var us := 0 if t["teams"][0]["name"] == CLUB_NAME else 1
+			league.extra_week = rnd
+			var fx := {"tie": mine, "leg": leg, "home": leg == us, "opponent": t["teams"][1 - us], "round": rnd}
+			if leg == 1:
+				fx["first_leg"] = [int(t["legs"][0][us]), int(t["legs"][0][1 - us])]
+			return fx
+		PyramidScript.advance(br)
+	return {}
+
+
+func playoff_done() -> bool:
+	return playoff.is_empty() or playoff_fixture().is_empty()
+
+
+## Your leg is played. `won_after` = true/false when extra time/penalties decided a level tie, else null.
+func record_playoff_leg(tie: String, us_goals: int, them_goals: int, won_after = null, how := "") -> void:
+	var t: Dictionary = playoff["bracket"][tie]
+	var us := 0 if t["teams"][0]["name"] == CLUB_NAME else 1
+	var g := [0, 0]
+	g[us] = us_goals
+	g[1 - us] = them_goals
+	t["legs"].append(g)
+	if t["legs"].size() == 2:
+		var a := int(t["legs"][0][us]) + int(t["legs"][1][us])
+		var b := int(t["legs"][0][1 - us]) + int(t["legs"][1][1 - us])
+		var we_win := a > b if a != b else bool(won_after)
+		if how != "":
+			t[how] = true
+		t["winner"] = t["teams"][us] if we_win else t["teams"][1 - us]
+
+
+func division_name(d := -1) -> String:
+	return PyramidScript.NAMES[clampi(division() if d < 0 else d, 0, PyramidScript.NAMES.size() - 1)]
+
+
+## Where you'll be next season, as far as it's known now (season over, play-offs done or not needed).
+## {outcome promoted|relegated|stayed, denied (would have gone up but not enough seats), to}
+func expected_outcome() -> Dictionary:
+	var d := division()
+	var pos := league.position_of(0)
+	var blocked: Array = season_end.get("blocked", [])
+	var out := "stayed"
+	var denied := false
+	if not playoff.is_empty() and playoff_done():
+		var w = playoff["bracket"]["F"]["winner"]
+		var won: bool = w != null and w["name"] == CLUB_NAME
+		if int(playoff["div"]) == d:
+			out = "promoted" if won else "stayed"
+		else:
+			out = "stayed" if won else "relegated"
+	elif d < PyramidScript.TOP and pos <= 2:
+		out = "promoted" if blocked.is_empty() else "stayed"
+		denied = not blocked.is_empty()
+	elif d < PyramidScript.TOP and pos <= 7 and not blocked.is_empty():
+		denied = true
+	elif d > 0 and pos >= 19:
+		out = "relegated"
+	var to := d + (1 if out == "promoted" else (-1 if out == "relegated" else 0))
+	return {"outcome": out, "denied": denied, "to": to}
+
+
+static func round_name(rnd: int, tie: String) -> String:
+	if rnd == 3:
+		return "Play-off final"
+	if rnd == 2:
+		return "Play-off semi-final"
+	return "Play-off quarter-final"
+
+
+## "Start season N+1": play-offs everywhere, everybody moves, you land in your new division.
+func start_next_season() -> Dictionary:
+	on_regular_season_end()
+	var tables: Array = season_end["tables"]
+	var blocked: Array = season_end["blocked"]
+	var d := division()
+	var po := []
+	for dd in PyramidScript.NAMES.size():
+		if dd >= PyramidScript.TOP:
+			po.append(null)
+		elif not playoff.is_empty() and int(playoff["div"]) == dd:
+			PyramidScript.advance(playoff["bracket"])
+			po.append(playoff["bracket"]["F"]["winner"])
+		else:
+			var seeds := PyramidScript.playoff_seeds(tables[dd], tables[dd + 1][17], blocked if dd == d else [])
+			po.append(PyramidScript.sim_playoffs(seeds))
+	pyramid.divisions[d] = league.teams.slice(1)
+	var pos: int = season_end["pos"]
+	pyramid.apply_moves(tables, po, blocked)
+	var nd := d
+	for dd in pyramid.divisions.size():
+		for i in pyramid.divisions[dd].size():
+			if pyramid.divisions[dd][i]["name"] == CLUB_NAME:
+				nd = dd
+				pyramid.divisions[dd].remove_at(i)
+				break
+	pyramid.you = nd
+	var outcome := "stayed"
+	if nd > d:
+		outcome = "promoted"
+	elif nd < d:
+		outcome = "relegated"
+	var would_go_up := d < PyramidScript.TOP and (pos <= 2 or (pos <= 7 and not blocked.is_empty()))
+	last_report = {"season": league.season, "from": d, "to": nd, "pos": pos, "outcome": outcome,
+		"denied": not blocked.is_empty() and would_go_up and outcome != "promoted", "seats_needed": seats_needed_up() if nd == d else 0,
+		"playoff": _playoff_summary()}
+	var old_season := league.season
+	league = LeagueScript.create_with(CLUB_NAME, pyramid.divisions[nd])
+	league.season = old_season + 1
+	league.last_finish = pos
+	season_end = {}
+	playoff = {}
+	start_season_money()
+	return last_report
+
+
+func _playoff_summary() -> String:
+	if playoff.is_empty():
+		return ""
+	var br: Dictionary = playoff["bracket"]
+	var last := ""
+	for k in ["A", "B", "C", "D", "F"]:
+		var t: Dictionary = br[k]
+		for c in t["teams"]:
+			if c != null and c["name"] == CLUB_NAME:
+				last = k
+	if last == "":
+		return ""
+	var t: Dictionary = br[last]
+	if t["winner"] == null:
+		return "In the %s" % round_name(int(t["round"]), last).to_lower()
+	var won: bool = t["winner"]["name"] == CLUB_NAME
+	var nm := round_name(int(t["round"]), last).replace("Play-off ", "")
+	return ("Won the play-off final" if last == "F" else "Through the %s" % nm) if won else "Out in the play-off %s" % nm
+
+
 func is_hardcore(sec: int) -> bool:
 	return hardcore.has(str(sec))
 
@@ -451,6 +700,7 @@ func to_dict() -> Dictionary:
 		"league": league.to_dict(), "sections": sections, "builds": builds,
 		"hardcore": hardcore, "temperature": temperature,
 		"ledger": ledger, "cash_log": cash_log, "cash_pennies": cash_pennies,
+		"pyramid": pyramid.to_dict(), "season_end": season_end, "playoff": playoff, "last_report": last_report,
 		"finances_season": finances_season, "prize_paid_season": prize_paid_season,
 	}
 
@@ -473,6 +723,10 @@ static func from_dict(d: Dictionary) -> ClubState:
 	s.sections = d.get("sections", {})
 	for k in s.sections:
 		s.sections[k]["rows"] = int(s.sections[k]["rows"])
+	s.pyramid = PyramidScript.from_dict(d.get("pyramid", {}))
+	s.season_end = d.get("season_end", {})
+	s.playoff = d.get("playoff", {})
+	s.last_report = d.get("last_report", {})
 	s.ledger = d.get("ledger", [])
 	s.cash_log = d.get("cash_log", [])
 	s.cash_pennies = float(d.get("cash_pennies", 0.0))

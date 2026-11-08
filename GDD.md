@@ -417,7 +417,15 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **A roof gives (Marcel): more approval, a higher ticket price per covered seat, and fewer fans staying away in bad weather** (the last one once weather exists). Numbers still to agree.
 - **Main stand brief (Marcel):** classic English for this tier (roof on columns in front of the seats), concrete terrace + steel trusses + corrugated roof, plastic seats in club colour, simple rear facade with entrances, **players' tunnel in the middle section**. Scoreboard and floodlights are **paid upgrades** later.
 - Built (renders only, not in the game yet): `tools/blender/build_shed.py --rows 3|5|8` (roof rises with the rows; `--render-set` for previews) and new `tools/blender/build_main_stand.py --rows 10|12|15 [--tunnel]` (`--render-set full|rows`). Main stand section: 1.5 m paddock walkway, 0.80 m rows, two front columns per section (5.75 m apart, continuous along the side), trussed rafters, deep fascia for a club name later, brick ground floor with windows/doors + cladding at the back, side screens as separate objects (hidden between neighbours). Tunnel section: the first 4 rows make way for a concrete tunnel block with an extendable white canopy with club-colour bands. Renders: `design/3d/the_shed/rows_3_5_8_*.png`, `design/3d/main_stand/*.png`.
-- Note: the models have 19 seats per row (the gangway takes one); the game counts 20 per row for bleachers.
+- **Feedback round 1 (Marcel, 2026-11-08):**
+  - **20 seats per row in the models** (Marcel chose B): gangway 1.0 m instead of 1.2 m, so what you see = what the game counts (bleachers, prices and promotion seat counts all use 20).
+  - **Access:** The Shed from the front (walkway + middle gangway; the fake back door is gone). Main stand: a **stair core at the back of every section** up to the rear walkway behind the top row, then down the gangways to your row.
+  - **Tunnel section starts above the tunnel over its full width** (no seats with a blocked view): the first 4 rows make way for a podium (dressing rooms, small windows, club band) with the tunnel in it and a rail along its edge.
+  - **Slimmer tunnel canopy** (2.3 m wide, ~2.4 m high).
+  - Gangways now have real treads (half-height front + full back per row); the black "holes" were the gangway steps hidden inside the row blocks.
+  - **Side walls between neighbours:** equal sections: none (as now). **Unequal sections: only the strip between the lower and the higher roof** (to build in the game, it depends on the neighbour).
+  - Roof numbers agreed: **approval: fans under a roof count 1.5× for the seating part**; **ticket +25% in The Shed, +50% in the main stand** on top of the division price; weather effect once weather exists.
+  - Seat positions per variant are exported as `*_seats.json` next to the .glb for the crowd. Seats are real geometry in the model for now; fps is watched (Marcel).
 
 ## 10i. 3D POC #2 — big two-tier stand (2026-11-07)
 **Marcel's ask:** a big stand as a POC, including floodlights, stairs, aisles, two tiers, a roof, roof beams, and some people spread over the seats.

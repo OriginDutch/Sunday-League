@@ -21,7 +21,7 @@ RISE = 0.42              # row height step
 WALK_D = 1.05            # front walkway depth
 WALK_Z = 0.45            # front walkway height (raised so the front row sees over the wall)
 ROW0_Z = 0.9             # first row tread height
-AISLE_W = 1.2            # central gangway
+AISLE_W = 1.0            # central gangway (1.0 m: 20 seats per row fit, Marcel 2026-11-08)
 SEAT_PITCH = 0.5
 BACK_Y = WALK_D + ROWS * TREAD          # back edge of the top row
 ROOF_FRONT_Y = -0.25                     # roof overhang over the walkway
@@ -67,7 +67,8 @@ M = {
     "dark": mat("Shadow_Gap", "#1E2322", 0.9),
 }
 
-parts = []   # (object) collected for joining per material
+parts = []
+SEATS = []   # seat positions of a single exported section, in Godot axes (x, up, towards the back = +z... see export)   # (object) collected for joining per material
 
 def box(name, sx, sy, sz, loc, m, rot=None):
     me = bpy.data.meshes.new(name)
@@ -151,8 +152,10 @@ def build_section(rows, x0=0.0):
     for r in range(ROWS):
         y0 = WALK_D + r * TREAD
         top = ROW0_Z + r * RISE
-        # each row is a solid step block, full height to the ground
-        box(f"Row{r}", W, TREAD, top, (0, y0 + TREAD / 2, top / 2), M["concrete"])
+        # each row is a solid step block, full height to the ground (left and right of the gangway)
+        for s in (-1, 1):
+            w = HW - AISLE_W / 2
+            box(f"Row{r}{s}", w, TREAD, top, (s * (AISLE_W / 2 + w / 2), y0 + TREAD / 2, top / 2), M["concrete"])
         # yellow safety nosing on the front edge of each step, both sides of the gangway
         for s in (-1, 1):
             box(f"Nosing{r}{s}", HW - AISLE_W / 2, 0.06, 0.03, (s * (AISLE_W / 2 + (HW - AISLE_W / 2) / 2), y0 + 0.03, top + 0.005), M["step_edge"])
@@ -162,7 +165,9 @@ def build_section(rows, x0=0.0):
         base = ROW0_Z + (r - 1) * RISE if r > 0 else WALK_Z
         top = ROW0_Z + r * RISE
         mid = (base + top) / 2
+        # two treads per row: half height on the front half, full row height on the back half
         box(f"AisleStep{r}", AISLE_W, TREAD / 2, mid, (0, y0 + TREAD / 4, mid / 2), M["concrete_dark"])
+        box(f"AisleStepB{r}", AISLE_W, TREAD / 2, top, (0, y0 + TREAD * 0.75, top / 2), M["concrete_dark"])
         box(f"AisleEdge{r}", AISLE_W, 0.06, 0.03, (0, y0 + 0.03, mid + 0.005), M["step_edge"])
         box(f"AisleEdgeB{r}", AISLE_W, 0.06, 0.03, (0, y0 + TREAD / 2 + 0.03, top + 0.005), M["step_edge"])
     # rear upstand behind the top row
@@ -190,12 +195,8 @@ def build_section(rows, x0=0.0):
         beam(f"AisleRailPost{t}", (0, p.y, floor), (0, p.y, p.z), 0.045, 0.045, M["rail"])
 
     # ------------------------------------------------------------------ seats (tip-up, 0.5 m pitch, gap for the gangway)
-    seat_xs = []
-    x = -HW + 0.4
-    while x < HW - 0.3:
-        if abs(x) > AISLE_W / 2 + 0.2:
-            seat_xs.append(x)
-        x += SEAT_PITCH
+    # 10 seats each side of the gangway = 20 per row, like the game counts
+    seat_xs = [sgn * (AISLE_W / 2 + 0.25 + k * SEAT_PITCH) for sgn in (-1, 1) for k in range(10)]
     for r in range(ROWS):
         y0 = WALK_D + r * TREAD
         top = ROW0_Z + r * RISE
@@ -207,6 +208,7 @@ def build_section(rows, x0=0.0):
             box(f"SeatPan{r}_{sx:.2f}", 0.42, 0.38, 0.05, (sx, sy - 0.04, top + 0.42), M["seat"], Matrix.Rotation(math.radians(-4), 3, 'X'))
             # back rest, leaning back
             box(f"SeatBack{r}_{sx:.2f}", 0.42, 0.05, 0.36, (sx, sy + 0.17, top + 0.64), M["seat"], Matrix.Rotation(math.radians(-12), 3, 'X'))
+            SEATS.append((round(sx, 3), round(top + 0.44, 3), round(-sy, 3), r))   # Blender (x, y, z) -> Godot (x, z, -y)
             n_seats += 1
 
     # ------------------------------------------------------------------ steel frame
@@ -259,9 +261,7 @@ def build_section(rows, x0=0.0):
         x = -(W + 0.3) / 2 + 0.11 + k * 0.22
         box(f"BackRib{k}", 0.05, 0.035, bw_h, (x, bw_y + 0.03, bw_h / 2), M["sheet"])
     box("BackWallInner", W + 0.3, 0.01, bw_h, (0, bw_y - 0.02, bw_h / 2), M["sheet_under"])
-    # a small exit door in the back wall, behind the gangway
-    box("BackDoor", 1.0, 0.05, 2.05, (0, bw_y + 0.05, 1.03 + 0.08), M["dark"])
-    box("BackDoorFrame", 1.15, 0.06, 0.08, (0, bw_y + 0.06, 2.18), M["steel"])
+    # no back door: fans come in from the front walkway and up the gangway (Marcel 2026-11-08)
 
     # ------------------------------------------------------------------ side screens (corrugated, back half of each end)
     side_front_y = WALK_D + TREAD * 0.6
@@ -314,6 +314,9 @@ _models = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets
 if "--render-set" not in sys.argv:
     for _name in (["the_shed_%d.glb" % ROWS] + (["the_shed.glb"] if ROWS == 3 else [])):
         bpy.ops.export_scene.gltf(filepath=os.path.join(_models, _name), export_format='GLB', use_selection=False, export_apply=True)
+    import json
+    with open(os.path.join(_models, "the_shed_%d_seats.json" % ROWS), "w") as f:
+        json.dump({"rows": ROWS, "seats": SEATS, "note": "[x, y, z, row] in the section's local Godot space"}, f)
 bpy.ops.wm.save_as_mainfile(filepath="/tmp/the_shed.blend")
 
 # ------------------------------------------------------------------ preview renders

@@ -22,12 +22,12 @@ RISE = 0.40
 WALK_D = 1.5             # paddock walkway in front of the first row
 WALK_Z = 0.6
 ROW0_Z = 1.25
-AISLE_W = 1.2
+AISLE_W = 1.0            # 20 seats per row fit (Marcel 2026-11-08)
 SEAT_PITCH = 0.5
 COL_X = [-HW / 2, HW / 2]       # 5.75 m apart, continuous across sections, clear of the gangway
-TUNNEL_W = 3.4                  # tunnel mouth width
+TUNNEL_W = 2.8                  # tunnel mouth width
 TUNNEL_H = 2.5
-TUNNEL_ROWS = 4                 # rows removed above the tunnel
+TUNNEL_ROWS = 4                 # tunnel section: the first rows go over the full width (Marcel)
 
 ROWS = 15
 TUNNEL = "--tunnel" in sys.argv
@@ -82,6 +82,7 @@ M = {
 }
 
 parts = []
+SEATS = []
 
 
 def _ob(name, me, loc, m):
@@ -181,33 +182,42 @@ def build_section(rows, tunnel=False, x0=0.0, side_left=True, side_right=True):
     tx = TUNNEL_W / 2 + 0.3                     # half width of the tunnel block
     in_tunnel = lambda x: tunnel and abs(x) < tx
 
-    # ---- terrace: one solid step block per row (split around the tunnel block)
+    # ---- terrace: one solid step block per row, left and right of the gangway
     box("Plinth", W, rear_walk_y + 0.4, 0.12, (0, rear_walk_y / 2, 0.06), M["concrete_dark"])
-    def span(name, y0, depth, top, m):
-        if tunnel and top <= TUNNEL_H + 0.4:
-            for s in (-1, 1):
-                w = HW - tx
-                box(f"{name}{s}", w, depth, top, (s * (tx + w / 2), y0 + depth / 2, top / 2), m)
-        else:
-            box(name, W, depth, top, (0, y0 + depth / 2, top / 2), m)
-    span("Walkway", 0.0, WALK_D, WALK_Z, M["concrete"])
-    for r in range(rows):
-        y0 = WALK_D + r * TREAD
-        top = ROW0_Z + r * RISE
-        span(f"Row{r}", y0, TREAD, top, M["concrete"])
-        for s in (-1, 1):
-            w = HW - AISLE_W / 2
-            if not (tunnel and r < TUNNEL_ROWS):
-                box(f"Nosing{r}{s}", w, 0.06, 0.03, (s * (AISLE_W / 2 + w / 2), y0 + 0.03, top + 0.005), M["step_edge"])
-    # gangway half-steps up the middle (from the first row above the tunnel when there is one)
+    t_depth = WALK_D + TUNNEL_ROWS * TREAD
+    t_top = ROW0_Z + (TUNNEL_ROWS - 1) * RISE + 0.2
     r_start = TUNNEL_ROWS if tunnel else 0
+    if tunnel:
+        # the tunnel section starts above the tunnel over its full width: a podium (dressing rooms) with the tunnel in it
+        for s in (-1, 1):
+            w = HW - tx
+            box(f"Podium{s}", w, t_depth, t_top, (s * (tx + w / 2), t_depth / 2, t_top / 2), M["concrete_dark"])
+            box(f"PodiumBand{s}", w, 0.04, 0.25, (s * (tx + w / 2), -0.02, t_top - 0.2), M["trim"])
+            for k in range(2):
+                wx = s * (tx + 0.9 + k * 1.6)
+                box(f"PodiumWindow{s}{k}", 1.0, 0.04, 0.5, (wx, -0.02, 1.75), M["glass"])
+    else:
+        box("Walkway", W, WALK_D, WALK_Z, (0, WALK_D / 2, WALK_Z / 2), M["concrete"])
     for r in range(r_start, rows):
         y0 = WALK_D + r * TREAD
-        base = ROW0_Z + (r - 1) * RISE if r > 0 else WALK_Z
+        top = ROW0_Z + r * RISE
+        for s in (-1, 1):
+            w = HW - AISLE_W / 2
+            box(f"Row{r}{s}", w, TREAD, top, (s * (AISLE_W / 2 + w / 2), y0 + TREAD / 2, top / 2), M["concrete"])
+            box(f"Nosing{r}{s}", w, 0.06, 0.03, (s * (AISLE_W / 2 + w / 2), y0 + 0.03, top + 0.005), M["step_edge"])
+    # gangway: two treads per row (front half at half height, back half at the row's height)
+    for r in range(r_start, rows):
+        y0 = WALK_D + r * TREAD
+        if tunnel and r == r_start:
+            base = t_top
+        else:
+            base = ROW0_Z + (r - 1) * RISE if r > 0 else WALK_Z
         top = ROW0_Z + r * RISE
         mid = (base + top) / 2
         box(f"AisleStep{r}", AISLE_W, TREAD / 2, mid, (0, y0 + TREAD / 4, mid / 2), M["concrete_dark"])
+        box(f"AisleStepB{r}", AISLE_W, TREAD / 2, top, (0, y0 + TREAD * 0.75, top / 2), M["concrete_dark"])
         box(f"AisleEdge{r}", AISLE_W, 0.06, 0.03, (0, y0 + 0.03, mid + 0.005), M["step_edge"])
+        box(f"AisleEdgeB{r}", AISLE_W, 0.06, 0.03, (0, y0 + TREAD / 2 + 0.03, top + 0.005), M["step_edge"])
     # rear walkway + upstand + rail
     box("RearWalk", W, rear_walk_y - back_y, top_z + 0.4, (0, (back_y + rear_walk_y) / 2, (top_z + 0.4) / 2), M["concrete_dark"])
     cyl("RearRail", 0.03, W - 0.2, (0, back_y + 0.1, top_z + 1.4), M["rail"], axis='X')
@@ -216,25 +226,26 @@ def build_section(rows, tunnel=False, x0=0.0, side_left=True, side_right=True):
 
     # ---- players' tunnel: concrete block under the first rows, dark mouth, extendable canopy
     if tunnel:
-        t_depth = WALK_D + TUNNEL_ROWS * TREAD
-        t_top = ROW0_Z + (TUNNEL_ROWS - 1) * RISE + 0.2
         for s in (-1, 1):
             box(f"TunnelWall{s}", 0.3, t_depth, t_top, (s * (TUNNEL_W / 2 + 0.15), t_depth / 2, t_top / 2), M["concrete_dark"])
         box("TunnelRoof", TUNNEL_W + 0.6, t_depth, t_top - TUNNEL_H, (0, t_depth / 2, TUNNEL_H + (t_top - TUNNEL_H) / 2), M["concrete_dark"])
         box("TunnelInside", TUNNEL_W, 0.1, TUNNEL_H, (0, t_depth - 0.05, TUNNEL_H / 2), M["dark"])
         box("TunnelFloor", TUNNEL_W, t_depth, 0.05, (0, t_depth / 2, 0.025), M["dark"])
         box("TunnelLintel", TUNNEL_W + 0.6, 0.12, 0.4, (0, -0.06, TUNNEL_H + 0.2), M["trim"])
-        # rail on the front edge of the tunnel block (people sit right behind it)
-        cyl("TunnelTopRail", 0.03, TUNNEL_W + 0.6, (0, 0.1, t_top + 0.9), M["rail"], axis='X')
-        for s2 in (-1, 0, 1):
-            cyl(f"TunnelTopRailPost{s2}", 0.025, 0.9, (s2 * (TUNNEL_W / 2 + 0.2), 0.1, t_top + 0.45), M["rail"], seg=8)
-        # extendable canopy out onto the pitch side: 4 hoops of white fabric with club-colour bands
+        # rail along the front edge of the podium, full width
+        cyl("PodiumRail", 0.03, W - 0.2, (0, 0.15, t_top + 0.95), M["rail"], axis='X')
+        for k in range(6):
+            x = -HW + 0.3 + k * (W - 0.6) / 5
+            cyl(f"PodiumRailPost{k}", 0.025, 0.95, (x, 0.15, t_top + 0.475), M["rail"], seg=8)
+        # extendable canopy out onto the pitch side: slim hoops of white fabric with club-colour bands
+        r_c, skirt = 1.15, 1.25
         for k in range(3):
-            half_tube(f"TunnelHoop{k}", 1.65 - k * 0.04, 1.35, (0, -0.8 - k * 1.3, 0.75), M["tunnel"])
-            box(f"TunnelBand{k}", 0.05, 1.35, 0.3, (1.62 - k * 0.04, -0.8 - k * 1.3, 0.9), M["trim"])
-            box(f"TunnelBandL{k}", 0.05, 1.35, 0.3, (-1.62 + k * 0.04, -0.8 - k * 1.3, 0.9), M["trim"])
+            rk = r_c - k * 0.03
+            yk = -0.75 - k * 1.25
+            half_tube(f"TunnelHoop{k}", rk, 1.3, (0, yk, skirt), M["tunnel"])
             for s in (-1, 1):
-                box(f"TunnelSkirt{k}{s}", 0.05, 1.35, 0.75, (s * (1.62 - k * 0.04), -0.8 - k * 1.3, 0.375), M["tunnel"])
+                box(f"TunnelSkirt{k}{s}", 0.05, 1.3, skirt, (s * (rk - 0.025), yk, skirt / 2), M["tunnel"])
+                box(f"TunnelBand{k}{s}", 0.06, 1.3, 0.28, (s * (rk - 0.02), yk, skirt * 0.75), M["trim"])
 
     # ---- front wall with adverts + rail (gap for the tunnel)
     ads = [M["ad1"], M["ad2"], M["ad3"], M["ad2"]]
@@ -261,23 +272,20 @@ def build_section(rows, tunnel=False, x0=0.0, side_left=True, side_right=True):
             cyl(f"FrontRailPost{x:.2f}", 0.025, 0.5, (x, -0.11, 1.42), M["rail"], seg=8)
 
     # ---- seats
-    seat_xs = []
-    x = -HW + 0.4
-    while x < HW - 0.3:
-        if abs(x) > AISLE_W / 2 + 0.2:
-            seat_xs.append(x)
-        x += SEAT_PITCH
+    seat_xs = [sgn * (AISLE_W / 2 + 0.25 + k * SEAT_PITCH) for sgn in (-1, 1) for k in range(10)]   # 20 per row
     n_seats = 0
     for r in range(rows):
         y0 = WALK_D + r * TREAD
         top = ROW0_Z + r * RISE
         sy = y0 + TREAD * 0.55
         for sx in seat_xs:
-            if tunnel and r < TUNNEL_ROWS and abs(sx) < tx + 0.2:
+            if tunnel and r < TUNNEL_ROWS:
                 continue
             box(f"SeatLeg{r}_{sx:.2f}", 0.06, 0.06, 0.32, (sx, sy, top + 0.16), M["seat_metal"])
             box(f"SeatPan{r}_{sx:.2f}", 0.42, 0.38, 0.05, (sx, sy - 0.04, top + 0.42), M["seat"], Matrix.Rotation(math.radians(-4), 3, 'X'))
             box(f"SeatBack{r}_{sx:.2f}", 0.42, 0.05, 0.36, (sx, sy + 0.17, top + 0.64), M["seat"], Matrix.Rotation(math.radians(-12), 3, 'X'))
+            if x0 == 0.0:
+                SEATS.append((round(sx, 3), round(top + 0.44, 3), round(-sy, 3), r))   # Godot axes (x, up, -y)
             n_seats += 1
 
     # ---- steel: front columns (in your view — that's the charm), rear columns, trussed rafters
@@ -341,14 +349,32 @@ def build_section(rows, tunnel=False, x0=0.0, side_left=True, side_right=True):
         box(f"CladRib{k}", 0.05, 0.04, fh - 3.25, (x, fy - 0.0, 3.25 + (fh - 3.25) / 2), M["cladding"])
     box("RearBand", W, 0.34, 0.18, (0, fy, 3.25), M["trim"])
     # windows (offices / bar under the stand) and one entrance with a canopy per section
-    for wx in (-4.2, -2.4, 2.4, 4.2):
+    for wx in (-4.3, -2.5):
         box(f"Window{wx}", 1.2, 0.05, 1.0, (wx, fy + 0.16, 1.9), M["glass"])
         box(f"WindowSill{wx}", 1.35, 0.12, 0.08, (wx, fy + 0.2, 1.36), M["concrete"])
     box("EntranceDoor", 1.6, 0.05, 2.3, (0, fy + 0.16, 1.15), M["dark"])
     box("EntranceCanopy", 2.4, 1.0, 0.1, (0, fy + 0.65, 2.65), M["trim"])
     box("EntranceSign", 1.2, 0.05, 0.3, (0, fy + 0.17, 2.85), M["fascia"])
+    # stair core to the rear walkway (fans go up here and down the gangways to their row)
+    sc_x0, sc_x1 = 1.6, 4.9
+    sc_w = sc_x1 - sc_x0
+    sc_cx = (sc_x0 + sc_x1) / 2
+    sc_d = 3.2
+    sc_h = top_z + 0.4 + 2.9
+    box("StairBrick", sc_w, sc_d, 3.2, (sc_cx, fy + sc_d / 2, 1.6), M["brick_rear"])
+    box("StairClad", sc_w - 0.1, sc_d - 0.1, sc_h - 3.2, (sc_cx, fy + sc_d / 2, 3.2 + (sc_h - 3.2) / 2), M["cladding"])
+    box("StairBand", sc_w + 0.04, sc_d + 0.04, 0.18, (sc_cx, fy + sc_d / 2, 3.25), M["trim"])
+    box("StairCap", sc_w + 0.12, sc_d + 0.12, 0.2, (sc_cx, fy + sc_d / 2, sc_h + 0.1), M["trim"])
+    box("StairDoor", 1.4, 0.05, 2.3, (sc_cx, fy + sc_d + 0.01, 1.15), M["dark"])
+    box("StairCanopy", 2.0, 0.8, 0.1, (sc_cx, fy + sc_d + 0.4, 2.6), M["trim"])
+    n_slits = max(1, int((sc_h - 4.0) / 2.4))
+    for k in range(n_slits):
+        z = 4.2 + k * 2.4
+        box(f"StairSlit{k}", 0.35, 0.04, 1.6, (sc_cx, fy + sc_d + 0.02, z + 0.8), M["glass"])
+    for s in (-1, 1):
+        cyl(f"Downpipe{s}", 0.06, roof_z(roof_back_y) - 0.2, (s * (HW - 0.15), fy + 0.2, (roof_z(roof_back_y) - 0.2) / 2), M["gutter"], seg=8)
     # upper window band in the cladding
-    box("UpperWindows", W - 1.0, 0.04, 0.6, (0, fy - 0.01 + 0.0 - 0.15, min(fh - 1.0, 5.5)), M["glass"])
+    box("UpperWindows", 2.8, 0.04, 0.6, (-3.4, fy + 0.0, min(fh - 1.0, 5.5)), M["glass"])
 
     # ---- side screens (separate objects so the game can hide them between neighbours)
     side_front_y = WALK_D + TREAD * 2
@@ -396,6 +422,9 @@ if not RENDER_SET:
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets/models",
         "main_stand_%d%s.glb" % (ROWS, "_tunnel" if TUNNEL else ""))
     bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=False, export_apply=True)
+    import json
+    with open(out.replace(".glb", "_seats.json"), "w") as f:
+        json.dump({"rows": ROWS, "tunnel": TUNNEL, "seats": SEATS, "note": "[x, y, z, row] in the section's local Godot space"}, f)
 
 if RENDER_SET:
     world = bpy.data.worlds.new("World"); scene.world = world

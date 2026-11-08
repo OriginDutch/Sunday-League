@@ -565,6 +565,7 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - Out: pitch hire £8 and referee £5 per home match · kit washing £2 per match · travel £3 per away match · league fee £30 per season (week 1) · building as now.
   - Check against the economy model (NL3 reference club: 15 fans, ~€907 income per season, 45% costs): the reference club ends ≈ +£460 per season; costs ≈ £340.
   - At the very start (5 fans, no seats): a home match = +£16 in (5 tea + 11 subs) vs −£15 out → roughly break-even; away −£5 + £11 subs = +£6. Nobody goes broke, growth comes from seats and fans.
+- **Marcel on the mock-up (2026-11-08):** layout is good for now. Build it so it scales: **bigger numbers, more income sources and expenses later**; **opponent crests** in the match list once clubs have logos; match-by-match **not clickable yet, but keep room to make it clickable later**.
 
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.

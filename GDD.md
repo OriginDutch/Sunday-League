@@ -23,7 +23,7 @@ You play the matches yourself (FIFA-style), and between matches you build up the
 | Platform | Desktop (not browser) |
 | Engine | Godot 4 (PoC built on 4.7.2) |
 | Language | GDScript in the PoC — **open question**, see §13 |
-| Controls | Mouse + keyboard (WASD). Controller is a nice-to-have |
+| Controls | Mouse + keyboard (WASD) and an Xbox-style controller in matches (2026-11-08); menus/hub by controller later |
 
 ## 3. Tone
 
@@ -556,6 +556,14 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
     - A player **stops growing around his peak**, which differs per player (one at 27, another at 32).
     - **Retirement:** the older the player, the higher the chance he stops, but it also depends on keeping his rating up, playing time, contract length and injuries.
     - Value now = rating + potential + age (replaces the blunt age multiplier table Claude showed; exact formula in the model, tunable).
+
+### Controller support (2026-11-08)
+- **Marcel's choices:** controller support after all ("nice-to-have" → now): **matches first** (hub and menus stay mouse for now), **FIFA-style aiming**, **Xbox** buttons, **FIFA-like layout**.
+- **Built:** A pass · hold B shoot (power) · X tackle · LB switch player · LT walk (sprint stays the default; a half-tilted stick also walks) · right stick up/down zoom · Start pause (new: freezes the match, Start again to play on) · after the match A/Start = back to the club.
+  - Aiming: passes go to the teammate the left stick points at (or the way you face with the stick centred), with the same arrow + pass ring as the mouse; a shot always goes at the goal, stick up/down picks the far/near side (goal marker as with the mouse); keeper kicks, corners and throw-ins follow the stick.
+  - Whatever you touched last is in charge: use the pad and the hint at the bottom switches to the pad buttons; touch the mouse/keyboard and it switches back. Keyboard + mouse work exactly as before.
+  - Dev: `--pad-test` plays a match with fake controller input (stick, walk, pass, pause, switching back to the keyboard) and prints the results.
+  - Not tested with a real controller (none here) — Marcel tests.
 
 ### Finances tab + bottom-tier economy (2026-11-08)
 - **Marcel's choices:** this step = the Finances tab **plus** the first real money flows for the bottom division (not the whole pyramid yet). The tab shows **this season's in/out per category, a per-match ledger, cash over time and what's coming up**. The club gets **small running costs** from day one. **Mock-up first**, then build.

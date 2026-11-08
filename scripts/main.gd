@@ -124,6 +124,14 @@ var stats := {"shots": [0, 0], "steals": [0, 0], "saves": [0, 0], "offside": [0,
 var camera: Camera3D
 var cam_target := Vector3.ZERO
 var aim_point := Vector3.ZERO
+# Controller (Marcel, 2026-11-08: matches first, FIFA-style aiming, Xbox layout). The last device you
+# touched decides how you aim and which hint is shown.
+const PAD_DEADZONE := 0.22
+const PAD_WALK_TILT := 0.5            # stick tilted less than this = walk (sprint is the default)
+var pad_active := false
+var pad_device := 0
+var paused := false
+var hint_label: Label
 var charging := false
 var charge := 0.0
 var switch_cooldown := 0.0
@@ -325,6 +333,12 @@ func _ready() -> void:
 				# dev: --club-colours=primaryhex,secondaryhex  (demo of the club colours upgrade)
 				var cc: PackedStringArray = arg.trim_prefix("--club-colours=").split(",")
 				bs.set_club_colours(Color(cc[0]), Color(cc[1]))
+	if "--pad-test" in args:
+		# dev: drive a match with fake controller events and print what happens
+		while club.squad.size() < ClubState.SQUAD_SIZE:
+			club.recruit(0)
+		start_friendly()
+		_pad_test = 0.0
 	if "--quick-friendly" in args:
 		# dev: play a 2x3s friendly with nobody at the controls, then show the summary
 		start_friendly()
@@ -417,6 +431,8 @@ func start_friendly() -> void:
 
 
 func back_to_hub() -> void:
+	paused = false
+	Engine.time_scale = 1.0
 	_enter_hub()
 
 
@@ -653,6 +669,8 @@ func _physics_process(delta: float) -> void:
 			_hub_process(delta)
 		_debug_screenshot(delta)
 		return
+	if _pad_test >= 0.0:
+		_pad_test_tick(delta)
 	match state:
 		"kickoff":
 			state_timer -= delta
@@ -750,6 +768,70 @@ func _debug_screenshot(delta: float) -> void:
 
 # dev helper: `-- --ui-demo --shot=/path.png` fakes a human charging a shot, to screenshot the aim UI
 var _ui_demo := false
+var _pad_test := -1.0
+var _pad_log := {}
+
+
+func _pad_ev(button := -1, pressed := true, axis := -1, value := 0.0) -> void:
+	var e: InputEvent
+	if button >= 0:
+		var b := InputEventJoypadButton.new()
+		b.button_index = button
+		b.pressed = pressed
+		e = b
+	else:
+		var m := InputEventJoypadMotion.new()
+		m.axis = axis
+		m.axis_value = value
+		e = m
+	e.device = 0
+	Input.parse_input_event(e)
+
+
+func _pad_test_tick(delta: float) -> void:
+	var t0 := _pad_test
+	_pad_test += delta
+	var t := _pad_test
+	var at := func(x: float) -> bool: return t0 < x and t >= x
+	if at.call(0.5):
+		_pad_ev(-1, true, JOY_AXIS_LEFT_X, 1.0)
+	if at.call(3.5):
+		print("PADTEST pad_active ", pad_active, " move ", controlled.desired_move if controlled else null, " sprint ", controlled.wants_sprint if controlled else null, " hint ", hint_label.text.left(20))
+		_pad_ev(-1, true, JOY_AXIS_LEFT_X, 0.35)
+	if at.call(4.0):
+		print("PADTEST half tilt sprint ", controlled.wants_sprint)
+		_pad_ev(-1, true, JOY_AXIS_LEFT_X, 0.0)
+		_pad_ev(-1, true, JOY_AXIS_LEFT_Y, -1.0)
+	var fr := Engine.get_process_frames()
+	if t >= 4.5 and not _pad_log.has("passed") and controlled != null and controlled.has_ball() and state == "play":
+		print("PADTEST aim dir ", Util.flat(aim_point - controlled.position).normalized().snapped(Vector3.ONE * 0.01), " has_ball ", controlled.has_ball())
+		_pad_log["passer"] = controlled
+		_pad_ev(JOY_BUTTON_A, true)
+		_pad_ev(JOY_BUTTON_A, false)
+		_pad_log["passed"] = t
+	if _pad_log.has("passed") and not _pad_log.has("checked") and t >= float(_pad_log["passed"]) + 0.3:
+		_pad_log["checked"] = true
+		print("PADTEST 0.3 s after A: passer still has ball ", (_pad_log["passer"] as Player).has_ball(), " ball speed ", snappedf(ball.vel.length(), 0.1))
+	if t >= 14.0 and not _pad_log.has("start1"):
+		_pad_log["start1"] = fr
+		_pad_ev(JOY_BUTTON_START, true)
+		_pad_ev(JOY_BUTTON_START, false)
+	elif _pad_log.has("start1") and not _pad_log.has("start2") and fr >= int(_pad_log["start1"]) + 3:
+		print("PADTEST paused ", paused, " time_scale ", Engine.time_scale, " msg ", msg_label.text)
+		_pad_log["start2"] = fr
+		_pad_ev(JOY_BUTTON_START, true)
+		_pad_ev(JOY_BUTTON_START, false)
+	elif _pad_log.has("start2") and not _pad_log.has("kb") and fr >= int(_pad_log["start2"]) + 3:
+		print("PADTEST resumed ", not paused, " time_scale ", Engine.time_scale)
+		_pad_log["kb"] = fr
+		_pad_ev(-1, true, JOY_AXIS_LEFT_Y, 0.0)
+		var k := InputEventKey.new()
+		k.keycode = KEY_W
+		k.pressed = true
+		Input.parse_input_event(k)
+	elif _pad_log.has("kb") and fr >= int(_pad_log["kb"]) + 3:
+		print("PADTEST keyboard back: pad_active ", pad_active, " hint ", hint_label.text.left(20), " (passed at ", _pad_log.get("passed", "never"), ")")
+		get_tree().quit()
 
 
 func _ui_demo_tick() -> void:
@@ -1050,7 +1132,85 @@ func _restart() -> void:
 
 # ================================================================== human input
 
+func _input(event: InputEvent) -> void:
+	# which device is in charge: a pad as soon as you use it, keyboard/mouse back when you touch those
+	var was := pad_active
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
+		pad_active = true
+		pad_device = event.device
+	elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.5:
+		pad_active = true
+		pad_device = event.device
+	elif event is InputEventKey and (event as InputEventKey).pressed:
+		pad_active = false
+	elif event is InputEventMouseButton or (event is InputEventMouseMotion and (event as InputEventMouseMotion).relative.length() > 3.0):
+		pad_active = false
+	if was != pad_active:
+		_update_hint()
+
+
+func _update_hint() -> void:
+	if hint_label == null:
+		return
+	hint_label.text = ("LS move (sprint by default) · LT walk · A pass · hold B shoot · X tackle · LB switch · RS zoom · Start pause"
+		if pad_active else
+		"WASD move (sprint by default) · Shift walk · LMB pass · hold RMB shoot · Space tackle · Q switch · R restart · Esc quit")
+
+
+## Controller buttons in a match (FIFA-like, Xbox): A pass · B shoot (hold for power) · X tackle ·
+## LB switch · Start pause. After the match: A / Start back to the club.
+func _pad_button(b: InputEventJoypadButton) -> void:
+	if mode == "summary":
+		if b.pressed and b.button_index in [JOY_BUTTON_A, JOY_BUTTON_START]:
+			back_to_hub()
+		return
+	if mode != "match":
+		return
+	if b.pressed and b.button_index == JOY_BUTTON_START:
+		_toggle_pause()
+		return
+	if paused:
+		return
+	var live := (state == "play" or state == "restart") and controlled != null
+	match b.button_index:
+		JOY_BUTTON_A:
+			if b.pressed and live and controlled.has_ball():
+				_human_pass()
+		JOY_BUTTON_B:
+			if b.pressed and live and controlled.has_ball():
+				charging = true
+				charge = 0.0
+			elif not b.pressed and charging:
+				charging = false
+				if live and controlled.has_ball():
+					_human_shoot()
+		JOY_BUTTON_X:
+			if b.pressed and state == "play" and controlled != null and not controlled.has_ball():
+				controlled.start_tackle()
+		JOY_BUTTON_LEFT_SHOULDER:
+			if b.pressed and (state == "play" or state == "restart"):
+				_manual_switch()
+
+
+func _toggle_pause() -> void:
+	paused = not paused
+	Engine.time_scale = 0.0 if paused else 1.0
+	msg_label.text = "PAUSED  (Start to play on)" if paused else ""
+
+
+## Left stick (with a dead zone), in pitch directions: up = away from the camera.
+func _pad_stick() -> Vector2:
+	var v := Vector2(Input.get_joy_axis(pad_device, JOY_AXIS_LEFT_X), Input.get_joy_axis(pad_device, JOY_AXIS_LEFT_Y))
+	var l := v.length()
+	if l < PAD_DEADZONE:
+		return Vector2.ZERO
+	return v / l * minf(1.0, (l - PAD_DEADZONE) / (1.0 - PAD_DEADZONE))
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton:
+		_pad_button(event as InputEventJoypadButton)
+		return
 	if mode == "freecam" and event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_F5:
 		mode = "match"   # dev cheat: back to the match
 		msg_label.text = ""
@@ -1149,11 +1309,20 @@ func _update_human(delta: float) -> void:
 		return
 	switch_cooldown = maxf(0.0, switch_cooldown - delta)
 	manual_lock = maxf(0.0, manual_lock - delta)
+	if pad_active:
+		var rs := Input.get_joy_axis(pad_device, JOY_AXIS_RIGHT_Y)
+		if absf(rs) > 0.3:
+			match_zoom = clampf(match_zoom * (1.0 + rs * delta * 1.2), 0.5, 1.8)
 	q_time += delta
 	_auto_switch()
 	if controlled == null:
 		return
-	aim_point = _mouse_ground_point()
+	var stick := Vector2.ZERO
+	if pad_active:
+		stick = _pad_stick()
+		aim_point = _pad_aim(stick)
+	else:
+		aim_point = _mouse_ground_point()
 	if _ui_demo:
 		_ui_demo_tick()
 
@@ -1166,6 +1335,8 @@ func _update_human(delta: float) -> void:
 		mv.x -= 1.0
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		mv.x += 1.0
+	if stick != Vector2.ZERO:
+		mv = Vector3(stick.x, 0, stick.y)
 
 	if RECEIVE_ASSIST and ball.pass_target == controlled and ball.owner_player == null:
 		# a pass is coming: run to where it was played (like the AI does), your input waits until you have it
@@ -1184,6 +1355,9 @@ func _update_human(delta: float) -> void:
 	if not (RECEIVE_ASSIST and ball.pass_target == controlled and ball.owner_player == null):
 		# sprint is the default; hold Shift to walk (Marcel, 2026-11-07: holding Shift all match hurts)
 		controlled.wants_sprint = not Input.is_key_pressed(KEY_SHIFT)
+		if pad_active:
+			# pad: LT held or the stick only half tilted = walk
+			controlled.wants_sprint = Input.get_joy_axis(pad_device, JOY_AXIS_TRIGGER_LEFT) < 0.5 and stick.length() >= PAD_WALK_TILT
 
 	if charging:
 		charge = minf(charge + delta / 0.9, 1.0)
@@ -1191,6 +1365,19 @@ func _update_human(delta: float) -> void:
 			charging = false
 		else:
 			controlled.face_towards(aim_point - controlled.position)
+
+
+## Pad aiming, FIFA-style: passes go the way the left stick points (or the way you face); a shot
+## goes at the goal, the stick's up/down picks the far or near side.
+func _pad_aim(stick: Vector2) -> Vector3:
+	var p := controlled
+	var dir := Vector3(stick.x, 0, stick.y) if stick != Vector2.ZERO else Util.flat(p.facing)
+	if dir.length() < 0.01:
+		dir = Vector3(p.attack_dir, 0, 0)
+	var shooting := charging and p.role != "GK" and p.restart_kind not in ["corner", "throw-in"]
+	if shooting:
+		return Vector3(HALF_L * p.attack_dir, 0, clampf(stick.y, -1.0, 1.0) * GOAL_W * 0.4)
+	return p.position + dir.normalized() * 18.0
 
 
 func _human_pass() -> void:
@@ -2285,8 +2472,9 @@ func _build_hud() -> void:
 	hs.content_margin_top = 10
 	hs.content_margin_bottom = 10
 	hp.add_theme_stylebox_override("panel", hs)
-	hp.add_child(Kit.label("WASD move (sprint by default) · Shift walk · LMB pass · hold RMB shoot · Space tackle · Q switch · R restart · Esc quit",
-		false, 14, 500, Kit.c("ink")))
+	hint_label = Kit.label("", false, 14, 500, Kit.c("ink"))
+	hp.add_child(hint_label)
+	_update_hint()
 	hud_board.add_child(hp)
 	hp.anchor_top = 1.0
 	hp.anchor_bottom = 1.0

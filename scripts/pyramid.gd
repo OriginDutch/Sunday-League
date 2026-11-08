@@ -88,14 +88,24 @@ static func playoff_seeds(rows: Array, eighteenth, skip: Array) -> Dictionary:
 	return seeds
 
 
+const TIES := ["A", "B", "C", "D", "F"]
+
+
 ## The bracket for a seeding (Marcel's format). Ties: [first-leg home, second-leg home].
+## The higher-placed club hosts the second leg (EFL / KNVB rule; Marcel 2026-11-08). The 18th of the
+## division above counts as the highest (rank 0), then 3rd … 7th.
 static func bracket(seeds: Dictionary) -> Dictionary:
+	var rank := {}
+	for k in seeds:
+		if seeds[k] != null:
+			rank[seeds[k]["name"]] = 0 if k == "18" else int(k)
 	return {
 		"A": {"teams": [seeds.get("7"), seeds.get("4")], "legs": [], "winner": null, "round": 1},
 		"B": {"teams": [seeds.get("6"), seeds.get("5")], "legs": [], "winner": null, "round": 1},
 		"C": {"teams": [null, null], "legs": [], "winner": null, "round": 2, "from": ["A", "B"]},
-		"D": {"teams": [seeds.get("18"), seeds.get("3")], "legs": [], "winner": null, "round": 2},
+		"D": {"teams": [seeds.get("3"), seeds.get("18")], "legs": [], "winner": null, "round": 2},
 		"F": {"teams": [null, null], "legs": [], "winner": null, "round": 3, "from": ["C", "D"]},
+		"rank": rank,
 	}
 
 
@@ -115,6 +125,12 @@ static func advance(br: Dictionary) -> void:
 			t["teams"][0] = br[f[0]]["winner"]
 		if t["teams"][1] == null and br[f[1]]["winner"] != null:
 			t["teams"][1] = br[f[1]]["winner"]
+		# both known, nothing played yet: the lower-placed club hosts the first leg
+		var tm: Array = t["teams"]
+		var rk: Dictionary = br.get("rank", {})
+		if tm[0] != null and tm[1] != null and t["legs"].is_empty():
+			if int(rk.get(tm[0]["name"], 99)) < int(rk.get(tm[1]["name"], 99)):
+				t["teams"] = [tm[1], tm[0]]
 
 
 ## Simulate a whole tie (both legs, extra time, penalties) between two AI clubs.
@@ -156,7 +172,7 @@ static func sim_playoffs(seeds: Dictionary) -> Variant:
 	var br := bracket(seeds)
 	for rnd in [1, 2, 3]:
 		advance(br)
-		for k in br:
+		for k in TIES:
 			var t: Dictionary = br[k]
 			if t["round"] == rnd and t["winner"] == null and t["teams"][0] != null and t["teams"][1] != null:
 				sim_tie(t)

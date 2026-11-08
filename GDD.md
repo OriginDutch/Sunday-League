@@ -65,7 +65,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Per division the lines can be switched off:** the bottom division (Non-League 3) has no relegation and no 18th-place play-off; the top division (Premier Division) has no promotion and no 3rd–7th play-offs. Later: European places as extra lines on the table.
 - Open: play-off format (bracket, one or two legs, home advantage).
 - **Next step chosen (2026-11-08, Marcel let Claude pick between promotion/relegation and a better stand tier): promotion/relegation.** Marcel's answers:
-  - **Play-off format (Marcel, 2026-11-08): three rounds, every tie over two legs.** Built as in Marcel's screenshot: the first-named team hosts the first leg (A: 7th home first; C: winner A home first; D: the 18th home first; final: winner C home first). Open question to Marcel: should the higher seed always host the second leg instead (that changes C and the final when 4th/5th are in it)?
+  - **Play-off format (Marcel, 2026-11-08): three rounds, every tie over two legs. The higher-placed club hosts the second leg** (official EFL/KNVB rule; Marcel, 2026-11-08). **The 18th of the division above counts as the highest** (it's from a higher division), then 3rd, 4th … 7th. So: A 7th home first, B 6th home first, D 3rd home first; in C and the final the lower-placed club starts at home.
     - Round 1: **A = 7th v 4th**, **B = 6th v 5th**.
     - Round 2: **C = winner A v winner B**; **D = 18th (of the division above) v 3rd**.
     - Round 3 (final): **C v D**.

@@ -518,7 +518,7 @@ func on_regular_season_end() -> void:
 
 
 func _your_tie(br: Dictionary, rnd: int) -> String:
-	for k in br:
+	for k in PyramidScript.TIES:
 		var t: Dictionary = br[k]
 		if int(t["round"]) != rnd:
 			continue
@@ -537,7 +537,7 @@ func playoff_fixture() -> Dictionary:
 	for rnd in [1, 2, 3]:
 		PyramidScript.advance(br)
 		var mine := _your_tie(br, rnd)
-		for k in br:
+		for k in PyramidScript.TIES:
 			var t: Dictionary = br[k]
 			if int(t["round"]) == rnd and k != mine and t["winner"] == null and t["teams"][0] != null and t["teams"][1] != null:
 				PyramidScript.sim_tie(t)

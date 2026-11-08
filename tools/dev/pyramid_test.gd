@@ -123,5 +123,28 @@ func _init() -> void:
 		r = c.start_next_season()
 		print("    season %d: %s, finished %d -> %s" % [r["season"], r["outcome"], r["pos"], PyramidScript.NAMES[c.division()]])
 		check(sizes_ok(c), "sizes ok")
+	print("7) home order: the higher-placed club hosts the 2nd leg (18th of the division above counts highest)")
+	var sd := {}
+	for k in ["3", "4", "5", "6", "7", "18"]:
+		sd[k] = {"name": "S" + k, "str": 1.0}
+	var br := PyramidScript.bracket(sd)
+	check(br["A"]["teams"][1]["name"] == "S4" and br["B"]["teams"][1]["name"] == "S5", "A: 4th hosts 2nd leg, B: 5th hosts 2nd leg")
+	check(br["D"]["teams"][0]["name"] == "S3" and br["D"]["teams"][1]["name"] == "S18", "D: 3rd home first, 18th hosts 2nd leg")
+	br["A"]["winner"] = sd["4"]
+	br["B"]["winner"] = sd["6"]
+	br["D"]["winner"] = sd["3"]
+	PyramidScript.advance(br)
+	check(br["C"]["teams"][0]["name"] == "S6" and br["C"]["teams"][1]["name"] == "S4", "C: 6th home first, 4th hosts 2nd leg")
+	br["C"]["winner"] = sd["4"]
+	PyramidScript.advance(br)
+	check(br["F"]["teams"][0]["name"] == "S4" and br["F"]["teams"][1]["name"] == "S3", "final: 4th home first, 3rd hosts 2nd leg")
+	var br2 := PyramidScript.bracket(sd)
+	br2["A"]["winner"] = sd["7"]
+	br2["B"]["winner"] = sd["5"]
+	br2["D"]["winner"] = sd["18"]
+	PyramidScript.advance(br2)
+	br2["C"]["winner"] = sd["7"]
+	PyramidScript.advance(br2)
+	check(br2["C"]["teams"][1]["name"] == "S5" and br2["F"]["teams"][1]["name"] == "S18", "C: 5th hosts 2nd leg over 7th; final: 18th hosts 2nd leg")
 	print("FAILS: %d" % fails)
 	quit(1 if fails else 0)

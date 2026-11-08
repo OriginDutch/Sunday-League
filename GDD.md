@@ -564,6 +564,7 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   - Whatever you touched last is in charge: use the pad and the hint at the bottom switches to the pad buttons; touch the mouse/keyboard and it switches back. Keyboard + mouse work exactly as before.
   - Dev: `--pad-test` plays a match with fake controller input (stick, walk, pass, pause, switching back to the keyboard) and prints the results.
   - Not tested with a real controller (none here) — Marcel tests.
+  - **Marcel tested (2026-11-08): "Controller voelt best goed!!"** Later: more passing options, e.g. **Y = lob pass**.
 
 ### Finances tab + bottom-tier economy (2026-11-08)
 - **Marcel's choices:** this step = the Finances tab **plus** the first real money flows for the bottom division (not the whole pyramid yet). The tab shows **this season's in/out per category, a per-match ledger, cash over time and what's coming up**. The club gets **small running costs** from day one. **Mock-up first**, then build.

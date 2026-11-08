@@ -1055,4 +1055,5 @@ def main():
         game_view(arm, objs)
 
 
-main()
+if __name__ == "__main__":
+    main()

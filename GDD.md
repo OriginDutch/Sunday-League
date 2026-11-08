@@ -71,6 +71,9 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
     - Round 3 (final): **C v D**.
     - The winner goes up (or, if it's the 18th, stays up). **If the 18th loses anywhere, they are relegated.**
   - **Divisions stay as listed for now: 14** (Non-League 3 → 2 → 1, League 10 → 1, Premier Division).
+  - **Level after two legs: extra time + penalties** (Marcel: "C is het devies" — also needed later for cups and European ties). No away goals.
+  - **Play-offs in the first 3 weeks of the 10-week off-season**, one round per week (both legs that week); the off-season is equally long for everyone.
+  - **You play your own play-off matches**; the other play-offs are simulated.
   - **Difficulty: the same in every division for now** (until the player system exists).
   - **Money per division from the economy model's game column** (ticket, spend per visitor, sponsor, prize money, costs).
   - **Promotion requirements now, as simple seat counts** (Claude proposes numbers, Marcel approves).

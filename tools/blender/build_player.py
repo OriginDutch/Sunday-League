@@ -450,6 +450,58 @@ def preview(arm, objs):
             shoot(os.path.join(PREVIEW_DIR, f"_{act}_{f:02d}.png"), (3.0, -0.4, 1.1), (0, -0.1, 0.95))
 
 
+def game_view(arm, objs):
+    """Render jog + sprint from the in-match camera (Godot: target + (0, 25, 21), looking at target - 1 z, fov 48°)."""
+    os.makedirs(PREVIEW_DIR, exist_ok=True)
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 16
+    scene.cycles.device = "CPU"
+    scene.render.resolution_x, scene.render.resolution_y = 960, 540
+    world = bpy.data.worlds.new("W")
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs[0].default_value = (0.6, 0.68, 0.75, 1)
+    world.node_tree.nodes["Background"].inputs[1].default_value = 1.0
+    scene.world = world
+    sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
+    sun.data.energy = 3.5
+    sun.rotation_euler = Euler((math.radians(40), math.radians(15), math.radians(-35)))
+    bpy.context.collection.objects.link(sun)
+    # mown stripes every 5 m so you can see the speed
+    for i in range(-10, 11):
+        me = bpy.data.meshes.new("S")
+        bm = bmesh.new()
+        bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=0.5,
+                              matrix=Matrix.Translation((i * 5.0, 0, 0)) @ Matrix.Diagonal((5.0, 80.0, 1.0, 1.0)))
+        bm.to_mesh(me)
+        g = bpy.data.objects.new("Stripe", me)
+        g.data.materials.append(material("G%d" % (i % 2), (0.16, 0.42, 0.14) if i % 2 else (0.13, 0.36, 0.12), 0.9))
+        bpy.context.collection.objects.link(g)
+    cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
+    cam.data.sensor_fit = "VERTICAL"
+    cam.data.angle = math.radians(48)
+    bpy.context.collection.objects.link(cam)
+    scene.camera = cam
+    for o in objs:
+        if o.name.startswith("Hair_"):
+            o.hide_render = o.name != "Hair_Short"
+        if o.name == "Beard":
+            o.hide_render = True
+    arm.rotation_euler = Euler((0, 0, math.radians(90)))     # run along +X (Godot: along the pitch)
+    for act, n, speed in (("sprint", 12, 8.4), ("jog", 16, 6.0)):
+        arm.animation_data.action = bpy.data.actions[act]
+        frames = n * 2
+        for f in range(frames):
+            scene.frame_set(f % n)
+            x = speed * f / FPS
+            arm.location = (x, 0, 0)
+            target = Vector((x, 0, 0))
+            cam.location = target + Vector((0, -21.0, 25.0))
+            cam.rotation_euler = (target + Vector((0, 1.0, 0)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+            scene.render.filepath = os.path.join(PREVIEW_DIR, f"_g{act}_{f:02d}.png")
+            bpy.ops.render.render(write_still=True)
+
+
 def main():
     reset()
     bpy.context.scene.render.fps = FPS
@@ -465,6 +517,8 @@ def main():
     print("WROTE", OUT_GLB, "objects", len(objs))
     if "--preview" in sys.argv:
         preview(arm, objs)
+    if "--game-view" in sys.argv:
+        game_view(arm, objs)
 
 
 main()

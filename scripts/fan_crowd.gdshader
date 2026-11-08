@@ -135,18 +135,22 @@ void vertex() {
 	if (part == 20) {
 		float ph = seed * 6.2831;
 		float u = v_uv.x;
-		float billow = sin(now * 2.3 + ph) * 0.28 * u * u * (0.6 + 0.4 * sin(v_uv.y * 3.1416));
-		float wave = sin(now * 6.5 - u * 6.0 + v_uv.y * 1.5 + ph) * 0.26 * u
-			+ sin(now * 11.0 - u * 10.0 + v_uv.y * 4.0 + ph * 2.0) * 0.08 * u;
+		float v = v_uv.y;
+		float billow = sin(now * 2.3 + ph) * 0.45 * u * u * (0.5 + 0.5 * sin(v * 3.1416));
+		float wave = sin(now * 6.5 - u * 6.5 + v * 1.8 + ph) * 0.36 * u
+			+ sin(now * 10.5 - u * 11.0 + v * 4.5 + ph * 2.0) * 0.13 * u
+			+ sin(now * 8.0 + v * 7.0 - u * 4.0 + ph * 3.0) * 0.09 * u * u;     // ripples running down the cloth
 		rest += NORMAL * (billow + wave);
-		rest.y -= 0.22 * u * u * (0.7 + 0.3 * v_uv.y);          // the free end sags a little
+		// the free end sags and lifts, and the far corners fold in a bit
+		rest.y -= 0.3 * u * u * (0.75 + 0.25 * v) * (0.65 + 0.35 * sin(now * 3.1 + u * 2.0 + ph));
+		rest.x -= 0.12 * u * u * (0.5 + 0.5 * sin(now * 4.2 + v * 3.0 + ph));
 	}
 	// the flag cloth drags behind the pole: the further from the pole, the older the frame it follows
 	int c0 = row0;
 	int c1 = row1;
 	float cw = w;
 	if (part == 20 && !in_intro) {
-		float fc = mod(f - (v_uv.x * v_uv.x * 6.0 + v_uv.x * 1.5 + v_uv.y * 1.2), float(len));
+		float fc = mod(f - (v_uv.x * v_uv.x * 9.0 + v_uv.x * 1.5 + v_uv.y * 1.6), float(len));
 		c0 = base + int(floor(fc));
 		c1 = base + (int(floor(fc)) + 1) % len;
 		cw = fract(fc);

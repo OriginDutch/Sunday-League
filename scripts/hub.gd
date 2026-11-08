@@ -1131,7 +1131,7 @@ func _cheats() -> void:
 	var wipe := Kit.link("Sure? Click again" if wipe_armed else "New game (wipes the save)", "demolish", false, 40)
 	wipe.pressed.connect(_on_wipe)
 	b.add_child(wipe)
-	b.add_child(Kit.label("In a match: F2 ends it now, F3 goal for you, F4 goal for them, F5 free camera. Anywhere: F8 fps counter, F9 vsync on/off.", false, 13, 500, Kit.c("muted"), true))
+	b.add_child(Kit.label("In a match: F2 ends it now, F3 goal for you, F4 goal for them, F5 free camera. Anywhere: ` (key left of 1) fps counter, Shift+` vsync on/off.", false, 13, 500, Kit.c("muted"), true))
 	Kit.tape(s["root"], Vector2(130, -14), 3, 96, true)
 	_at(s["root"], 500, 146, 360)
 

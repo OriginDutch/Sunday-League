@@ -1134,7 +1134,8 @@ func _restart() -> void:
 
 # ================================================================== human input
 
-# ------------------------------------------------------------------ fps overlay (F8; F9 = vsync on/off)
+# ------------------------------------------------------------------ fps overlay (` key; Shift+` = vsync on/off)
+# (not F8/F9: when the game runs inside the Godot editor, F8 stops the game)
 
 var _fps_layer: CanvasLayer
 var _fps_label: Label
@@ -1187,7 +1188,7 @@ func _fps_tick(delta: float) -> void:
 		for c in grounds.crowds:
 			fans += c.fan_count()
 	var vs := DisplayServer.window_get_vsync_mode() != DisplayServer.VSYNC_DISABLED
-	_fps_label.text = "%d fps  ·  %.1f ms\n%.1f M triangles  ·  %d draw calls\n%d fans  ·  vsync %s (F9)" % [
+	_fps_label.text = "%d fps  ·  %.1f ms\n%.1f M triangles  ·  %d draw calls\n%d fans  ·  vsync %s (Shift+`)" % [
 		fps, 1000.0 / maxf(fps, 1.0), tris / 1000000.0, calls, fans, "on" if vs else "off"]
 
 
@@ -1197,10 +1198,10 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
-		var key := (event as InputEventKey).keycode
-		if key == KEY_F8:
+		var ke := event as InputEventKey
+		if ke.keycode == KEY_QUOTELEFT and not ke.shift_pressed:
 			_toggle_fps()
-		elif key == KEY_F9:
+		elif ke.keycode == KEY_QUOTELEFT and ke.shift_pressed:
 			var on := DisplayServer.window_get_vsync_mode() != DisplayServer.VSYNC_DISABLED
 			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED if on else DisplayServer.VSYNC_ENABLED)
 	# which device is in charge: a pad as soon as you use it, keyboard/mouse back when you touch those

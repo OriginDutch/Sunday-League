@@ -289,6 +289,9 @@ func _ready() -> void:
 	for arg in args:
 		if arg.begins_with("--hub-tab="):
 			hub.tab = arg.trim_prefix("--hub-tab=")   # dev: open the hub on a tab (screenshots)
+			for a2 in args:
+				if a2.begins_with("--stand-cat="):
+					hub.stand_cat = a2.trim_prefix("--stand-cat=")   # dev: Seating / Stands / Fans
 			hub.refresh()
 	if "--settings" in args:
 		hub.settings_open = true   # dev: open the settings modal
@@ -806,11 +809,11 @@ func cheat_view_away() -> String:
 	return t["name"]
 
 
-## Dev cheat (fps test): open bleachers, 7 rows, on every section, finished now.
+## Dev cheat (fps test): the biggest stand (main stand, 15 rows) on every section, finished now.
 func cheat_max_stadium() -> void:
 	club.builds.clear()
 	for sec in Grounds.section_count():
-		club.sections[str(sec)] = {"stage": "bleachers", "rows": ClubState.BLEACHER_ROWS[-1]}
+		club.sections[str(sec)] = {"stage": "main", "rows": ClubState.STAGES["main"]["rows"][-1]}   # the biggest stand there is
 		for k in ClubState.SPOTS_PER_SECTION:
 			club.slots.erase(str(sec * ClubState.SPOTS_PER_SECTION + k))
 	grounds.rebuild_furniture()

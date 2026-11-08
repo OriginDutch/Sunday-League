@@ -684,16 +684,17 @@ func _stadium_tab() -> void:
 			refresh())
 		b.add_child(rb)
 		var sfx := "_rush" if rush else ""
-		var flav := {"bleachers": "Aluminium. Cold in January.", "shed": "A roof! Ticket +25%. Fans stay dry.",
-			"main": "Columns in your view. Ticket +50%.", "rows": "Up we go."}
+		var flav := {"bleachers": "Cold in January.", "shed": "A roof! Ticket +25%.",
+			"main": "Columns. Ticket +50%.", "rows": "Up we go."}
 		var icons := {"bleachers": "stadium", "shed": "stadium", "main": "stadium", "rows": "plus"}
 		for st in ClubState.STAGE_ORDER:
 			var info_st: Dictionary = ClubState.STAGES[st]
 			var steps: Array = info_st["rows"]
-			grid.add_child(_shop_card(st + sfx, info_st["name"], icons[st], "+%d seats · %s rows" % [int(steps[0]) * ClubState.BLEACHER_SEATS_PER_ROW, "/".join(steps.map(func(x): return str(x)))],
-				"%s wk · +%d wk demolition if something's there" % [_wk(club.build_weeks(st + sfx)), int(ClubState.DEMOLITION_WEEKS)], flav[st]))
-		grid.add_child(_shop_card("rows" + sfx, "More rows", icons["rows"], "next row step",
-			"on any stand · price per place of that stand", flav["rows"]))
+			# short texts: a long "adds" line made the card wider than its slot (Marcel 2026-11-09)
+			grid.add_child(_shop_card(st + sfx, info_st["name"], icons[st], "+%d seats" % (int(steps[0]) * ClubState.BLEACHER_SEATS_PER_ROW),
+				"%s wk · rows %s · +%d wk to demolish" % [_wk(club.build_weeks(st + sfx)), "/".join(steps.map(func(x): return str(x))), int(ClubState.DEMOLITION_WEEKS)], flav[st]))
+		grid.add_child(_shop_card("rows" + sfx, "More rows", icons["rows"], "next step",
+			"on any stand · its price per place", flav["rows"]))
 	b.add_child(grid)
 	var info := _hbox(8)
 	info.add_child(Kit.icon("info", 18, Kit.c("pen")))

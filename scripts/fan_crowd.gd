@@ -13,6 +13,8 @@ const WOMEN := 0.15          # Marcel: ~15% women, ~12% children
 const CHILDREN := 0.12
 const HC_STANDING := 0.6     # hard core: share that always stands
 const GLASSES := 0.12
+## Flag routines (Marcel): figure 8s then a circle, alternating; both directions. Consecutive in fans.json.
+const FLAG_CLIPS := ["flag_8x4", "flag_8x4_cw", "flag_8x3", "flag_8x3_cw"]
 const FLAG_GAP := 2.6        # metres between flag wavers (no poles in each other's way, room to swing)
 
 const SKIN := [Color(0.98, 0.84, 0.72), Color(0.94, 0.76, 0.62), Color(0.85, 0.64, 0.48), Color(0.72, 0.52, 0.38),
@@ -94,16 +96,16 @@ func setup(seats: Array, opts: Dictionary) -> void:
 	for c in d["clips"]:
 		rows.append(int(d["clips"][c]["row"]))
 		lens.append(int(d["clips"][c]["frames"]))
-		desync.append(1 if c in ["sit_idle", "stand_idle", "flag_wave", "flag_wave_cw", "scarf_up"] else 0)
-	for k in range(rows.size(), 16):
+		desync.append(1 if c in ["sit_idle", "stand_idle", "scarf_up"] or c in FLAG_CLIPS else 0)
+	for k in range(rows.size(), 24):
 		rows.append(0); lens.append(1); desync.append(0)
 	_mat.set_shader_parameter("clip_row", rows)
 	_mat.set_shader_parameter("clip_len", lens)
 	_mat.set_shader_parameter("clip_desync", desync)
 	_mat.set_shader_parameter("clip_scarf_up", clip["scarf_up"])
 	_mat.set_shader_parameter("clip_scarf_twirl", clip["scarf_twirl"])
-	_mat.set_shader_parameter("clip_flag", clip["flag_wave"])
-	_mat.set_shader_parameter("clip_flag_cw", clip["flag_wave_cw"])
+	_mat.set_shader_parameter("clip_flag_first", clip[FLAG_CLIPS[0]])
+	_mat.set_shader_parameter("clip_flag_last", clip[FLAG_CLIPS[-1]])
 	var club_b: Color = opts.get("club_b", Color(0.95, 0.95, 0.95))
 	_mat.set_shader_parameter("club_a", club_a)
 	_mat.set_shader_parameter("club_b", club_b)
@@ -236,7 +238,7 @@ func _roll(rng: RandomNumberGenerator, seat: Dictionary, temp: String, flag_chan
 	var pal := skin | (hc << 3) | ((rng.randi() % TROUSERS.size()) << 7) | ((rng.randi() % COATS.size()) << 10) | ((rng.randi() % COATS.size()) << 13) | (shirt << 16)
 	var base := "stand_idle" if standing else "sit_idle"
 	if flag:
-		base = "flag_wave" if rng.randf() < 0.5 else "flag_wave_cw"
+		base = FLAG_CLIPS[rng.randi() % FLAG_CLIPS.size()]
 	elif standing and hard:
 		var q := rng.randf()
 		base = "clap_stand" if q < 0.15 else ("scarf_up" if scarf and q < 0.3 else "stand_idle")

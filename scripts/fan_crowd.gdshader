@@ -10,13 +10,13 @@ uniform int bones = 21;
 uniform float now = 0.0;
 uniform float fps = 24.0;
 uniform float seat_height = 0.455;
-uniform int clip_row[16];
-uniform int clip_len[16];
-uniform int clip_desync[16];       // 1 = idle loop: every fan its own phase/speed
+uniform int clip_row[24];
+uniform int clip_len[24];
+uniform int clip_desync[24];       // 1 = idle loop: every fan its own phase/speed
 uniform int clip_scarf_up = 9;
 uniform int clip_scarf_twirl = 10;
-uniform int clip_flag = 11;
-uniform int clip_flag_cw = 12;
+uniform int clip_flag_first = 11;    // the flag clips are consecutive
+uniform int clip_flag_last = 14;
 uniform vec3 club_a : source_color = vec3(0.1, 0.55, 0.25);
 uniform vec3 club_b : source_color = vec3(0.95, 0.95, 0.95);
 uniform vec3 skin_pal[8];
@@ -98,7 +98,7 @@ void vertex() {
 	else if (part == 16) show = has(mask, 10);                           // moustache
 	else if (part == 17) show = has(mask, 2) && cur == clip_scarf_up;
 	else if (part == 18) show = has(mask, 2) && cur == clip_scarf_twirl;
-	else if (part == 19 || part == 20) show = has(mask, 11) && (cur == clip_flag || cur == clip_flag_cw);
+	else if (part == 19 || part == 20) show = has(mask, 11) && cur >= clip_flag_first && cur <= clip_flag_last;
 	else if (part == 4) show = !has(mask, 15);                           // hair under a cap/beanie
 
 	// --- colours

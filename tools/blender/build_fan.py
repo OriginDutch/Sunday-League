@@ -291,20 +291,41 @@ FLAG_POLE = 3.0      # metres of pole above the bottom hand
 FLAG_W, FLAG_H = 1.9, 1.3
 
 
-def flag_dir(ph):
-    """Pole direction (Blender axes) at phase ph, and the direction its tip is moving."""
-    c, r = math.tan(math.radians(FLAG_TILT)), math.tan(math.radians(FLAG_CONE))
-    d = Vector((r * math.sin(ph), -(c + r * math.cos(ph)), 1.0)).normalized()
-    m = Vector((r * math.cos(ph), r * math.sin(ph), 0.0))
-    return d, m
+FLAG_FRAMES = 40     # frames per loop (one figure 8 or one circle)
 
 
-def flag_wave(ph):
+def flag_tip(kind, t):
+    """Tip offset of the pole (tan-space: x sideways, y backwards) and its velocity, for one loop at t in 0..1.
+    Both shapes share the point (A, -c) with velocity (0, -A), so 8s and circles chain without a jump:
+      figure 8: (A sin p, -c + A/2 sin 2p), p from pi/2 round to pi/2 + 2 pi
+      circle:   (A cos q, -c - A sin q),      q from 0 round to 2 pi"""
+    A, c = math.tan(math.radians(FLAG_CONE)), math.tan(math.radians(FLAG_TILT))
+    if kind == "8":
+        p = math.pi / 2 + 2 * math.pi * t
+        return Vector((A * math.sin(p), -c + A / 2 * math.sin(2 * p), 0)), Vector((A * math.cos(p), A * math.cos(2 * p), 0))
+    q = 2 * math.pi * t
+    return Vector((A * math.cos(q), -c - A * math.sin(q), 0)), Vector((-A * math.sin(q), -A * math.cos(q), 0))
+
+
+def flag_sequence(n_eights, mirror=False):
+    """Per frame: (pole direction, tip velocity, sideways amount -1..1) for n figure 8s then one circle."""
+    out = []
+    A = math.tan(math.radians(FLAG_CONE))
+    for kind in ["8"] * n_eights + ["o"]:
+        for f in range(FLAG_FRAMES):
+            h, v = flag_tip(kind, f / FLAG_FRAMES)
+            if mirror:
+                h.x, v.x = -h.x, -v.x
+            out.append(((Vector((h.x, h.y, 1.0))).normalized(), v, h.x / A))
+    return out
+
+
+def flag_wave(side):
     """Classic ultra flag (Marcel's reference): pole near upright, held low with both hands, the tip
-    circling a cone above / in front; the body leans back a bit and twists along."""
-    s, c = math.sin(ph), math.cos(ph)
+    going round above / in front; the body leans back a bit and twists along with the pole."""
+    s = side
     r = stand(arms=False)
-    r["spine"] = (-9 + 2 * c, s * 10, -s * 4)
+    r["spine"] = (-9, s * 10, -s * 4)
     r["chest"] = (-3, s * 6, -s * 2)
     r["head"] = (-14, -s * 6, 0)
     both(r, "thigh", -4, 0, -9)
@@ -312,20 +333,18 @@ def flag_wave(ph):
     return P(r)
 
 
-def flag_timeline(n=40, sign=1):
-    """sign 1 = counter-clockwise (seen from above), -1 = clockwise."""
-    return [(f, flag_wave(sign * 2 * math.pi * f / n)) for f in range(n + 1)]
+def flag_timeline(n_eights, mirror=False):
+    seq = flag_sequence(n_eights, mirror)
+    tl = [(f, flag_wave(side)) for f, (_, _, side) in enumerate(seq)]
+    tl.append((len(seq), flag_wave(seq[0][2])))          # closing key = first
+    return tl, seq
 
 
-def key_flag(arm, frame, ph, sign=1):
-    """The flag bone's rotation for this frame: pole along flag_dir, cloth trailing the motion."""
-    d, m = flag_dir(ph)
-    m = m * sign
+def key_flag(arm, frame, d, m):
+    """The flag bone's rotation for this frame: pole along d, cloth trailing the tip's motion m."""
     t = -(m - d * m.dot(d)).normalized()             # cloth points away from where the tip goes
     side = d.cross(t).normalized()
-    # rest: pole = +Z, cloth = +X (armature space)
-    R_arm = Matrix((t, side, d)).transposed() @ Matrix(((1, 0, 0), (0, 1, 0), (0, 0, 1)))  # columns: X->t, Y->side, Z->d
-    # rest columns are X=(1,0,0), Y=(0,1,0), Z=(0,0,1) so R_arm maps them straight on
+    R_arm = Matrix((t, side, d)).transposed()        # columns: rest X -> t, rest Y -> side, rest Z -> d
     pb = arm.pose.bones["flag"]
     rest = pb.bone.matrix_local.to_3x3()
     local = rest.inverted() @ R_arm @ rest
@@ -397,24 +416,27 @@ CLIPS = [  # name, timeline, loop
     ("fist_pump", loop(14, fist_pump, 2), True),
     ("scarf_up", loop(48, scarf_up, 6), True),
     ("scarf_twirl", loop(16, scarf_twirl, 1), True),
-    ("flag_wave", flag_timeline(40), True),
-    ("flag_wave_cw", flag_timeline(40, -1), True),
+    # Marcel: alternate per waver — figure 8s, then a circle, then 8s again, all chaining smoothly
+    ("flag_8x4", *flag_timeline(4), True),
+    ("flag_8x4_cw", *flag_timeline(4, True), True),
+    ("flag_8x3", *flag_timeline(3), True),
+    ("flag_8x3_cw", *flag_timeline(3, True), True),
     ("despair_sit", loop(48, despair_sit, 6), True),
     ("despair_stand", loop(48, despair_stand, 6), True),
 ]
 SITTING = {"sit_idle", "sit_clap", "despair_sit"}
 
 
-def key_clip(arm, timeline, flag=0):
-    """flag: 0 = no flag, 1 / -1 = flag circling counter-clockwise / clockwise."""
+def key_clip(arm, timeline, flag_seq=None):
+    """flag_seq: per-frame (pole direction, tip velocity, side) for the flag clips."""
     act = bpy.data.actions.new("clip")
     arm.animation_data_create()
     arm.animation_data.action = act
-    n = timeline[-1][0]
     for f, pose in timeline:
         bp.pose_key(arm, f, *pose)
-        if flag:
-            key_flag(arm, f, flag * 2 * math.pi * f / n, flag)
+        if flag_seq:
+            d, m, _ = flag_seq[f % len(flag_seq)]
+            key_flag(arm, f, d, m)
     return act
 
 
@@ -434,9 +456,11 @@ def bake(arm):
     scene = bpy.context.scene
     clips, mats, sit_amount = {}, [], []
     row = 0
-    for name, tl, is_loop in CLIPS:
-        key_clip(arm, tl, flag={"flag_wave": 1, "flag_wave_cw": -1}.get(name, 0))
-        if name.startswith("flag_wave"):
+    for entry in CLIPS:
+        name, tl, is_loop = entry[0], entry[1], entry[-1]
+        seq = entry[2] if len(entry) == 4 else None
+        key_clip(arm, tl, seq)
+        if seq:
             add_flag_ik(arm)
         last = tl[-1][0]
         n = last if is_loop else last + 1        # loops: the last key equals the first, skip it
@@ -452,7 +476,7 @@ def bake(arm):
             else:
                 s = 0.0
             sit_amount.append(round(s, 3))
-        if name.startswith("flag_wave"):
+        if seq:
             remove_ik(arm)
         clips[name] = {"row": row, "frames": n, "loop": is_loop}
         row += n
@@ -640,7 +664,8 @@ def flag_preview():
     p.ring_tube(g0 - up * 0.25, g0 + up * FLAG_POLE, 0.02, 0.016, "FlagPole", 6)
     p.box(g0 + up * (FLAG_POLE - 0.03 - FLAG_H / 2) + out * (FLAG_W / 2 + 0.02), (FLAG_W, 0.01, FLAG_H), "FlagCloth")
     objs.append(p.build(arm))
-    key_clip(arm, flag_timeline(40), flag=1)
+    tl, seq = flag_timeline(4)
+    key_clip(arm, tl, seq)
     add_flag_ik(arm)
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
@@ -668,7 +693,7 @@ def flag_preview():
     for view, pos in views:
         cam.location = pos
         cam.rotation_euler = (look - Vector(pos)).to_track_quat("-Z", "Y").to_euler()
-        for k, f in enumerate((0, 10, 20, 30)):
+        for k, f in enumerate((0, 10, 20, 30, 170, 180, 190)):
             scene.frame_set(f)
             path = f"/tmp/_flag_{view}_{k}.png"
             scene.render.filepath = path

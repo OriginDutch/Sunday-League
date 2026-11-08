@@ -52,43 +52,151 @@ func setup(m: Main, t: int, r: String, home: Vector3, shirt: Color) -> void:
 	_update_facing()
 
 
+const PlayerModel := preload("res://assets/models/player.glb")
+const NUMBER_FONT := preload("res://assets/fonts/WorkSans-Variable.ttf")
+const SHORTS := Color(0.95, 0.95, 0.95)
+const BOOTS := Color(0.08, 0.08, 0.09)
+const GLOVES := Color(0.92, 1.0, 0.45)
+const SKIN_TONES := [Color(0.98, 0.82, 0.68), Color(0.87, 0.67, 0.5), Color(0.6, 0.42, 0.3), Color(0.42, 0.28, 0.2)]
+const HAIR_TONES := [Color(0.15, 0.1, 0.07), Color(0.45, 0.28, 0.12), Color(0.9, 0.75, 0.35), Color(0.8, 0.35, 0.12), Color(0.2, 0.2, 0.22)]
+const HAIR_STYLES := ["Hair_Short", "Hair_Buzz", "Hair_Quiff", "Hair_Long"]
+const LOOPS := ["idle", "jog", "sprint", "celebrate"]
+## Speed (m/s) at which the jog / sprint cycles match the feet to the ground.
+const JOG_NATURAL := 6.0
+const SPRINT_NATURAL := 8.4
+const ANIM_BLEND := 0.15
+
+static var _mat_cache := {}      # "Shirt|color" -> material shared by everyone with that colour
+
+var anim: AnimationPlayer
+var anim_now := ""
+var oneshot_timer := 0.0         # > 0 while a one-shot (kick, slide, dive, catch, celebrate) owns the body
+var shirt_number := 0
+
+
 func _build_visual(shirt: Color) -> void:
 	visual = Node3D.new()
 	add_child(visual)
-	body = Node3D.new()
+	body = Node3D.new()            # stun wobble on top of the animation
 	visual.add_child(body)
+	var model: Node3D = PlayerModel.instantiate()
+	body.add_child(model)
+	anim = model.get_node("AnimationPlayer")
+	for a in LOOPS:
+		anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+	var skin: Color = SKIN_TONES[randi() % SKIN_TONES.size()]
+	var hair: Color = HAIR_TONES[randi() % HAIR_TONES.size()]
+	var style: String = HAIR_STYLES[randi() % HAIR_STYLES.size()]
+	var beard := randf() < 0.3
+	var colours := {"Shirt": shirt, "Shorts": SHORTS, "Socks": shirt, "Boots": BOOTS, "Skin": skin, "Hair": hair}
+	var skel: Skeleton3D = model.get_node("PlayerRig/Skeleton3D")
+	for mi in skel.get_children():
+		if not mi is MeshInstance3D:
+			continue
+		var m: MeshInstance3D = mi
+		if m.name.begins_with("Hair_"):
+			m.visible = m.name == style
+		elif m.name == "Beard":
+			m.visible = beard
+		var gloves := role == "GK" and m.name.begins_with("Hand_")
+		for i in m.mesh.get_surface_count():
+			var base: Material = m.mesh.surface_get_material(i)
+			var key: String = base.resource_name
+			if gloves and key == "Skin":
+				m.set_surface_override_material(i, _kit_mat(base, "Gloves", GLOVES))
+			elif colours.has(key):
+				m.set_surface_override_material(i, _kit_mat(base, key, colours[key]))
+	_add_number(skel, shirt)
+	_play("idle")
 
-	var skin_tones := [Color(0.98, 0.82, 0.68), Color(0.87, 0.67, 0.5), Color(0.6, 0.42, 0.3), Color(0.42, 0.28, 0.2)]
-	var hair_tones := [Color(0.15, 0.1, 0.07), Color(0.45, 0.28, 0.12), Color(0.9, 0.75, 0.35), Color(0.8, 0.35, 0.12), Color(0.2, 0.2, 0.22)]
-	var skin: Color = skin_tones[randi() % skin_tones.size()]
-	var hair: Color = hair_tones[randi() % hair_tones.size()]
 
-	# legs + shorts + shirt (chunky toy style)
-	Util.cylinder(body, 0.09, 0.09, 0.5, Vector3(-0.13, 0.25, 0), skin, 8)
-	Util.cylinder(body, 0.09, 0.09, 0.5, Vector3(0.13, 0.25, 0), skin, 8)
-	Util.cylinder(body, 0.26, 0.28, 0.25, Vector3(0, 0.6, 0), Color(0.95, 0.95, 0.95))
-	var torso := MeshInstance3D.new()
-	var cap := CapsuleMesh.new()
-	cap.radius = 0.3
-	cap.height = 0.85
-	cap.radial_segments = 12
-	cap.rings = 4
-	torso.mesh = cap
-	torso.material_override = Util.mat(shirt)
-	torso.position = Vector3(0, 1.0, 0)
-	body.add_child(torso)
-	# arms
-	Util.cylinder(body, 0.08, 0.08, 0.5, Vector3(-0.36, 1.0, 0), shirt, 8)
-	Util.cylinder(body, 0.08, 0.08, 0.5, Vector3(0.36, 1.0, 0), shirt, 8)
-	# head, hair, eyes (+Z is "forward" in local space)
-	Util.sphere(body, 0.24, Vector3(0, 1.62, 0), skin)
-	var h := Util.sphere(body, 0.22, Vector3(0, 1.74, -0.03), hair)
-	h.scale = Vector3(1.05, 0.6, 1.05)
-	Util.sphere(body, 0.035, Vector3(-0.08, 1.65, 0.21), Color(0.05, 0.05, 0.05))
-	Util.sphere(body, 0.035, Vector3(0.08, 1.65, 0.21), Color(0.05, 0.05, 0.05))
-	if role == "GK":
-		Util.sphere(body, 0.1, Vector3(-0.36, 0.72, 0), Color(0.9, 1.0, 0.4))
-		Util.sphere(body, 0.1, Vector3(0.36, 0.72, 0), Color(0.9, 1.0, 0.4))
+func _kit_mat(base: Material, key: String, c: Color) -> Material:
+	var k := "%s|%s" % [key, c.to_html()]
+	if not _mat_cache.has(k):
+		var m: StandardMaterial3D = base.duplicate()
+		m.albedo_color = c
+		_mat_cache[k] = m
+	return _mat_cache[k]
+
+
+## Shirt number on the back, riding the chest bone. Set by Main after spawning (set_number).
+var _number_label: Label3D
+
+
+func _add_number(skel: Skeleton3D, shirt: Color) -> void:
+	var bone := skel.find_bone("chest")
+	var att := BoneAttachment3D.new()
+	att.bone_name = "chest"
+	skel.add_child(att)
+	_number_label = Label3D.new()
+	var bold := FontVariation.new()
+	bold.base_font = NUMBER_FONT
+	bold.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 800}
+	_number_label.font = bold
+	_number_label.font_size = 96
+	_number_label.outline_size = 8
+	_number_label.pixel_size = 0.0027
+	var lum := shirt.get_luminance()
+	_number_label.modulate = Color(0.08, 0.08, 0.08) if lum > 0.55 else Color(1, 1, 1)
+	_number_label.outline_modulate = Color(1, 1, 1, 0.0) if lum > 0.55 else Color(0, 0, 0, 0.35)
+	_number_label.double_sided = false
+	_number_label.shaded = true
+	# on the back of the chest (model faces +Z, so the back is -Z), facing backwards
+	var want := Transform3D(Basis(Vector3.UP, PI), Vector3(0, 1.31, -0.163))
+	_number_label.transform = skel.get_bone_global_rest(bone).affine_inverse() * want
+	att.add_child(_number_label)
+
+
+func set_number(n: int) -> void:
+	shirt_number = n
+	if _number_label:
+		_number_label.text = str(n)
+
+
+func _play(clip: String, blend := ANIM_BLEND, speed := 1.0) -> void:
+	if anim_now != clip:
+		anim.play(clip, blend)
+		anim_now = clip
+	anim.speed_scale = speed
+
+
+## One-shot body action; the locomotion picks up again after `hold` seconds (default: the clip length).
+func play_once(clip: String, speed := 1.0, hold := -1.0) -> void:
+	if anim == null:
+		return
+	anim_now = ""
+	_play(clip, 0.08, speed)
+	anim.seek(0.0, true)
+	oneshot_timer = hold if hold > 0.0 else anim.get_animation(clip).length / speed
+
+
+func celebrate(seconds: float) -> void:
+	play_once("celebrate", randf_range(0.9, 1.15), seconds)
+
+
+func _process(delta: float) -> void:
+	if anim == null or main == null:
+		return
+	if oneshot_timer > 0.0:
+		oneshot_timer -= delta
+		return
+	if role == "GK" and has_ball():
+		if anim_now != "catch":
+			play_once("catch")
+		return
+	var spd := Util.flat(vel).length()
+	if role == "GK" and wants_sprint and spd > 5.0 and main.ball.owner_player == null:
+		var right := Vector3(-facing.z, 0, facing.x)     # facing +Z -> right is -X
+		var side := vel.dot(right)
+		if absf(side) > 4.0:
+			play_once("dive_right" if side > 0.0 else "dive_left", 1.15)
+			return
+	if spd < 0.7:
+		_play("idle")
+	elif wants_sprint and spd > SPEED + 0.3:
+		_play("sprint", ANIM_BLEND, clampf(spd / SPRINT_NATURAL, 0.6, 1.4))
+	else:
+		_play("jog", ANIM_BLEND, clampf(spd / JOG_NATURAL, 0.45, 1.4))
 
 
 # ------------------------------------------------------------------ movement
@@ -158,12 +266,8 @@ func _update_facing() -> void:
 
 
 func _animate(delta: float) -> void:
-	var spd := vel.length()
-	bob_t += delta * (4.0 + spd * 1.6)
-	body.position.y = absf(sin(bob_t)) * minf(spd, 6.0) * 0.018
-	var lean := 0.5 if tackle_timer > 0.0 else spd * 0.025
-	body.rotation.x = lean
-	body.rotation.z = sin(bob_t * 3.0) * 0.15 if stun > 0.0 else 0.0
+	bob_t += delta * 14.0
+	body.rotation.z = sin(bob_t) * 0.12 if stun > 0.0 else 0.0
 
 
 # ------------------------------------------------------------------ actions
@@ -214,6 +318,7 @@ func pass_to(receiver: Player) -> void:
 		return
 	var to := Util.flat(best_target - position)
 	face_towards(to)
+	play_once("pass", 1.2)
 	main.ball.kick(to.normalized() * best_v + Vector3.UP * 0.4, self, receiver)
 	main.ball.pass_meet = best_target
 
@@ -231,6 +336,7 @@ func _lob_to(receiver: Player, run: Vector3) -> void:
 	var vh := to.length() / t * (1.0 + Ball.AIR_DRAG * t * 0.5)   # compensate air drag
 	var vy := 0.5 * Ball.GRAVITY * t + (Ball.RADIUS - Ball.RADIUS) / t
 	face_towards(to)
+	play_once("shoot", 1.1)
 	main.ball.kick(to.normalized() * vh + Vector3.UP * vy, self, receiver)
 	main.ball.pass_meet = target
 	main.ball.pass_lob = true
@@ -241,6 +347,7 @@ func pass_towards(point: Vector3) -> void:
 	# arrive at the point at roughly the comfortable speed
 	var spd := clampf(sqrt(PASS_ARRIVAL_SPEED * PASS_ARRIVAL_SPEED + 2.0 * (Ball.ROLL_DECEL + Ball.ROLL_DRAG * 10.0) * to.length()), 8.0, MAX_PASS_SPEED)
 	face_towards(to)
+	play_once("pass", 1.2)
 	main.ball.kick(to.normalized() * spd + Vector3.UP * 0.4, self, null)
 
 
@@ -258,6 +365,7 @@ func shoot_at(target: Vector3, power: float, height: float, error_scale: float =
 	var vy := (height - Ball.RADIUS + 0.5 * Ball.GRAVITY * t * t) / t
 	vy = minf(vy, 11.0)
 	face_towards(dir)
+	play_once("shoot", 1.15)
 	main.ball.kick(dir * spd + Vector3.UP * vy, self, null)
 
 
@@ -266,6 +374,7 @@ func long_kick(target: Vector3, power: float) -> void:
 	var to := Util.flat(target - position)
 	var spd := lerpf(11.0, 22.0, power)
 	face_towards(to)
+	play_once("shoot", 1.0)
 	main.ball.kick(to.normalized() * spd + Vector3.UP * lerpf(4.0, 8.0, power), self, null)
 
 
@@ -277,6 +386,7 @@ func start_tackle() -> void:
 		vel = to.normalized() * (Main.HUMAN_TACKLE_LUNGE if is_human else Main.AI_TACKLE_LUNGE)
 		face_towards(to)
 	tackle_timer = 0.35
+	play_once("slide", 1.35)
 
 
 # ------------------------------------------------------------------ AI

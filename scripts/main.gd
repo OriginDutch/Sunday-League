@@ -691,14 +691,21 @@ func _physics_process(delta: float) -> void:
 
 
 # dev helper: `-- --autoplay --shot=/path/shot.png` saves a screenshot after a few seconds and quits
+# (`--shot-after=S` waits S seconds, `--zoom=Z` forces the match zoom, e.g. 0.35 for a close look)
 var _shot_timer := 0.0
 
 
 func _debug_screenshot(delta: float) -> void:
+	var wait := 4.0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--shot-after="):
+			wait = float(arg.substr(13))
+		elif arg.begins_with("--zoom="):
+			match_zoom = float(arg.substr(7))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--shot="):
 			_shot_timer += delta
-			if _shot_timer > 4.0:
+			if _shot_timer > wait:
 				var img := get_viewport().get_texture().get_image()
 				img.save_png(arg.substr(7))
 				get_tree().quit()
@@ -965,6 +972,9 @@ func _goal(scoring_team: int) -> void:
 		msg_label.text = "GOAL!\n%s" % scorer.display_name
 	if grounds != null:
 		_crowd("goal_for" if scoring_team == 0 else "goal_against")
+	for p in players:
+		if p.team == scoring_team:
+			p.celebrate(state_timer)
 	print("[%s] GOAL team %d  -> %d - %d" % [_clock_text(), scoring_team, score[0], score[1]])
 
 
@@ -1732,6 +1742,9 @@ func _spawn_teams() -> void:
 			players.append(p)
 		for p in list:
 			p.speed_mult = 1.0 if t == 0 else opp_strength
+	for list in [home, away]:
+		for i in list.size():
+			list[i].set_number(i + 1)    # keeper 1, then the 4-3-3 in formation order
 	for i in home.size():
 		if club != null and i < club.squad.size():
 			home[i].display_name = club.squad[i]["name"]

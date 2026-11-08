@@ -307,14 +307,16 @@ def body(arm):
 
 # ------------------------------------------------------------------ animations (rotation keys per bone, degrees)
 
-def pose_key(arm, frame, rots, hips_z=0.0, hips_y=0.0):
+def pose_key(arm, frame, rots, up=0.0, fwd=0.0, side=0.0):
+    """rots: bone -> (x, y, z) degrees. up/fwd/side: hips offset in metres (side + = the player's left, Blender +X).
+    The hips bone points up, so its local axes are X = +X, Y = up, Z = forward (-Y)."""
     for name, pb in arm.pose.bones.items():
         pb.rotation_mode = "XYZ"
         r = rots.get(name, (0, 0, 0))
         pb.rotation_euler = Euler([math.radians(a) for a in r])
         pb.keyframe_insert("rotation_euler", frame=frame)
     hb = arm.pose.bones["hips"]
-    hb.location = (0, hips_y, hips_z)
+    hb.location = (side, up, fwd)
     hb.keyframe_insert("location", frame=frame)
 
 
@@ -323,12 +325,12 @@ def make_action(arm, name, frames, keyfn, cyclic=True):
     arm.animation_data_create()
     arm.animation_data.action = act
     for f in frames:
-        rots, hz, hy = keyfn(f)
-        pose_key(arm, f, rots, hz, hy)
+        k = keyfn(f)
+        rots, offs = k[0], k[1:]
+        pose_key(arm, f, rots, *offs)
     if cyclic:
         for fc in getattr(act, "fcurves", []):
             fc.modifiers.new("CYCLES")
-    # keep the action for export
     act.use_fake_user = True
     track = arm.animation_data.nla_tracks.new()
     track.name = name
@@ -359,7 +361,7 @@ def run_cycle(n, thigh_amp, knee_amp, arm_amp, elbow, lean, bob):
             rots[f"foot.{side}"] = (-knee * 0.25, 0, 0)
             rots[f"upperarm.{side}"] = (ls * arm_amp, 0, sg * 6)
             rots[f"forearm.{side}"] = (-elbow, 0, 0)
-        return rots, abs(math.cos(ph)) * bob - bob * 0.5, 0.0
+        return rots, abs(math.cos(ph)) * bob - bob * 0.5
     return key
 
 
@@ -373,14 +375,200 @@ def idle_cycle(n):
             rots[f"forearm.{side}"] = (-14, 0, 0)
             rots[f"thigh.{side}"] = (-2, 0, sg * -3)
             rots[f"shin.{side}"] = (4, 0, 0)
-        return rots, b * 0.006, 0.0
+        return rots, b * 0.006
     return key
+
+
+# One-shot actions are keyed as poses on a timeline: [(frame, pose)], pose = (rots, up, fwd, side).
+# Conventions (checked in renders): spine/chest/head/hips +X bends forward; limbs -X swing forward;
+# arms: Z = +sg * a lifts the arm sideways (sg = +1 left, -1 right); hips +Z tilts towards the player's right.
+
+def keyed(timeline):
+    def key(f):
+        for fr, pose in timeline:
+            if fr == f:
+                return pose
+        raise KeyError(f)
+    return key, [fr for fr, _ in timeline]
+
+
+def P(rots, up=0.0, fwd=0.0, side=0.0):
+    return (rots, up, fwd, side)
+
+
+def both(rots, bone, x=0.0, y=0.0, z=0.0, mirror_z=True):
+    """Same rotation on .L and .R (Z mirrored so 'outwards' stays outwards)."""
+    rots[f"{bone}.L"] = (x, y, z)
+    rots[f"{bone}.R"] = (x, -y if mirror_z else y, -z if mirror_z else z)
+    return rots
+
+
+def stand():
+    r = {"spine": (2, 0, 0)}
+    both(r, "upperarm", 2, 0, 8)
+    both(r, "forearm", -14)
+    both(r, "thigh", -2, 0, -3)
+    both(r, "shin", 4)
+    return r
+
+
+def kick_timeline(power):
+    """Right-foot strike. power 1 = shot, ~0.55 = pass (side-foot: the leg turns out)."""
+    a = power
+    turn = (1.0 - a) * 40.0            # side-foot: thigh turned outwards
+    def pose(thR, shR, lean, armout, plant_th, plant_sh, twist):
+        r = {"spine": (lean, twist, 0), "chest": (lean * 0.5, twist, 0), "head": (-lean * 0.6, -twist, 0)}
+        r["thigh.R"] = (thR, -turn, 0)
+        r["shin.R"] = (shR, 0, 0)
+        r["foot.R"] = (-10, 0, 0)
+        r["thigh.L"] = (plant_th, 0, -4)
+        r["shin.L"] = (plant_sh, 0, 0)
+        r["foot.L"] = (-plant_sh * 0.4, 0, 0)
+        r["upperarm.L"] = (-25 * a, 0, armout)          # left arm out for balance
+        r["upperarm.R"] = (30 * a, 0, -armout * 0.6)
+        both(r, "forearm", -35)
+        return r
+    tl = [
+        (0, P(pose(45 * a, 100 * a, 4, 35 * a, -18, 28, 12 * a), -0.04)),          # wound up (no slow back-swing: the ball goes now)
+        (3, P(pose(-35 * a, 25, -4, 55 * a, -12, 22, -4 * a), -0.05)),             # contact
+        (6, P(pose(-80 * a, 12, -10 * a, 60 * a, -6, 14, -14 * a), -0.03)),         # follow-through
+        (10, P(pose(-30 * a, 30, -2, 30 * a, -4, 10, -5 * a), -0.01)),
+        (14, P(stand())),
+    ]
+    return tl
+
+
+def slide_timeline():
+    def lying(depth):
+        r = {"hips": (-50 * depth, 0, 8 * depth), "spine": (10 * depth, 0, 0), "chest": (12 * depth, 0, 0), "head": (20 * depth, 0, 0)}
+        r["thigh.L"] = (-40 * depth, 0, -4)          # lead leg straight out at the ball
+        r["shin.L"] = (4, 0, 0)
+        r["foot.L"] = (-15 * depth, 0, 0)
+        r["thigh.R"] = (10 * depth, 0, 0)            # trailing leg tucked under
+        r["shin.R"] = (110 * depth, 0, 0)
+        r["upperarm.R"] = (40 * depth, 0, -35 * depth)   # right hand down behind for support
+        r["forearm.R"] = (-10, 0, 0)
+        r["upperarm.L"] = (-40 * depth, 0, 45 * depth)
+        r["forearm.L"] = (-40, 0, 0)
+        return r
+    return [
+        (0, P(lying(0.35), -0.15)),
+        (4, P(lying(1.0), -0.62)),
+        (12, P(lying(1.0), -0.66)),
+        (17, P(lying(0.55), -0.35)),
+        (22, P(stand())),
+    ]
+
+
+def celebrate_cycle(n):
+    def key(f):
+        ph = 2 * math.pi * f / n
+        s = math.sin(ph)
+        jump = max(0.0, s)
+        r = {"spine": (-6, 0, 0), "chest": (-8, 0, 0), "head": (-14, 0, 0)}
+        both(r, "upperarm", -150 - 20 * s, 0, 25)     # both fists up, pumping
+        both(r, "forearm", -40 - 30 * s)
+        both(r, "thigh", -10 * jump, 0, -4)
+        both(r, "shin", 22 * jump + 6)
+        both(r, "foot", 20 * jump)
+        return r, jump * 0.22
+    return key
+
+
+def dive_timeline(d):
+    """Keeper dive; d = +1 to the keeper's left (+X), -1 to his right."""
+    L, R = ("L", "R") if d > 0 else ("R", "L")      # L = the arm/leg on the diving side
+    def pose(tilt, reach, crouch):
+        r = {"hips": (0, 0, -d * tilt), "spine": (crouch * 10, 0, -d * tilt * 0.15), "head": (0, 0, d * tilt * 0.25)}
+        r[f"upperarm.{L}"] = (-30 - 140 * reach, 0, (1 if L == "L" else -1) * 20 * reach)
+        r[f"upperarm.{R}"] = (-30 - 130 * reach, 0, (1 if R == "L" else -1) * 10 * reach)
+        both(r, "forearm", -40 + 30 * reach)
+        r[f"thigh.{L}"] = (-30 * crouch, 0, 0)
+        r[f"shin.{L}"] = (60 * crouch, 0, 0)
+        r[f"thigh.{R}"] = (-20 * crouch, 0, -(1 if R == "L" else -1) * 25 * reach)   # trailing leg kicks out
+        r[f"shin.{R}"] = (20 + 40 * crouch, 0, 0)
+        return r
+    return [
+        # small sideways offsets only: in the game the keeper's node itself flies across the goal
+        (0, P(pose(10, 0.0, 1.0), -0.22, 0, d * 0.05)),
+        (4, P(pose(55, 0.9, 0.4), -0.25, 0, d * 0.3)),
+        (9, P(pose(85, 1.0, 0.2), -0.7, 0, d * 0.45)),
+        (18, P(pose(90, 0.7, 0.3), -0.78, 0, d * 0.5)),
+        (26, P(pose(40, 0.2, 0.8), -0.45, 0, d * 0.4)),
+        (32, P(stand(), 0, 0, d * 0.3)),
+    ]
+
+
+def catch_timeline():
+    def pose(reach, crouch):
+        r = {"spine": (10 + 8 * crouch, 0, 0), "chest": (6, 0, 0), "head": (-6, 0, 0)}
+        both(r, "upperarm", -40 - 30 * reach, 0, 4)
+        both(r, "forearm", -110 + 60 * reach)
+        both(r, "thigh", -30 * crouch, 0, -6)
+        both(r, "shin", 55 * crouch)
+        both(r, "foot", -15 * crouch)
+        return r
+    return [
+        (0, P(pose(1.0, 0.6), -0.12)),
+        (4, P(pose(0.7, 0.8), -0.18)),
+        (9, P(pose(0.0, 0.4), -0.08)),     # ball tucked into the chest
+        (16, P(pose(0.0, 0.0))),
+    ]
 
 
 def animations(arm):
     make_action(arm, "idle", list(range(0, 49, 6)), idle_cycle(48))
     make_action(arm, "jog", list(range(0, 17, 2)), run_cycle(16, 28, 55, 24, 75, 6, 0.035))
     make_action(arm, "sprint", list(range(0, 13, 1)), run_cycle(12, 48, 95, 50, 85, 14, 0.06))
+    make_action(arm, "celebrate", list(range(0, 21, 2)), celebrate_cycle(20))
+    for name, tl in (("shoot", kick_timeline(1.0)), ("pass", kick_timeline(0.55)), ("slide", slide_timeline()),
+                     ("dive_left", dive_timeline(1)), ("dive_right", dive_timeline(-1)), ("catch", catch_timeline())):
+        key, frames = keyed(tl)
+        make_action(arm, name, frames, key, cyclic=False)
+
+
+def poses_sheet(arm, objs):
+    """Quick check of every new action: a few frames each, front-left 3/4 view, contact sheet."""
+    os.makedirs(PREVIEW_DIR, exist_ok=True)
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 8
+    scene.cycles.device = "CPU"
+    scene.render.resolution_x, scene.render.resolution_y = 260, 300
+    world = bpy.data.worlds.new("W")
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs[0].default_value = (0.55, 0.62, 0.55, 1)
+    scene.world = world
+    sun = bpy.data.objects.new("Sun", bpy.data.lights.new("Sun", "SUN"))
+    sun.data.energy = 3.0
+    sun.rotation_euler = Euler((math.radians(50), math.radians(10), math.radians(-30)))
+    bpy.context.collection.objects.link(sun)
+    me = bpy.data.meshes.new("G")
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=6)
+    bm.to_mesh(me)
+    g = bpy.data.objects.new("Ground", me)
+    g.data.materials.append(material("Grass", (0.12, 0.35, 0.12), 0.9))
+    bpy.context.collection.objects.link(g)
+    cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
+    cam.data.lens = 35
+    bpy.context.collection.objects.link(cam)
+    scene.camera = cam
+    for o in objs:
+        if o.name.startswith("Hair_"):
+            o.hide_render = o.name != "Hair_Short"
+        if o.name == "Beard":
+            o.hide_render = True
+    cam.location = (2.6, -3.6, 1.6)
+    cam.rotation_euler = (Vector((0.2, 0, 0.7)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+    for act, frames in (("shoot", [0, 3, 6, 10]), ("pass", [0, 3, 6, 10]), ("slide", [0, 4, 12, 17]),
+                        ("celebrate", [0, 5, 10, 15]), ("dive_left", [0, 4, 9, 26]), ("dive_right", [0, 4, 9, 26]),
+                        ("catch", [0, 4, 9, 16])):
+        arm.animation_data.action = bpy.data.actions[act]
+        for i, f in enumerate(frames):
+            scene.frame_set(f)
+            scene.render.filepath = os.path.join(PREVIEW_DIR, f"_pose_{act}_{i}.png")
+            bpy.ops.render.render(write_still=True)
 
 
 # ------------------------------------------------------------------ preview renders
@@ -517,6 +705,8 @@ def main():
     print("WROTE", OUT_GLB, "objects", len(objs))
     if "--preview" in sys.argv:
         preview(arm, objs)
+    if "--poses" in sys.argv:
+        poses_sheet(arm, objs)
     if "--game-view" in sys.argv:
         game_view(arm, objs)
 

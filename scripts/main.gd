@@ -2,6 +2,7 @@ class_name Main
 extends Node3D
 const LeagueScript = preload("res://scripts/league.gd")
 const Kit = preload("res://scripts/ui_kit.gd")
+const SettingsScript = preload("res://scripts/settings.gd")
 ## Football PoC — builds the pitch, spawns teams, handles input, possession, match flow and HUD.
 ## 11v11 on a full-size pitch: two halves (switching sides), throw-ins, corners, goal kicks, offside.
 
@@ -175,6 +176,8 @@ func _ready() -> void:
 		light_mode = "old"
 	elif "--new-light" in args:
 		light_mode = "new"
+	SettingsScript.load_all()
+	Kit.dark = SettingsScript.dark
 	_build_environment()
 	_build_pitch()
 	_build_goals()
@@ -187,8 +190,11 @@ func _ready() -> void:
 	_build_indicators()
 	name_label = Label3D.new()
 	name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	name_label.font = Kit.font(false, 700)   # noticeboard style: ink on a paper-coloured outline
+	name_label.modulate = Kit.c("ink")
+	name_label.outline_modulate = Kit.c("paper")
 	name_label.font_size = 64
-	name_label.outline_size = 12
+	name_label.outline_size = 22
 	name_label.pixel_size = 0.01
 	name_label.no_depth_test = true
 	name_label.visible = false
@@ -218,6 +224,11 @@ func _ready() -> void:
 		if "--shot-test" in args:
 			_shot_test_begin()
 	else:
+		var dev_hub: bool = Array(args).any(func(a: String) -> bool:
+			return a.begins_with("--hub") or a.begins_with("--away-view") or a.begins_with("--sim-rounds") \
+				or a in ["--table", "--cheats", "--fill-test", "--shed", "--bigstand"])
+		if not dev_hub and "--menu-skip" not in args:
+			hub.screen = "menu"   # the game starts on the main menu (GDD §10e)
 		_enter_hub()
 	for arg in args:
 		if arg.begins_with("--fast="):
@@ -246,6 +257,16 @@ func _ready() -> void:
 		if arg.begins_with("--hub-tab="):
 			hub.tab = arg.trim_prefix("--hub-tab=")   # dev: open the hub on a tab (screenshots)
 			hub.refresh()
+	if "--settings" in args:
+		hub.settings_open = true   # dev: open the settings modal
+		hub.refresh()
+	for arg in args:
+		if arg.begins_with("--preview="):
+			# dev: show the build preview card, e.g. --preview=bleachers,3
+			var pv := arg.trim_prefix("--preview=").split(",")
+			placing_item = pv[0]
+			hub.refresh()
+			hub.update_preview(pv[0], int(pv[1]), get_viewport().get_visible_rect().size * Vector2(0.55, 0.45))
 	if "--table" in args:
 		hub.table_open = true   # dev: open the full league table
 		hub.refresh()
@@ -355,7 +376,7 @@ func start_friendly() -> void:
 	ball.visible = true
 	score = [0, 0]
 	half = 1
-	time_left = HALF_SECONDS
+	time_left = SettingsScript.half_seconds()
 	for k in stats:
 		stats[k] = [0, 0]
 	if match_home:
@@ -440,6 +461,7 @@ func _cancel_placing() -> void:
 	placing_item = ""
 	hover_slot = -1
 	grounds.show_markers(false)
+	hub.update_preview("", -1, Vector2.ZERO)
 	hub.refresh()
 
 
@@ -491,13 +513,13 @@ func _hub_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		pan.x += 1.0
 	if pan != Vector3.ZERO:
-		hub_focus += pan.normalized().rotated(Vector3.UP, hub_yaw) * 30.0 * maxf(hub_zoom, 0.3) * delta
+		hub_focus += pan.normalized().rotated(Vector3.UP, hub_yaw) * 30.0 * maxf(hub_zoom, 0.3) * delta * SettingsScript.camera_mult()
 		hub_focus.x = clampf(hub_focus.x, -HALF_L - HUB_PAN_LIMIT, HALF_L + HUB_PAN_LIMIT)
 		hub_focus.z = clampf(hub_focus.z, -HALF_W - HUB_PAN_LIMIT, HALF_W + HUB_PAN_LIMIT)
 	if Input.is_key_pressed(KEY_Q):
-		hub_yaw += HUB_ROTATE_SPEED * delta
+		hub_yaw += HUB_ROTATE_SPEED * delta * SettingsScript.camera_mult()
 	if Input.is_key_pressed(KEY_E):
-		hub_yaw -= HUB_ROTATE_SPEED * delta
+		hub_yaw -= HUB_ROTATE_SPEED * delta * SettingsScript.camera_mult()
 	if Input.is_key_pressed(KEY_R):
 		hub_pitch = clampf(hub_pitch + HUB_TILT_SPEED * delta, HUB_PITCH_MIN, HUB_PITCH_MAX)
 	if Input.is_key_pressed(KEY_F):
@@ -508,6 +530,10 @@ func _hub_process(delta: float) -> void:
 	var p := _mouse_ground_point()
 	hover_slot = grounds.nearest_free_slot(p, placing_item, 3.0)
 	grounds.show_markers(true, placing_item, hover_slot)
+	var anchor := Vector3.ZERO
+	if hover_slot >= 0:
+		anchor = Grounds.section_point(hover_slot, 0.0, Grounds.SEAT_OFFSET) if placing_item in ClubState.SECTION_ITEMS else Grounds.slot_position(hover_slot)
+	hub.update_preview(placing_item, hover_slot, camera.unproject_position(anchor + Vector3(0, 1.0, 0)))
 
 
 func _hub_click() -> void:
@@ -908,7 +934,7 @@ var _quick := false
 
 func _second_half() -> void:
 	half = 2
-	time_left = 3.0 if _quick else HALF_SECONDS
+	time_left = 3.0 if _quick else SettingsScript.half_seconds()
 	# switch sides
 	for p in players:
 		p.attack_dir = -p.attack_dir
@@ -961,7 +987,7 @@ func _restart() -> void:
 			p.attack_dir = -p.attack_dir
 			p.home_pos = Vector3(-p.home_pos.x, 0, -p.home_pos.z)
 	half = 1
-	time_left = HALF_SECONDS
+	time_left = SettingsScript.half_seconds()
 	_start_kickoff(first_kickoff_team)
 
 
@@ -975,7 +1001,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mode == "hub" or mode == "freecam":
 		if event is InputEventMouseMotion and _hub_drag:
 			var mm := event as InputEventMouseMotion
-			hub_yaw -= mm.relative.x * HUB_DRAG_SENS
+			hub_yaw -= mm.relative.x * HUB_DRAG_SENS * SettingsScript.camera_mult()
 			hub_pitch = clampf(hub_pitch + rad_to_deg(mm.relative.y * HUB_DRAG_SENS), HUB_PITCH_MIN, HUB_PITCH_MAX)
 			_hub_drag_moved += mm.relative.length()
 		elif event is InputEventMouseButton:
@@ -2180,6 +2206,14 @@ func _build_hud() -> void:
 	pw.offset_right = 210
 	pw.offset_top = -96 - 64
 	pw.offset_bottom = -96
+
+
+## Dark/light switch: rebuild the HUD with the new colours.
+func rebuild_hud() -> void:
+	var was := hud_layer.visible
+	hud_layer.queue_free()
+	_build_hud()
+	hud_layer.visible = was
 
 
 func _fit_hud() -> void:

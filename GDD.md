@@ -234,7 +234,15 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Laid out in design pixels (1920×1080) on a board scaled to the window. 2D MSAA on (rotated paper needs it).
 - Claude's picks (Marcel can overrule): **club colours = the current green** (Main.HOME_SHIRT) with the spec's club-colour rules (green tape/pins/button/accents; button text follows the contrast rule → ink on green). **Finances** tab shown but disabled until it's built.
 - **Round 1b (same day):** post-match summary as a pinned index card (score line with crests, home team left; Attendance / Money / Fans columns; approval breakdown; "Back to the club") + an "Elsewhere today" sticky note with the other results. In-match HUD: score chip top left (3-letter names, crests, score pill, half + clock), big messages (GOAL!, HALF TIME…) on a sticky note, toasts as a paper tag, shot power on paper, controls hint on a paper strip (real bindings only; dev keys are in the F1 panel), minimap as an index card in club/ink dots.
-- Not yet: build preview card beside the ghost, main menu, settings (incl. light/dark), formation card on Squad, player name tag + edge arrows restyle.
+- **Round 1c (Marcel: "Je mag het allemaal afmaken"):**
+  - **Main menu** (the game now starts here): title on taped paper, Continue (club · season · week · seats), Start a new club (asks twice when a save exists), Settings, Quit; club-news note; v0.1 tag. The top bar's quit icon goes back to the menu (and saves).
+  - **Settings** (modal from the top bar or the menu, saved in `user://settings.json`): Music / Effects / Crowd volume (audio buses; no music exists yet), match length 1–10 min per half (default 3), camera speed (hub/build camera 0.5×–1.5×), **Light / Dark** (dark rebuilds hub + HUD live).
+  - **Build preview card** beside the hovered spot while placing: where (side · section · spot), price, you pay, cash after, adds (seats before → after, £ per home match when filled, ready time/date, demolition warning), left click / Esc hints.
+  - **Formation card** (4-3-3 sketch) next to the Squad table; empty positions faded.
+  - Player name tag in Work Sans, ink on a paper outline; edge arrows in club colour.
+- Dev flags: `--settings`, `--preview=item,idx`, `--hub-tab=Name`, `--table`; dev flags that need the hub skip the menu.
+- Screens: `design/ui-noticeboard/game/*.png`.
+- Not done / open: a real 3D ghost of the item while placing (now: the yellow marker), tooltip/hover states polish, edge-arrow name tags, the Squad "selected player" note, UI scale setting.
 - Screens: `design/ui-noticeboard/game/hub_*.png`.
 
 ### UI open points

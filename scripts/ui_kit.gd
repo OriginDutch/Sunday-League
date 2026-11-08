@@ -451,3 +451,74 @@ static func highlighter() -> Panel:
 	p.add_theme_stylebox_override("panel", s)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return p
+
+
+# ------------------------------------------------------------------ settings controls
+
+static func _circle_tex(d: int, fill: Color, border: Color, bw: float) -> ImageTexture:
+	var img := Image.create(d, d, false, Image.FORMAT_RGBA8)
+	var r := d * 0.5
+	for y in d:
+		for x in d:
+			var dist := Vector2(x + 0.5 - r, y + 0.5 - r).length()
+			var a := clampf(r - dist, 0.0, 1.0)
+			if a <= 0.0:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+				continue
+			var c := border if dist > r - bw else fill
+			img.set_pixel(x, y, Color(c.r, c.g, c.b, c.a * a))
+	return ImageTexture.create_from_image(img)
+
+
+## Slider: ink-outlined track with a club-colour fill and a round knob.
+static func slider(value: float, min_v := 0.0, max_v := 100.0) -> HSlider:
+	var s := HSlider.new()
+	s.min_value = min_v
+	s.max_value = max_v
+	s.value = value
+	s.custom_minimum_size = Vector2(0, 44)
+	s.focus_mode = Control.FOCUS_NONE
+	var track := StyleBoxFlat.new()
+	track.bg_color = c("tag")
+	track.set_border_width_all(2)
+	track.border_color = c("ink")
+	track.set_corner_radius_all(4)
+	track.content_margin_top = 4
+	track.content_margin_bottom = 4
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = club_primary
+	fill.set_border_width_all(2)
+	fill.border_color = c("ink")
+	fill.set_corner_radius_all(4)
+	fill.content_margin_top = 4
+	fill.content_margin_bottom = 4
+	s.add_theme_stylebox_override("slider", track)
+	s.add_theme_stylebox_override("grabber_area", fill)
+	s.add_theme_stylebox_override("grabber_area_highlight", fill)
+	var knob := _circle_tex(24, c("tag"), c("ink"), 2.0)
+	s.add_theme_icon_override("grabber", knob)
+	s.add_theme_icon_override("grabber_highlight", knob)
+	return s
+
+
+## Segmented control (e.g. Light | Dark). Returns the container; callback gets the picked option.
+static func segmented(options: Array, selected: String, on_pick: Callable) -> PanelContainer:
+	var p := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = c("tag")
+	sb.set_border_width_all(2)
+	sb.border_color = c("ink")
+	sb.set_corner_radius_all(6)
+	sb.set_content_margin_all(4)
+	p.add_theme_stylebox_override("panel", sb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	for o in options:
+		var b := nav_item(o, "check" if o == selected else "minus", o == selected)
+		b.custom_minimum_size = Vector2(0, 44)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var opt: String = o
+		b.pressed.connect(func() -> void: on_pick.call(opt))
+		row.add_child(b)
+	p.add_child(row)
+	return p

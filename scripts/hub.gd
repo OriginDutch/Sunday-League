@@ -2,6 +2,7 @@ class_name Hub
 extends CanvasLayer
 const LeagueScript = preload("res://scripts/league.gd")
 const Kit = preload("res://scripts/ui_kit.gd")
+const SettingsScript = preload("res://scripts/settings.gd")
 ## Between-match screens in the Clubhouse Noticeboard style (GDD §10e, design/ui-noticeboard/):
 ## top bar, bottom strip (ticker + Club / Stadium / Recruitment / Squad / Finances), and per tab:
 ## Club = Our Goal + Next Match (with mini table), Stadium = build catalogue, Recruitment, Squad.
@@ -19,6 +20,11 @@ var main: Main
 var club: ClubState
 var root: Control                 # full-window layer (main toggles its visibility)
 var board: Control                # 1920×1080 design space, scaled to the window
+var screen := "hub"               # "hub" | "menu" (main menu)
+var settings_open := false
+var menu_new_armed := false
+var overlay: Control              # build preview card (kept across refreshes)
+var _prev_key := ""
 var tab := "Club"
 var stand_cat := "Seating"        # Stadium catalogue tab
 var table_open := false
@@ -39,6 +45,9 @@ func build(m: Main) -> void:
 	board = Control.new()
 	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(board)
+	overlay = Control.new()
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(overlay)
 	get_viewport().size_changed.connect(_fit)
 	_fit()
 	_build_summary()
@@ -50,6 +59,8 @@ func _fit() -> void:
 	board.scale = Vector2(s, s)
 	board.position = Vector2.ZERO
 	board.size = vp / s
+	overlay.scale = Vector2(s, s)
+	overlay.size = vp / s
 
 
 func set_club(c: ClubState) -> void:
@@ -70,6 +81,11 @@ func refresh() -> void:
 		return
 	for ch in board.get_children():
 		ch.queue_free()
+	if screen == "menu":
+		_menu()
+		if settings_open:
+			_settings()
+		return
 	_top_bar()
 	match tab:
 		"Club":
@@ -86,6 +102,8 @@ func refresh() -> void:
 	_hint()
 	if table_open:
 		_full_table()
+	if settings_open:
+		_settings()
 
 
 func go(t: String) -> void:
@@ -182,6 +200,27 @@ func _top_bar() -> void:
 		var s: Array = stats[i]
 		tags.add_child(Kit.stat_tag(s[0], s[1], s[2], rots[i], s[3]))
 	row.add_child(tags)
+	var div := ColorRect.new()
+	div.color = Kit.c("div")
+	div.custom_minimum_size = Vector2(1, 44)
+	div.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(div)
+	var set_b := Kit.icon_button("settings", "Settings")
+	set_b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	set_b.pressed.connect(func() -> void:
+		settings_open = true
+		refresh())
+	row.add_child(set_b)
+	var quit_b := Kit.icon_button("quit", "Quit to menu")
+	quit_b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	quit_b.pressed.connect(func() -> void:
+		if main.placing_item != "":
+			main.placing_item = ""
+			main.grounds.show_markers(false)
+		club.save()
+		screen = "menu"
+		refresh())
+	row.add_child(quit_b)
 	Kit.tape(holder, Vector2(40, -12), -4)
 	var rt := Kit.tape(holder, Vector2.ZERO, 3)
 	rt.anchor_left = 1.0
@@ -724,6 +763,7 @@ func _squad_tab() -> void:
 	Kit.pin(s["root"], 276)
 	Kit.pin(s["root"], 644)
 	_at(s["root"], 500, 132, 920)
+	_formation_card()
 
 
 func _squad_row(cells: Array, widths: Array, head := false) -> Control:
@@ -867,6 +907,335 @@ static func _money(v: int) -> String:
 		out = "," + s.substr(s.length() - 3) + out
 		s = s.substr(0, s.length() - 3)
 	return ("-" if v < 0 else "") + s + out
+
+
+
+# ================================================================== main menu
+
+func _menu() -> void:
+	var title := Kit.sheet("paper", 840, -0.8, Vector4(40, 34, 40, 30), 6)
+	var tb: VBoxContainer = title["body"]
+	var h := Kit.label("Sunday League", true, 104, 700, Kit.c("ink"))
+	h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tb.add_child(h)
+	var sub := Kit.label("From a field and some chairs to the very top.", true, 26, 400, Kit.c("pen"))
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tb.add_child(sub)
+	Kit.tape(title["root"], Vector2(80, -14), -6, 120)
+	Kit.tape(title["root"], Vector2(640, -14), 5, 120)
+	board.add_child(title["root"])
+	title["root"].anchor_left = 0.5
+	title["root"].anchor_right = 0.5
+	title["root"].offset_left = -420
+	title["root"].offset_right = 420
+	title["root"].offset_top = 150
+
+	var m := Kit.sheet("plain_card", 560, 0.6, Vector4(30, 30, 30, 28), 14)
+	var mb: VBoxContainer = m["body"]
+	var has_save := FileAccess.file_exists(ClubState.SAVE_PATH)
+	if has_save:
+		var lg: LeagueScript = club.league
+		var cont := Kit.primary("Continue", "play", 72, 22)
+		cont.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		cont.text = "Continue\n%s · Season %d · Week %d · %d seats" % [ClubState.CLUB_NAME, lg.season, lg.current_week(), club.seats()]
+		cont.pressed.connect(func() -> void:
+			screen = "hub"
+			refresh())
+		mb.add_child(cont)
+	var nw := Kit.link("Sure? This wipes your club — click again" if menu_new_armed else "Start a new club", "plus", false, 56)
+	nw.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	nw.add_theme_font_size_override("font_size", 19)
+	nw.pressed.connect(func() -> void:
+		if has_save and not menu_new_armed:
+			menu_new_armed = true
+			refresh()
+			return
+		menu_new_armed = false
+		main.new_game()
+		club.save()
+		screen = "hub"
+		tab = "Club"
+		refresh())
+	mb.add_child(nw)
+	var st := Kit.link("Settings", "settings", false, 56)
+	st.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	st.add_theme_font_size_override("font_size", 19)
+	st.pressed.connect(func() -> void:
+		settings_open = true
+		refresh())
+	mb.add_child(st)
+	var q := Kit.link("Quit", "quit", false, 56)
+	q.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	q.add_theme_font_size_override("font_size", 19)
+	q.pressed.connect(func() -> void:
+		club.save()
+		main.get_tree().quit())
+	mb.add_child(q)
+	Kit.pin(m["root"], 280)
+	board.add_child(m["root"])
+	m["root"].anchor_left = 0.5
+	m["root"].anchor_right = 0.5
+	m["root"].offset_left = -280
+	m["root"].offset_right = 280
+	m["root"].offset_top = 430
+
+	var n := Kit.sheet("note", 320, 2.5, Vector4(22, 26, 22, 22), 6)
+	(n["body"] as VBoxContainer).add_child(Kit.caps("Club news", Kit.c("note_muted")))
+	(n["body"] as VBoxContainer).add_child(Kit.label("The kettle's fixed. Training resumes Weds 7pm.", true, 21, 400, Kit.c("note_ink"), true))
+	Kit.tape(n["root"], Vector2(110, -14), -4)
+	_at(n["root"], 200, 470, 320, true)
+
+	var v := PanelContainer.new()
+	var vs := Kit.box(Kit.c("paper"), 3, false)
+	vs.content_margin_left = 10
+	vs.content_margin_right = 10
+	vs.content_margin_top = 6
+	vs.content_margin_bottom = 6
+	v.add_theme_stylebox_override("panel", vs)
+	v.add_child(Kit.label("v0.1", false, 14, 500, Kit.c("muted")))
+	board.add_child(v)
+	v.anchor_top = 1.0
+	v.anchor_bottom = 1.0
+	v.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	v.offset_left = 32
+	v.offset_bottom = -24
+
+
+# ================================================================== settings (modal)
+
+func _settings() -> void:
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.45)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	board.add_child(dim)
+	var s := Kit.sheet("plain_card", 760, 0.0, Vector4(34, 28, 34, 28), 18)
+	var b: VBoxContainer = s["body"]
+	var close := Kit.icon_button("close", "Close settings")
+	close.pressed.connect(_close_settings)
+	b.add_child(_spread(Kit.heading("Settings", 42), close))
+	b.add_child(Kit.caps("Sound"))
+	var sound := _hbox(24)
+	sound.add_child(_slider_box("Music", SettingsScript.music, func(v: float) -> void:
+		SettingsScript.music = int(v)
+		SettingsScript.apply_audio()))
+	sound.add_child(_slider_box("Effects", SettingsScript.effects, func(v: float) -> void:
+		SettingsScript.effects = int(v)
+		SettingsScript.apply_audio()))
+	sound.add_child(_slider_box("Crowd", SettingsScript.crowd, func(v: float) -> void:
+		SettingsScript.crowd = int(v)
+		SettingsScript.apply_audio()))
+	b.add_child(sound)
+	b.add_child(Kit.rule(Kit.c("tag_border"), 1))
+	b.add_child(Kit.caps("Match"))
+	var step := _hbox(10)
+	var minus := Kit.icon_button("minus", "Shorter")
+	var val := Kit.label("%d min per half" % SettingsScript.half_minutes, false, 18, 700, Kit.c("ink"))
+	val.custom_minimum_size = Vector2(150, 0)
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	val.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var plus := Kit.icon_button("plus", "Longer")
+	minus.pressed.connect(func() -> void:
+		SettingsScript.half_minutes = maxi(1, SettingsScript.half_minutes - 1)
+		val.text = "%d min per half" % SettingsScript.half_minutes)
+	plus.pressed.connect(func() -> void:
+		SettingsScript.half_minutes = mini(10, SettingsScript.half_minutes + 1)
+		val.text = "%d min per half" % SettingsScript.half_minutes)
+	step.add_child(minus)
+	step.add_child(val)
+	step.add_child(plus)
+	b.add_child(_spread(Kit.label("Match length", false, 16, 600, Kit.c("ink")), step))
+	b.add_child(Kit.rule(Kit.c("tag_border"), 1))
+	b.add_child(Kit.caps("Camera & look"))
+	b.add_child(_slider_box("Camera speed", SettingsScript.camera_speed, func(v: float) -> void:
+		SettingsScript.camera_speed = int(v)))
+	var seg := Kit.segmented(["Light", "Dark"], "Dark" if SettingsScript.dark else "Light", func(o: String) -> void:
+		SettingsScript.dark = o == "Dark"
+		Kit.dark = SettingsScript.dark
+		SettingsScript.save()
+		main.rebuild_hud()
+		refresh())
+	seg.custom_minimum_size = Vector2(320, 0)
+	b.add_child(_spread(Kit.label("Appearance", false, 16, 600, Kit.c("ink")), seg))
+	var done := Kit.primary("Done", "check")
+	done.size_flags_horizontal = Control.SIZE_SHRINK_END
+	done.custom_minimum_size = Vector2(180, 56)
+	done.pressed.connect(_close_settings)
+	b.add_child(done)
+	Kit.pin(s["root"], 380)
+	board.add_child(s["root"])
+	s["root"].anchor_left = 0.5
+	s["root"].anchor_right = 0.5
+	s["root"].offset_left = -380
+	s["root"].offset_right = 380
+	s["root"].offset_top = 120
+	var n := Kit.sheet("note", 300, 3.0, Vector4(20, 24, 20, 20), 4)
+	(n["body"] as VBoxContainer).add_child(Kit.label("Turning the crowd down won't make them any nicer.", true, 20, 400, Kit.c("note_ink"), true))
+	Kit.tape(n["root"], Vector2(100, -14), -5)
+	board.add_child(n["root"])
+	n["root"].anchor_left = 0.5
+	n["root"].anchor_right = 0.5
+	n["root"].offset_left = 400
+	n["root"].offset_right = 700
+	n["root"].offset_top = 640
+
+
+func _slider_box(lab: String, value: int, on_change: Callable) -> VBoxContainer:
+	var v := _vbox(6)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var num := Kit.label("%d%%" % value, false, 16, 700, Kit.c("ink"))
+	v.add_child(_spread(Kit.label(lab, false, 16, 600, Kit.c("ink")), num))
+	var sl := Kit.slider(value)
+	sl.value_changed.connect(func(x: float) -> void:
+		num.text = "%d%%" % int(x)
+		on_change.call(x))
+	v.add_child(sl)
+	return v
+
+
+func _close_settings() -> void:
+	settings_open = false
+	SettingsScript.save()
+	refresh()
+
+
+# ================================================================== build preview (beside the hovered spot)
+
+static func _side_name(sec: int) -> String:
+	var L := ClubState.SECTIONS_LONG
+	var S := ClubState.SECTIONS_SHORT
+	if sec < L:
+		return "Main side · Section %d" % (sec + 1)
+	if sec < 2 * L:
+		return "Near side · Section %d" % (sec - L + 1)
+	if sec < 2 * L + S:
+		return "West end · Section %d" % (sec - 2 * L + 1)
+	return "East end · Section %d" % (sec - 2 * L - S + 1)
+
+
+## Called by main every hub frame while placing. idx = hovered spot/section (-1 = none).
+func update_preview(item: String, idx: int, screen_pos: Vector2) -> void:
+	if item == "" or idx < 0 or screen != "hub":
+		_prev_key = ""
+		for ch in overlay.get_children():
+			ch.queue_free()
+		return
+	var key := "%s:%d:%d" % [item, idx, club.money]
+	if key != _prev_key:
+		_prev_key = key
+		for ch in overlay.get_children():
+			ch.queue_free()
+		overlay.add_child(_preview_card(item, idx))
+	if overlay.get_child_count() > 0:
+		var card: Control = overlay.get_child(overlay.get_child_count() - 1)
+		var p := screen_pos / overlay.scale.x + Vector2(60, -120)
+		p.x = clampf(p.x, 500.0, overlay.size.x - 440.0)
+		p.y = clampf(p.y, 130.0, overlay.size.y - 560.0)
+		card.position = p
+
+
+func _preview_card(item: String, idx: int) -> Control:
+	var sec_item := item in ClubState.SECTION_ITEMS
+	var names := {"chair": "Chair", "bench": "Bench", "bleachers": "Open bleachers", "bleachers_rush": "Open bleachers (rush)",
+		"rows": "+2 rows", "rows_rush": "+2 rows (rush)"}
+	var s := Kit.sheet("plain_card", 400, 0.6, Vector4(24, 24, 24, 20), 12)
+	var b: VBoxContainer = s["body"]
+	b.add_child(Kit.heading(names.get(item, item), 34))
+	var where := _side_name(idx) if sec_item else "%s · Spot %d" % [_side_name(idx / ClubState.SPOTS_PER_SECTION), idx % ClubState.SPOTS_PER_SECTION + 1]
+	b.add_child(Kit.label(where, false, 16, 500, Kit.c("muted")))
+	var price := club.build_cost(item, idx) if sec_item else club.price_of(item)
+	b.add_child(Kit.caps("Cost", Kit.c("muted")))
+	b.add_child(_line("Price", "£%s" % _money(price)))
+	b.add_child(Kit.rule())
+	b.add_child(_line("You pay", "£%s" % _money(price), null, true))
+	var after := club.money - price
+	b.add_child(_line("Cash after", ("-£%s" % _money(-after)) if after < 0 else "£%s" % _money(after), Kit.c("danger") if after < 0 else null))
+	b.add_child(Kit.caps("Adds", Kit.c("muted")))
+	var add_seats := 1
+	match item:
+		"bench":
+			add_seats = ClubState.BENCH_SEATS
+		"bleachers", "bleachers_rush":
+			add_seats = ClubState.BLEACHER_ROWS[0] * ClubState.BLEACHER_SEATS_PER_ROW
+		"rows", "rows_rush":
+			add_seats = 2 * ClubState.BLEACHER_SEATS_PER_ROW
+	b.add_child(_adds("seat", "+%d seat%s (%d → %d)" % [add_seats, "" if add_seats == 1 else "s", club.seats(), club.seats() + add_seats]))
+	b.add_child(_adds("cash", "+£%d per home match when filled" % (add_seats * ClubState.TICKET_PRICE)))
+	if sec_item:
+		var w := club.build_weeks(item, idx)
+		var ready := club.ready_label({"finish": club.now() + w})
+		b.add_child(_adds("clock", "Ready in %s wk · %s" % [_wk(w), ready], Kit.c("ink")))
+		if item.begins_with("bleachers") and club._section_has_furniture(idx):
+			b.add_child(_adds("demolish", "Clears the chairs/benches here (+%d wk demolition)" % int(ClubState.DEMOLITION_WEEKS), Kit.c("danger")))
+		b.add_child(Kit.label("The section is closed while it's being built.", true, 19, 400, Kit.c("pen"), true))
+	else:
+		b.add_child(_adds("clock", "Ready instantly", Kit.c("ink")))
+		b.add_child(Kit.label("Stack up to 4 per spot. They don't match. Nobody minds." if item == "chair" else "Seats four. Five if you're friendly.",
+			true, 19, 400, Kit.c("pen"), true))
+	b.add_child(Kit.label("Left click to build · right click or Esc to cancel", false, 14, 500, Kit.c("muted")))
+	Kit.pin(s["root"], 200)
+	return s["root"]
+
+
+func _line(lab: String, val: String, col = null, big := false) -> Control:
+	return _spread(Kit.label(lab, false, 16, 500, Kit.c("muted")),
+		Kit.label(val, false, 22 if big else 17, 700 if big else 600, Kit.c("ink") if col == null else col))
+
+
+func _adds(ic: String, text: String, col = null) -> Control:
+	var h := _hbox(10)
+	var c: Color = Kit.c("ok") if col == null else col
+	h.add_child(Kit.icon(ic, 20, c))
+	var l := Kit.label(text, false, 16, 600, c, true)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(l)
+	return h
+
+
+# ================================================================== formation sketch (Squad tab)
+
+class Formation extends Control:
+	const SPOTS := [["GK", 50, 90], ["LB", 14, 70], ["CB", 37, 74], ["CB", 63, 74], ["RB", 86, 70], ["CM", 28, 48],
+		["CDM", 50, 56], ["CM", 72, 48], ["LW", 16, 22], ["ST", 50, 15], ["RW", 84, 22]]
+	var pen := Color.BLACK
+	var ink := Color.BLACK
+	var card := Color.WHITE
+	var font: Font
+	var filled := 11
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var faint := Color(pen.r, pen.g, pen.b, 0.6)
+		draw_rect(r, pen, false, 2.0)
+		draw_line(Vector2(0, size.y * 0.5), Vector2(size.x, size.y * 0.5), faint, 2.0)
+		draw_arc(size * 0.5, 45.0, 0, TAU, 40, faint, 2.0)
+		draw_rect(Rect2(size.x * 0.25, size.y - 70, size.x * 0.5, 70), faint, false, 2.0)
+		draw_rect(Rect2(size.x * 0.25, 0, size.x * 0.5, 70), faint, false, 2.0)
+		for i in SPOTS.size():
+			var sp: Array = SPOTS[i]
+			var c := Vector2(size.x * sp[1] / 100.0, size.y * sp[2] / 100.0)
+			draw_circle(c, 20.0, card if i < filled else Color(card.r, card.g, card.b, 0.5))
+			draw_arc(c, 20.0, 0, TAU, 32, ink if i < filled else Color(ink.r, ink.g, ink.b, 0.35), 2.0)
+			var t: String = sp[0]
+			var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+			draw_string(font, c + Vector2(-w * 0.5, 5), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ink)
+
+
+func _formation_card() -> void:
+	var s := Kit.sheet("plain_card", 420, -0.8, Vector4(22, 24, 22, 22), 14)
+	var b: VBoxContainer = s["body"]
+	b.add_child(_spread(Kit.heading("Formation", 34), Kit.caps("4-3-3")))
+	var f := Formation.new()
+	f.pen = Kit.c("pen")
+	f.ink = Kit.c("ink")
+	f.card = Kit.c("card")
+	f.font = Kit.font(false, 700)
+	f.filled = club.squad.size()
+	f.custom_minimum_size = Vector2(0, 470)
+	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(f)
+	b.add_child(Kit.label("Drawn by the gaffer on a beer mat. Copied out neatly.", true, 19, 400, Kit.c("muted"), true))
+	Kit.tape(s["root"], Vector2(160, -14), 3)
+	_at(s["root"], 40, 150, 420)
 
 
 # ================================================================== post-match summary

@@ -92,5 +92,5 @@ func _draw_arrows() -> void:
 		var pos := center + dir * minf(tx, ty)
 		var perp := Vector2(-dir.y, dir.x)
 		var pts := PackedVector2Array([pos + dir * 12.0, pos - dir * 8.0 + perp * 8.0, pos - dir * 8.0 - perp * 8.0])
-		arrows.draw_colored_polygon(pts, Color(Main.HOME_SHIRT, 0.9))
-		arrows.draw_polyline(PackedVector2Array([pts[0], pts[1], pts[2], pts[0]]), Color(1, 1, 1, 0.9), 1.5)
+		arrows.draw_colored_polygon(pts, Kit.c("primary"))
+		arrows.draw_polyline(PackedVector2Array([pts[0], pts[1], pts[2], pts[0]]), Kit.c("paper"), 2.0)

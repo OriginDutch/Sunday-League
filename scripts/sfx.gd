@@ -32,11 +32,13 @@ func _ready() -> void:
 	if _kicks_big.is_empty():
 		_kicks_big = _kicks
 	_cheer_player = AudioStreamPlayer.new()
+	_cheer_player.bus = "Crowd"
 	add_child(_cheer_player)
 	_whistle = _make_whistle(0.32)
 	_whistle_long = _make_whistle(0.9)
 	for i in 8:
 		var p := AudioStreamPlayer.new()
+		p.bus = "Effects"
 		add_child(p)
 		_pool.append(p)
 

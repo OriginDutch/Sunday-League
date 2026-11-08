@@ -32,6 +32,7 @@ var protect := 0.0          # can't be dispossessed while > 0
 var contact_time := 0.0     # how long this player has been pressing the ball carrier
 var stun := 0.0             # after a missed tackle / being tackled
 var tackle_timer := 0.0     # lunging
+var tackle_kind := "slide"  # "slide" (X / C) or "poke" (A / Space: standing tackle, Marcel 2026-11-08)
 var has_ball_time := 0.0
 var think_timer := 0.0
 var jitter := Vector3.ZERO  # small personal offset so AI isn't robotic
@@ -271,12 +272,17 @@ func step(delta: float) -> void:
 
 	if tackle_timer > 0.0:
 		tackle_timer -= delta
+		if tackle_timer <= 0.0 and tackle_kind == "slide" and is_human and not has_ball():
+			stun = maxf(stun, SLIDE_MISS_DOWN)   # missed sliding tackle: on the floor for a moment
 		if is_human:
 			# your lunge homes in on the ball a little, so a tackle goes where you meant it
 			var to_ball := Util.flat(main.ball.position - position)
 			if to_ball.length() > 0.05:
 				vel = vel.slerp(to_ball.normalized() * vel.length(), clampf(delta * 8.0, 0.0, 1.0))
-		vel = vel.move_toward(Vector3.ZERO, 12.0 * delta)
+		if tackle_kind == "slide":
+			vel = vel.move_toward(Vector3.ZERO, 12.0 * delta)
+		else:
+			vel = vel.move_toward(desired_move.limit_length(1.0) * SPEED, ACCEL * delta)
 	else:
 		var max_speed := SPRINT if wants_sprint else SPEED
 		if role == "GK":
@@ -419,9 +425,24 @@ func _run_of(receiver: Player) -> Vector3:
 	return run * Main.PASS_LEAD
 
 
+## Flight time of a half-high pass (A A) over `d` metres (Ball.GRAVITY 22: 0.70 s ≈ 1.5 m top,
+## 0.82 s ≈ 2 m). Marcel: max 1.5 m up to ~18 m, rising to ~2 m at 25 m; beyond that the ball's
+## speed (31 m/s) is the limit and it climbs a little more.
+static func lofted_time(d: float) -> float:
+	return maxf(0.70 + clampf((d - 18.0) / 7.0, 0.0, 1.0) * 0.12, d / 31.0)
+
+
 ## Half-high pass (A A): over a leg, quicker than a lob.
 func lofted_pass_to(receiver: Player) -> void:
-	air_pass_to(receiver, _run_of(receiver), 22.0, 0.6, 1.0, "pass")   # top ~1–2.75 m
+	var run := _run_of(receiver)
+	var target := receiver.position
+	var t := 0.7
+	for i in 4:
+		target = receiver.position + run * t
+		target.x = clampf(target.x, -Main.HALF_L + 1.0, Main.HALF_L - 1.0)
+		target.z = clampf(target.z, -Main.HALF_W + 1.0, Main.HALF_W - 1.0)
+		t = lofted_time(Util.flat_dist(position, target))
+	air_ball_to(target, t, receiver, "pass")
 
 
 ## High lob / long ball (X).
@@ -525,9 +546,28 @@ func long_kick(target: Vector3, power: float) -> void:
 	main.ball.kick(to.normalized() * spd + Vector3.UP * lerpf(4.0, 8.0, power), self, null)
 
 
+const SLIDE_MISS_DOWN := 0.5
+const POKE_TIME := 0.25
+
+
+## Standing tackle (A / Space): stick a leg out, no lunge. Shorter reach and less chance than a slide,
+## but you stay on your feet when you miss.
+func start_poke() -> void:
+	if tackle_timer > 0.0 or stun > 0.0:
+		return
+	var to := Util.flat(main.ball.position - position)
+	if to.length() > 0.01:
+		face_towards(to)
+		vel = to.normalized() * maxf(vel.length(), 3.5)   # a small step in, not a lunge
+	tackle_kind = "poke"
+	tackle_timer = POKE_TIME
+	play_once("pass", 1.6)
+
+
 func start_tackle() -> void:
 	if tackle_timer > 0.0 or stun > 0.0:
 		return
+	tackle_kind = "slide"
 	var to := Util.flat(main.ball.position - position)
 	if to.length() > 0.01:
 		vel = to.normalized() * (Main.HUMAN_TACKLE_LUNGE if is_human else Main.AI_TACKLE_LUNGE)

@@ -69,6 +69,10 @@ const AI_TACKLE_RATE := 0.5            # AI vs AI tackle attempts per second whe
 const AI_TACKLE_START_RANGE := 1.4     # AI only lunges when this close to the ball
 const AI_TACKLE_LUNGE := 7.0           # lunge speed (m/s) for 0.35 s
 const HUMAN_TACKLE_LUNGE := 10.0
+const POKE_REACH := 1.5                # standing tackle (A / Space) reach...
+const POKE_SUCCESS := 0.6              # ...and chance relative to a slide
+const SHOT_TAP := 0.15                 # released before this charge (≈0.14 s) = a tap...
+const SHOT_TAP_POWER := 0.6            # ...which shoots at this power (Marcel 2026-11-08)
 const AI_JOCKEY_DISTANCE := 1.6        # AI presser keeps this gap when you have the ball
 const AI_JOCKEY_DISTANCE_AI := 1.1     # ...and this gap against an AI carrier
 const MARK_DISTANCE := 2.2             # markers stand this far goal-side of their man
@@ -335,6 +339,12 @@ func _ready() -> void:
 				bs.set_club_colours(Color(cc[0]), Color(cc[1]))
 	if "--fps" in args:
 		_toggle_fps()
+	if "--tackle-test" in args:
+		# dev: standing tackle (A) vs slide (X) success and miss behaviour, plus the B tap shot
+		while club.squad.size() < ClubState.SQUAD_SIZE:
+			club.recruit(0)
+		start_friendly()
+		_tt = 0.0
 	if "--pass-test2" in args:
 		# dev: every pass type with fake pad buttons; prints the ball's flight and who gets it
 		while club.squad.size() < ClubState.SQUAD_SIZE:
@@ -456,6 +466,82 @@ func _po_test_tick(delta: float) -> void:
 		get_tree().quit()
 
 
+var _tt := -1.0
+var _tt_i := -1
+var _tt_res := {}
+# [kind, button, start distance from the carrier]
+const TT := [["poke", JOY_BUTTON_A, 0.7], ["slide", JOY_BUTTON_X, 1.5], ["slide whiff", JOY_BUTTON_X, 7.0], ["poke whiff", JOY_BUTTON_A, 4.0], ["tap shot", JOY_BUTTON_B, 0.0], ["held shot 0.5s", JOY_BUTTON_B, 0.5]]
+const TT_REPS := 20
+
+
+func _tt_tick(delta: float) -> void:
+	if state != "play" and _tt_i < 0:
+		return
+	_tt += delta
+	var idx := _tt_i / TT_REPS if _tt_i >= 0 else -1
+	if _tt_i < 0 or _tt > 1.6:
+		if _tt_i >= 0:
+			var r: Dictionary = _tt_res.get(TT[idx][0], {"won": 0, "n": 0, "stun": 0.0, "kind": "", "speed": 0.0})
+			r["n"] += 1
+			if ball.owner_player == home[5]:
+				r["won"] += 1
+			r["stun"] = maxf(float(r["stun"]), float(_tt_res.get("_stun", 0.0)))
+			r["kind"] = home[5].tackle_kind
+			r["speed"] = maxf(float(r["speed"]), float(_tt_res.get("_speed", 0.0)))
+			_tt_res[TT[idx][0]] = r
+		_tt_i += 1
+		_tt_res["_stun"] = 0.0
+		_tt_res["_speed"] = 0.0
+		if _tt_i >= TT.size() * TT_REPS:
+			for k in TT:
+				var r2: Dictionary = _tt_res[k[0]]
+				print("TT %-15s won ball %d/%d  tackle_kind %s  max time on the floor %.2fs  shot speed %.1f" % [k[0], r2["won"], r2["n"], r2["kind"], r2["stun"], r2["speed"]])
+			get_tree().quit()
+			return
+		_tt = 0.0
+		idx = _tt_i / TT_REPS
+		var sc: Array = TT[idx]
+		var flip := home[0].attack_dir
+		for q in players:
+			q.vel = Vector3.ZERO
+			q.desired_move = Vector3.ZERO
+			q.position = q.home_pos
+			q.stun = 0.0
+			q.tackle_timer = 0.0
+			q.contact_time = 0.0
+		pad_active = true
+		var me: Player = home[5]
+		if String(sc[0]).contains("shot"):
+			me.position = Vector3(30.0 * flip, 0, 0)
+			ball.reset_to(me.position)
+			_give_ball(me)
+		else:
+			var carrier: Player = away[9]
+			carrier.position = Vector3(0, 0, 0)
+			ball.reset_to(carrier.position)
+			_give_ball(carrier)
+			carrier.protect = 0.0
+			carrier.stun = 99.0   # stands still with the ball
+			me.position = carrier.position + Vector3(-float(sc[2]) * flip, 0, 0)
+			me.face_towards(carrier.position - me.position)
+		controlled = me
+		for q in players:
+			if q != away[9] and q != me:
+				q.stun = 99.0
+		return
+	var sc3: Array = TT[idx]
+	var me2: Player = home[5]
+	_tt_res["_stun"] = maxf(float(_tt_res["_stun"]), me2.stun if me2.stun < 50.0 else 0.0)
+	if ball.owner_player == null:
+		_tt_res["_speed"] = maxf(float(_tt_res["_speed"]), ball.vel.length())
+	if _tt - delta < 0.2 and _tt >= 0.2:
+		_pad_ev(int(sc3[1]), true)
+		if not String(sc3[0]).begins_with("held"):
+			_pad_ev(int(sc3[1]), false)
+	if String(sc3[0]).begins_with("held") and _tt - delta < 0.2 + float(sc3[2]) and _tt >= 0.2 + float(sc3[2]):
+		_pad_ev(int(sc3[1]), false)
+
+
 var _pt2 := -1.0
 var _pt2_i := -1
 var _pt2_log := {}
@@ -463,6 +549,7 @@ var _pt2_log := {}
 const PT2 := [
 	["A ground", [[0.0, JOY_BUTTON_A]], Vector2(1, 0), Vector3(-5, 0, 0), "CM", 20.0],
 	["A A lofted", [[0.0, JOY_BUTTON_A], [0.08, JOY_BUTTON_A]], Vector2(1, 0), Vector3(-5, 0, 0), "CM", 20.0],
+	["A A lofted short", [[0.0, JOY_BUTTON_A], [0.08, JOY_BUTTON_A]], Vector2(1, 0), Vector3(8, 0, 0), "CM", 20.0],
 	["X lob", [[0.0, JOY_BUTTON_X]], Vector2(1, 0), Vector3(-25, 0, 0), "CB", 20.0],
 	["X cross", [[0.0, JOY_BUTTON_X]], Vector2(0, -1), Vector3(38, 0, 28), "RW", 40.0],
 	["Y through", [[0.0, JOY_BUTTON_Y]], Vector2(1, 0), Vector3(5, 0, 0), "CM", 25.0],
@@ -907,6 +994,8 @@ func _physics_process(delta: float) -> void:
 		_pad_test_tick(delta)
 	if _pt2 >= 0.0:
 		_pt2_tick(delta)
+	if _tt >= 0.0:
+		_tt_tick(delta)
 	match state:
 		"kickoff":
 			state_timer -= delta
@@ -1510,7 +1599,7 @@ func _pen_button(pressed: bool) -> void:
 		charge = 0.0
 	elif charging:
 		charging = false
-		pens["power"] = charge
+		pens["power"] = charge if charge >= SHOT_TAP else SHOT_TAP_POWER   # a tap = quick shot
 		pens["z"] = pens["aim_z"]
 		pens["phase"] = "runup"
 		pens["timer"] = 0.0
@@ -1768,9 +1857,9 @@ func _update_hint() -> void:
 		hint_label.text = ("Penalty: LS left/right aims · hold B for power, release to shoot · Start pause" if pad_active else
 			"Penalty: aim with the mouse · hold RMB for power, release to shoot · Esc quit")
 		return
-	hint_label.text = ("LS move · LT walk · A pass (A A high) · X lob/cross · Y through (Y Y high, LB+Y over the top) · hold B shoot (LB+B chip) · no ball: X tackle, LB switch · Start pause"
+	hint_label.text = ("LS move · LT walk · A pass (A A high) · X lob/cross · Y through (Y Y high, LB+Y over the top) · hold B shoot (LB+B chip) · no ball: A tackle, X slide, LB switch · Start pause"
 		if pad_active else
-		"WASD move · Shift walk · LMB pass · MMB high pass · E lob/cross · F through (Ctrl high, Shift over the top) · hold RMB shoot (Ctrl chip) · Space tackle · Q switch · Esc quit")
+		"WASD move · Shift walk · LMB pass · MMB high pass · E lob/cross · F through (Ctrl high, Shift over the top) · hold RMB shoot (Ctrl chip) · Space tackle · C slide · Q switch · Esc quit")
 
 
 ## Controller buttons in a match (FIFA-like, Xbox): A pass · B shoot (hold for power) · X tackle ·
@@ -1797,6 +1886,8 @@ func _pad_button(b: InputEventJoypadButton) -> void:
 		JOY_BUTTON_A:
 			if b.pressed and live and controlled.has_ball():
 				_queue_pass("ground")
+			elif b.pressed and state == "play" and controlled != null and not controlled.has_ball():
+				controlled.start_poke()
 		JOY_BUTTON_B:
 			if b.pressed and live and controlled.has_ball():
 				charging = true
@@ -1889,6 +1980,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE:
 				get_tree().quit()
 			KEY_SPACE:
+				if state == "play" and controlled != null and not controlled.has_ball():
+					controlled.start_poke()
+			KEY_C:
 				if state == "play" and controlled != null and not controlled.has_ball():
 					controlled.start_tackle()
 			KEY_E:
@@ -2100,7 +2194,8 @@ func _do_pass(kind: String) -> void:
 			if mate != null:
 				p.lofted_pass_to(mate)
 			else:
-				p.air_ball_towards(aim_point, 22.0, 0.6, 1.0)
+				var lt := Player.lofted_time(minf(Util.flat_dist(p.position, aim_point), 35.0))
+				p.air_ball_to(p.position + aim.normalized() * minf(aim.length(), 35.0), lt)
 		"lob":
 			if _in_cross_zone(p) and p.role != "GK":
 				mate = _cross_target(p)
@@ -2169,6 +2264,8 @@ func _through_target(p: Player, aim: Vector3) -> Player:
 
 func _human_shoot() -> void:
 	var p := controlled
+	if charge < SHOT_TAP:
+		charge = SHOT_TAP_POWER   # a tap: quick shot
 	if p.role == "GK" or p.restart_kind == "corner":
 		p.long_kick(aim_point, charge)
 		return
@@ -2323,14 +2420,17 @@ func _resolve_possession(delta: float) -> void:
 			continue
 		var d := Util.flat_dist(opp.position, ball.position)
 		# lunging tackle
-		var tackle_reach := 1.2 if opp.is_human else 0.8
+		var poke := opp.tackle_kind == "poke"
+		var tackle_reach := (POKE_REACH if poke else 1.2) if opp.is_human else 0.8
 		if opp.tackle_timer > 0.0 and d < tackle_reach and holder.protect <= 0.0:
 			var success := diff("human_tackle_success") if opp.is_human else diff("ai_tackle_success")
+			if poke:
+				success *= POKE_SUCCESS
 			if randf() < success:
 				_steal(opp, holder)
 			else:
 				opp.tackle_timer = 0.0
-				opp.stun = 0.5
+				opp.stun = 0.0 if poke else 0.5   # a standing tackle that fails: you're still on your feet
 				if holder.is_human:
 					toast("DODGED!")
 			return

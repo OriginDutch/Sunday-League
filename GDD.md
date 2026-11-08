@@ -600,19 +600,21 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
   | Button | Pass |
   |---|---|
   | A | ground pass |
-  | A A | lofted ground pass (half-high, top ~1–3 m) |
+  | A A | lofted ground pass (half-high: **max ~1.5 m up to ~18 m, rising to ~2 m at 25 m**, Marcel 2026-11-08; further than that the ball's speed caps it and it climbs a bit more) |
   | X | lob (top ~3–8 m); **from the flank in their half (outside the box width) a cross** to the teammate in/near the box closest to the penalty spot (or into the box if nobody's there) |
   | Y | through-ball along the ground, into the space ahead of the most forward teammate in the aim direction |
   | Y Y | lofted through-ball (half-high, **max ~2 m**, Marcel 2026-11-08) |
   | LB + Y | through-ball over the top (high) |
   | LB + B (hold) | chip shot: high, slower, drops just under the bar |
 
-  Without the ball X = tackle and LB = switch player, as before; with the ball LB is the modifier.
-- **Mouse/keyboard (Marcel: controller is the standard, keyboard combos Claude's choice):** instant, no wind-up. LMB pass · **middle mouse** lofted pass · **E** lob/cross · **F** through-ball · **Ctrl+F** lofted through · **Shift+F** over the top · **Ctrl + hold RMB** chip.
+  Without the ball: **A = standing tackle**, **X = sliding tackle**, LB = switch player; with the ball LB is the modifier.
+- **Tackles (Marcel 2026-11-08, "precies wat je zegt"):** standing tackle (A / **Space**): a small step in (no lunge), reach 1.5 m, 60% of a slide's chance; miss and you're still on your feet. Sliding tackle (X / **C**, was Space): lunge as before; miss (fail on contact, or slide into nothing) and you're on the floor for 0.5 s. The floor time on a slide into nothing is for your player only; the AI's tackles are unchanged. Later: fouls/cards, more likely from a slide.
+- **Quick shot (Marcel chose option B):** release B / RMB within ~0.14 s = a tap = a shot at **60% power**; holding works as before (0–100%, shot on release). Also for penalties and the chip. FIFA works differently (the shot starts on press, power is how long you hold during the wind-up, a tap ≈ 1 of 4 bars; B B = low driven shot), kept in mind for later.
+- **Mouse/keyboard (Marcel: controller is the standard, keyboard combos Claude's choice):** instant, no wind-up. Space = standing tackle, C = sliding tackle. LMB pass · **middle mouse** lofted pass · **E** lob/cross · **F** through-ball · **Ctrl+F** lofted through · **Shift+F** over the top · **Ctrl + hold RMB** chip.
 - Receivers run onto through-balls; once a through-ball has gone past the meeting point they chase it. Your own receiver waits under a high ball instead of running at it while it's overhead.
 - Throw-ins stay throws whatever button. The AI doesn't use the new pass types yet (Marcel: now or later is both fine).
 - Ball gravity is 22 (not 9.81), so heights are set by flight time: 0.7 s ≈ 1.3 m, 1.0 s ≈ 2.8 m, 1.4 s ≈ 5.4 m.
-- Dev: `-- --pass-test2 --menu-skip` plays every pass type with fake pad buttons and prints height, flight and who gets it (opponents frozen; `--pt2-live` lets them play).
+- Dev: `-- --tackle-test --menu-skip` (standing vs sliding tackle success and floor time, tap vs held shot). `-- --pass-test2 --menu-skip` plays every pass type with fake pad buttons and prints height, flight and who gets it (opponents frozen; `--pt2-live` lets them play).
 
 ### Finances tab + bottom-tier economy (2026-11-08)
 - **Marcel's choices:** this step = the Finances tab **plus** the first real money flows for the bottom division (not the whole pyramid yet). The tab shows **this season's in/out per category, a per-match ledger, cash over time and what's coming up**. The club gets **small running costs** from day one. **Mock-up first**, then build.

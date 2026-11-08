@@ -165,7 +165,21 @@ def half_tube(name, r, length, loc, m, seg=12, thick=0.05):
     return _ob(name, me, loc, m)
 
 
-def build_section(rows, tunnel=False, x0=0.0, side_left=True, side_right=True):
+def profile(rows):
+    """(roof front y, front z, back y, back z, facade y) of a main stand with `rows` rows."""
+    back_y = WALK_D + rows * TREAD
+    top_z = ROW0_Z + (rows - 1) * RISE
+    rby = back_y + 1.2 + 0.4
+    return -0.4, top_z + 2.6 + 0.9, rby, top_z + 2.6, rby + 0.02
+
+
+def line_z(p, y):
+    fy, fz, by, bz, _ = p
+    return fz + (bz - fz) * (y - fy) / (by - fy)
+
+
+def build_section(rows, tunnel=False, x0=0.0, left=None, right=None):
+    """left/right: the neighbour's row count, or None for an open end (full side screen)."""
     first = len(parts)
     back_y = WALK_D + rows * TREAD
     top_z = ROW0_Z + (rows - 1) * RISE
@@ -376,12 +390,19 @@ def build_section(rows, tunnel=False, x0=0.0, side_left=True, side_right=True):
     # upper window band in the cladding
     box("UpperWindows", 2.8, 0.04, 0.6, (-3.4, fy + 0.0, min(fh - 1.0, 5.5)), M["glass"])
 
-    # ---- side screens (separate objects so the game can hide them between neighbours)
+    # ---- side screens: full at an open end; none between equal neighbours; between unequal ones only
+    # the strip between the lower and the higher roof, drawn by the taller section (Marcel 2026-11-08)
     side_front_y = WALK_D + TREAD * 2
-    for s, show in ((-1, side_left), (1, side_right)):
-        if not show:
-            continue
+    for s, nb in ((-1, left), (1, right)):
         x = s * (HW + 0.06)
+        if nb is not None:
+            if nb >= rows:
+                continue
+            other = profile(nb)
+            fy0, nbw = roof_front_y, other[4]
+            pts = [(fy0, line_z(other, fy0)), (nbw, line_z(other, nbw)), (nbw, 0.0), (fy, 0.0), (fy, roof_z(fy)), (fy0, roof_z(fy0))]
+            poly_prism(f"StepScreen{s}", pts, x - 0.05, x + 0.05, M["cladding"])
+            continue
         pts = [(side_front_y, 0.0), (fy, 0.0), (fy, roof_z(fy)), (side_front_y, roof_z(side_front_y))]
         poly_prism(f"SideScreen{s}", pts, x - 0.05, x + 0.05, M["cladding"])
         box(f"SidePost{s}", 0.16, 0.16, roof_z(side_front_y), (x, side_front_y, roof_z(side_front_y) / 2), M["steel"])
@@ -392,9 +413,10 @@ def build_section(rows, tunnel=False, x0=0.0, side_left=True, side_right=True):
 
 
 if RENDER_SET == "full":
-    n_seats = sum(build_section(15, k == 1, (k - 1) * W, k == 0, k == 2) for k in range(3))
+    n_seats = sum(build_section(15, k == 1, (k - 1) * W, None if k == 0 else 15, None if k == 2 else 15) for k in range(3))
 elif RENDER_SET == "rows":
-    n_seats = sum(build_section(r, False, (k - 1) * (W + 0.8)) for k, r in enumerate((10, 12, 15)))
+    rs = (10, 12, 15)
+    n_seats = sum(build_section(r, False, (k - 1) * W, rs[k - 1] if k > 0 else None, rs[k + 1] if k < 2 else None) for k, r in enumerate(rs))
 else:
     n_seats = build_section(ROWS, TUNNEL)
 

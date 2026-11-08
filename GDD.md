@@ -423,7 +423,7 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   - **Tunnel section starts above the tunnel over its full width** (no seats with a blocked view): the first 4 rows make way for a podium (dressing rooms, small windows, club band) with the tunnel in it and a rail along its edge.
   - **Slimmer tunnel canopy** (2.3 m wide, ~2.4 m high).
   - Gangways now have real treads (half-height front + full back per row); the black "holes" were the gangway steps hidden inside the row blocks.
-  - **Side walls between neighbours:** equal sections: none (as now). **Unequal sections: only the strip between the lower and the higher roof** (to build in the game, it depends on the neighbour).
+  - **Side walls between neighbours:** equal sections: none. **Unequal sections: only the strip between the lower and the higher roof**, drawn by the taller section (both build scripts take the neighbours' row counts; the game will pick the strip per neighbour). Open end: full side screen.
   - Roof numbers agreed: **approval: fans under a roof count 1.5× for the seating part**; **ticket +25% in The Shed, +50% in the main stand** on top of the division price; weather effect once weather exists.
   - Seat positions per variant are exported as `*_seats.json` next to the .glb for the crowd. Seats are real geometry in the model for now; fps is watched (Marcel).
 

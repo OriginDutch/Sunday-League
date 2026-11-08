@@ -142,7 +142,20 @@ def set_rows(rows):
     ROOF_FRONT_Z = ROOF_BACK_Z + 0.5
 
 
-def build_section(rows, x0=0.0):
+def profile(rows):
+    """(roof front y, front z, back y, back z, back wall y) of a Shed with `rows` rows."""
+    back_y = WALK_D + rows * TREAD
+    bz = ROW0_Z + (rows - 1) * RISE + 2.31
+    return ROOF_FRONT_Y, bz + 0.5, back_y + 0.35, bz, back_y + 0.33
+
+
+def line_z(p, y):
+    fy, fz, by, bz, _ = p
+    return fz + (bz - fz) * (y - fy) / (by - fy)
+
+
+def build_section(rows, x0=0.0, left=None, right=None):
+    """left/right: the neighbour's row count (None = open end: full side screen)."""
     set_rows(rows)
     first = len(parts)
     n_seats = 0
@@ -264,9 +277,27 @@ def build_section(rows, x0=0.0):
     # no back door: fans come in from the front walkway and up the gangway (Marcel 2026-11-08)
 
     # ------------------------------------------------------------------ side screens (corrugated, back half of each end)
+    # Marcel (2026-11-08): no wall between equal neighbours; between unequal ones only the strip
+    # between the lower and the higher roof (drawn by the taller section); full screen at an open end.
     side_front_y = WALK_D + TREAD * 0.6
-    for s in (-1, 1):
+    me = profile(ROWS)
+    for s, nb in ((-1, left), (1, right)):
         x = s * (HW + 0.15)
+        if nb is not None:
+            if nb >= ROWS:
+                continue
+            other = profile(nb)
+            fy0 = ROOF_FRONT_Y
+            nbw = other[4]
+            pts = [(fy0, line_z(other, fy0)), (nbw, line_z(other, nbw)), (nbw, 0.0), (bw_y, 0.0), (bw_y, roof_z(bw_y)), (fy0, roof_z(fy0))]
+            poly_prism(f"StepScreen{s}", pts, x - 0.015, x + 0.015, M["sheet"])
+            for k in range(int((bw_y - fy0) / 0.22)):
+                y = fy0 + 0.11 + k * 0.22
+                lo = line_z(other, y) if y <= nbw else 0.0
+                h = roof_z(y) - lo
+                if h > 0.05:
+                    box(f"StepRib{s}_{k}", 0.035, 0.05, h, (x + s * 0.03, y, lo + h / 2), M["sheet"])
+            continue
         pts = [(side_front_y, 0.0), (bw_y, 0.0), (bw_y, roof_z(bw_y)), (side_front_y, roof_z(side_front_y))]
         poly_prism(f"SideScreen{s}", pts, x - 0.015, x + 0.015, M["sheet"])
         for k in range(int((bw_y - side_front_y) / 0.22)):
@@ -283,8 +314,8 @@ def build_section(rows, x0=0.0):
 
 if "--render-set" in sys.argv:
     n_seats = 0
-    for rows, x0 in ((3, -W - 0.6), (5, 0.0), (8, W + 0.6)):
-        n_seats += build_section(rows, x0)
+    for rows, x0, l, r in ((3, -W, None, 5), (5, 0.0, 3, 8), (8, W, 5, None)):
+        n_seats += build_section(rows, x0, l, r)
 else:
     n_seats = build_section(ROWS)
 

@@ -1745,8 +1745,14 @@ func _spawn_teams() -> void:
 	for list in [home, away]:
 		for i in list.size():
 			list[i].set_number(i + 1)    # keeper 1, then the 4-3-3 in formation order
+			list[i].slot = i
+	for i in away.size():
+		away[i].look_seed = "%s#%d" % [opponent_name, i]
 	for i in home.size():
+		home[i].look_seed = "%s#%d" % [ClubState.CLUB_NAME, i]
 		if club != null and i < club.squad.size():
+			home[i].look_seed = club.squad[i]["name"]
+			home[i].look_age = int(club.squad[i].get("age", 0))
 			home[i].display_name = club.squad[i]["name"]
 
 

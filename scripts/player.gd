@@ -53,13 +53,12 @@ func setup(m: Main, t: int, r: String, home: Vector3, shirt: Color) -> void:
 
 
 const PlayerModel := preload("res://assets/models/player.glb")
+const PlayerLook := preload("res://scripts/player_look.gd")
+const BodyShape := preload("res://scripts/body_shape.gd")
 const NUMBER_FONT := preload("res://assets/fonts/WorkSans-Variable.ttf")
 const SHORTS := Color(0.95, 0.95, 0.95)
 const BOOTS := Color(0.08, 0.08, 0.09)
 const GLOVES := Color(0.92, 1.0, 0.45)
-const SKIN_TONES := [Color(0.98, 0.82, 0.68), Color(0.87, 0.67, 0.5), Color(0.6, 0.42, 0.3), Color(0.42, 0.28, 0.2)]
-const HAIR_TONES := [Color(0.15, 0.1, 0.07), Color(0.45, 0.28, 0.12), Color(0.9, 0.75, 0.35), Color(0.8, 0.35, 0.12), Color(0.2, 0.2, 0.22)]
-const HAIR_STYLES := ["Hair_Short", "Hair_Buzz", "Hair_Quiff", "Hair_Long"]
 const LOOPS := ["idle", "jog", "sprint", "celebrate"]
 ## Speed (m/s) at which the jog / sprint cycles match the feet to the ground.
 const JOG_NATURAL := 6.0
@@ -72,6 +71,13 @@ var anim: AnimationPlayer
 var anim_now := ""
 var oneshot_timer := 0.0         # > 0 while a one-shot (kick, slide, dive, catch, celebrate) owns the body
 var shirt_number := 0
+## Set by Main right after setup (same frame); the look is applied deferred, so these can still change.
+var look_seed := ""
+var look_age := 0
+var slot := 0
+var look := {}
+var _model: Node3D
+var _skel: Skeleton3D
 
 
 func _build_visual(shirt: Color) -> void:
@@ -84,20 +90,14 @@ func _build_visual(shirt: Color) -> void:
 	anim = model.get_node("AnimationPlayer")
 	for a in LOOPS:
 		anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
-	var skin: Color = SKIN_TONES[randi() % SKIN_TONES.size()]
-	var hair: Color = HAIR_TONES[randi() % HAIR_TONES.size()]
-	var style: String = HAIR_STYLES[randi() % HAIR_STYLES.size()]
-	var beard := randf() < 0.3
-	var colours := {"Shirt": shirt, "Shorts": SHORTS, "Socks": shirt, "Boots": BOOTS, "Skin": skin, "Hair": hair}
+	var colours := {"Shirt": shirt, "Shorts": SHORTS, "Socks": shirt, "Boots": BOOTS}
 	var skel: Skeleton3D = model.get_node("PlayerRig/Skeleton3D")
+	_model = model
+	_skel = skel
 	for mi in skel.get_children():
 		if not mi is MeshInstance3D:
 			continue
 		var m: MeshInstance3D = mi
-		if m.name.begins_with("Hair_"):
-			m.visible = m.name == style
-		elif m.name == "Beard":
-			m.visible = beard
 		var gloves := role == "GK" and m.name.begins_with("Hand_")
 		for i in m.mesh.get_surface_count():
 			var base: Material = m.mesh.surface_get_material(i)
@@ -106,8 +106,67 @@ func _build_visual(shirt: Color) -> void:
 				m.set_surface_override_material(i, _kit_mat(base, "Gloves", GLOVES))
 			elif colours.has(key):
 				m.set_surface_override_material(i, _kit_mat(base, key, colours[key]))
+	_apply_look.call_deferred()
 	_add_number(skel, shirt)
 	_play("idle")
+
+
+## Height, build, skin, hair and beard from PlayerLook (seeded by look_seed, beard/grey by look_age).
+func _apply_look() -> void:
+	if _skel == null or not is_instance_valid(_skel):
+		return
+	var hairs := ["bald"]
+	var beards := []
+	for c in _skel.get_children():
+		var n := String(c.name)
+		if n.begins_with("Hair_"):
+			hairs.append(n.substr(5))
+		elif n.begins_with("Beard_"):
+			var style := n.substr(6, n.rfind("_") - 6)
+			if not style in beards:
+				beards.append(style)
+	hairs.sort()
+	beards.sort()
+	look = PlayerLook.make(look_seed if look_seed != "" else str(get_instance_id()), role, slot, look_age, hairs, beards)
+	var beard := PlayerLook.beard(look)
+	var keep_beard := "" if beard.is_empty() else "Beard_%s_%s" % beard
+	var skin: Color = look["skin"]
+	var hair := PlayerLook.hair_color(look)
+	var skin_mat: StandardMaterial3D = null
+	var hair_mat: StandardMaterial3D = null
+	var beard_mat: StandardMaterial3D = null
+	for c in _skel.get_children():
+		if not c is MeshInstance3D:
+			continue
+		var m: MeshInstance3D = c
+		var n := String(m.name)
+		if n.begins_with("Hair_") and n != "Hair_" + look["hair"] or n.begins_with("Beard_") and n != keep_beard:
+			m.queue_free()
+			continue
+		var gloves := role == "GK" and n.begins_with("Hand_")
+		for i in m.mesh.get_surface_count():
+			var base: Material = m.mesh.surface_get_material(i)
+			var key: String = base.resource_name
+			if key == "Skin" and not gloves:
+				if skin_mat == null:
+					skin_mat = base.duplicate()
+					skin_mat.albedo_color = skin
+				m.set_surface_override_material(i, skin_mat)
+			elif key == "Hair" and n.begins_with("Beard_"):
+				if beard_mat == null:
+					beard_mat = base.duplicate()
+					beard_mat.albedo_color = hair.lerp(skin, 0.45) if beard[1] == "stubble" else hair
+				m.set_surface_override_material(i, beard_mat)
+			elif key == "Hair":
+				if hair_mat == null:
+					hair_mat = base.duplicate()
+					hair_mat.albedo_color = hair
+				m.set_surface_override_material(i, hair_mat)
+	var s: float = look["height"] / PlayerLook.MODEL_HEIGHT
+	body.scale = Vector3.ONE * s
+	var shape: SkeletonModifier3D = BodyShape.new()
+	shape.setup(look, s)
+	_skel.add_child(shape)
 
 
 func _kit_mat(base: Material, key: String, c: Color) -> Material:

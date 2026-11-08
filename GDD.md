@@ -217,6 +217,15 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
   - **Names on shirts: "soon", not yet.**
   - Marcel tests the hairstyles/beards in-game and screenshots the ones he doesn't like.
 - **Fans v2 — Marcel's wishes (2026-11-08, in discussion, nothing built yet):** the current fans read as blobs. Less detailed than players but more than now; bodies simpler but **not boxy**. Reuse hair/beards, with a much higher chance of "normal" styles (no spikes everywhere). Fans stand up to cheer; some stand and jump, wave arms or clap. A stadium section can be marked as **"harde kern"** (hard core): flags appear there, a small chance per place that grows in higher divisions with more fans. Maybe scarves held up or twirled. Claude asked to lay out his limits first.
+- **Fans v2 — Marcel's answers (2026-11-08):**
+  - Crowd mostly men, plus women (~10%) and children (~20%) — Marcel's guesses, to check against real demographics (Claude found UK surveys: women ~8–14%, up to 23% at some clubs; ~13% of season tickets went to youngsters in 2009-10).
+  - Clothing: club shirt, club sweater or random clothes; far higher club-wear chance in the hard core.
+  - **Weather is coming** (not in yet). With temperature: fans in coats when cold; players maybe long sleeves / gloves.
+  - **Hard core:** multiple sections allowed, free, no limit, purely visual for now.
+  - **Flags** use the club colours, and later the patterns/colours from the planned **shirt editor** and the crest from a possible **logo editor**; on top of that seeded variations.
+  - **Scarves** everywhere, higher chance in the hard core; fewer in warm weather (more shirts then).
+  - **Away fans:** not yet — goes into the **stadium editor**.
+  - **Standing up:** goal → everyone; big chance → some; hard core → always a share standing (Claude's proposal, agreed).
 - **Saves (Marcel, 2026-11-07):** saves don't matter yet — old saves may simply reset. **Marcel says when a save starts to matter.**
 - **Currency:** stays **£** in-game; the sign is just a sign (Marcel). Model numbers in € are used as-is.
 - **Sections vs slots (Marcel, 2026-11-07):** move from the 40 small slots to the **~11.5 m sections** of the stand POC (benches/chairs look odd otherwise) — work out what fits in 11.5 m. Also think about the **edges: ad boards, fences/rails, facilities, player dugouts** and similar. Proposal (Claude): 9 sections per long side, 5 per short side; per section 10 m seating + 1.2 m aisle = 5 benches or 20 chairs in a row (20 seats); pitchside layer with ad board + barrier (rope → fence → rail); dugouts fixed in front of the middle section of the main side.

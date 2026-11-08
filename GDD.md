@@ -557,6 +557,15 @@ Every income source exists in every tier, but in the lowest tiers the amounts ar
     - **Retirement:** the older the player, the higher the chance he stops, but it also depends on keeping his rating up, playing time, contract length and injuries.
     - Value now = rating + potential + age (replaces the blunt age multiplier table Claude showed; exact formula in the model, tunable).
 
+### Finances tab + bottom-tier economy (2026-11-08)
+- **Marcel's choices:** this step = the Finances tab **plus** the first real money flows for the bottom division (not the whole pyramid yet). The tab shows **this season's in/out per category, a per-match ledger, cash over time and what's coming up**. The club gets **small running costs** from day one. **Mock-up first**, then build.
+- Mock-up: `design/ui-noticeboard/mockups/S_Finances.dc.html` (generator `generators/finances.py`, local render `design/ui-noticeboard/finances_preview.png`). Example club halfway a Non-League 3 season.
+- **Claude's number proposal (nothing decided), bottom division, £:**
+  - In: tickets £2 per seated fan (as now; standing fans pay nothing) · tea hut £1 per visitor (seated + standing) · match subs £1 per player per match (Sunday-league reality: the players chip in) · sponsor £50 per season (paid in week 1) · prize money £1.70 at the end of the season (the GDD joke).
+  - Out: pitch hire £8 and referee £5 per home match · kit washing £2 per match · travel £3 per away match · league fee £30 per season (week 1) · building as now.
+  - Check against the economy model (NL3 reference club: 15 fans, ~€907 income per season, 45% costs): the reference club ends ≈ +£460 per season; costs ≈ £340.
+  - At the very start (5 fans, no seats): a home match = +£16 in (5 tea + 11 subs) vs −£15 out → roughly break-even; away −£5 + £11 subs = +£6. Nobody goes broke, growth comes from seats and fans.
+
 ### Playing vs autoplay
 - One baseline: **playing yourself = 100% of match rewards, autoplay = 75%**.
 

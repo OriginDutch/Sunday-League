@@ -65,7 +65,12 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - **Per division the lines can be switched off:** the bottom division (Non-League 3) has no relegation and no 18th-place play-off; the top division (Premier Division) has no promotion and no 3rd–7th play-offs. Later: European places as extra lines on the table.
 - Open: play-off format (bracket, one or two legs, home advantage).
 - **Next step chosen (2026-11-08, Marcel let Claude pick between promotion/relegation and a better stand tier): promotion/relegation.** Marcel's answers:
-  - Play-off format: Marcel sends a screenshot (pending).
+  - **Play-off format (Marcel, 2026-11-08): three rounds, every tie over two legs** (lower seed at home first, higher seed hosts the second leg):
+    - Round 1: **A = 7th v 4th**, **B = 6th v 5th**.
+    - Round 2: **C = winner A v winner B**; **D = 18th (of the division above) v 3rd**.
+    - Round 3 (final): **C v D**.
+    - The winner goes up (or, if it's the 18th, stays up). **If the 18th loses anywhere, they are relegated.**
+  - **Divisions stay as listed for now: 14** (Non-League 3 → 2 → 1, League 10 → 1, Premier Division).
   - **Difficulty: the same in every division for now** (until the player system exists).
   - **Money per division from the economy model's game column** (ticket, spend per visitor, sponsor, prize money, costs).
   - **Promotion requirements now, as simple seat counts** (Claude proposes numbers, Marcel approves).

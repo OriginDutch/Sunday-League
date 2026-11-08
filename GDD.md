@@ -412,6 +412,13 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - Next: real recordings from free/CC0 libraries (Marcel downloads, Claude cuts + loops + builds in). Open: keep the procedural sounds as fallback or remove them.
 
 
+## 10h2. The Shed + main stand for real (2026-11-08)
+- **Marcel's choices:** next stages after the bleachers are **The Shed** (3 → 5 → 8 rows, ~£5,600 per section from the economy model) and **the main stand** (10 → 12 → 15 rows, ~£50k per section, 4 weeks), so Premier's 5,000 seats are reachable. Corners stay empty for now (to discuss after this).
+- **A roof gives (Marcel): more approval, a higher ticket price per covered seat, and fewer fans staying away in bad weather** (the last one once weather exists). Numbers still to agree.
+- **Main stand brief (Marcel):** classic English for this tier (roof on columns in front of the seats), concrete terrace + steel trusses + corrugated roof, plastic seats in club colour, simple rear facade with entrances, **players' tunnel in the middle section**. Scoreboard and floodlights are **paid upgrades** later.
+- Built (renders only, not in the game yet): `tools/blender/build_shed.py --rows 3|5|8` (roof rises with the rows; `--render-set` for previews) and new `tools/blender/build_main_stand.py --rows 10|12|15 [--tunnel]` (`--render-set full|rows`). Main stand section: 1.5 m paddock walkway, 0.80 m rows, two front columns per section (5.75 m apart, continuous along the side), trussed rafters, deep fascia for a club name later, brick ground floor with windows/doors + cladding at the back, side screens as separate objects (hidden between neighbours). Tunnel section: the first 4 rows make way for a concrete tunnel block with an extendable white canopy with club-colour bands. Renders: `design/3d/the_shed/rows_3_5_8_*.png`, `design/3d/main_stand/*.png`.
+- Note: the models have 19 seats per row (the gangway takes one); the game counts 20 per row for bleachers.
+
 ## 10i. 3D POC #2 — big two-tier stand (2026-11-07)
 **Marcel's ask:** a big stand as a POC, including floodlights, stairs, aisles, two tiers, a roof, roof beams, and some people spread over the seats.
 

@@ -480,6 +480,21 @@ BRIDGES = [(_bkind[tuple(c)][0], _bkind[tuple(c)][1], tuple(c)) for c in _BR["ca
 BRIDGES += [("footbridge", "foot", tuple(c)) for c in _BR["foot"]]
 BRIDGES.append(("footpath over the weir", "foot", (TOWN_WEIR.x - 14, TOWN_WEIR.y)))
 
+# ---------------------------------------------------------------- step 2: main roads (Marcel's sketch, traced)
+_RD = _json.load(open(os.path.join(HERE, "marcel_roads_2026-11-09.json")))
+MAIN_ROADS = [LineString(_chaikin([tuple(c) for c in ln], 2)) for ln in _RD["lines"]]
+ROUNDABOUT = tuple(_RD["roundabout"])
+# the old straight road via the station bridge is gone (Marcel): its bridge goes; the new road crosses rail and river
+# by two separate bridges from different periods (Marcel)
+BRIDGES = [b_ for b_ in BRIDGES if b_[0] != "station bridge"]
+_mr = unary_union(MAIN_ROADS)
+for _x in getattr(_mr.intersection(LineString(CANAL_PTS)), "geoms", [_mr.intersection(LineString(CANAL_PTS))]):
+    if _x.geom_type == "Point" and min(Point(b_[2]).distance(_x) for b_ in BRIDGES) > 25:
+        BRIDGES.append(("new road bridge (later period)", "modern", (_x.x, _x.y)))
+RAIL_CROSSINGS = [q for q in getattr(_mr.intersection(RAIL), "geoms", [_mr.intersection(RAIL)]) if q.geom_type == "Point"]
+# west main road becomes an ordinary road towards the old stone bridge (Marcel)
+OLD_BRIDGE_LINK = LineString(_chaikin([(-312, -73), (-360, -20), (-410, 30), (-460, 75), (-500, 102)], 2))
+
 
 # ---------------------------------------------------------------- the way up (proposal): a lane with two hairpins + a footpath
 LANE = [P(20, -420), P(25, -330), P(45, -270), P(5, -235), P(55, -190), P(10, -150), P(50, -110), P(35, -70), VP]
@@ -577,6 +592,22 @@ def main():
     for W_ in ([] if NO_RIVER else WEIRS + [TOWN_WEIR]):
         ax.plot([W_.x - 8, W_.x + 8], [W_.y - 12, W_.y + 12], color="white", lw=2.5, zorder=6)
         ax.plot([W_.x - 8, W_.x + 8], [W_.y - 12, W_.y + 12], color="#3f7fa8", lw=1.0, zorder=6, ls=(0, (1, 1)))
+    # main roads (Marcel's sketch) + roundabout + where they cross the railway (bridges)
+    for rd in MAIN_ROADS:
+        xx_, yy_ = rd.xy
+        ax.plot(xx_, yy_, color="#222", lw=5.2, zorder=10.5, solid_capstyle="round")
+        ax.plot(xx_, yy_, color="#f2d27a", lw=3.2, zorder=10.6, solid_capstyle="round")
+    xx_, yy_ = OLD_BRIDGE_LINK.xy
+    ax.plot(xx_, yy_, color="#222", lw=3.0, zorder=10.5, solid_capstyle="round")
+    ax.plot(xx_, yy_, color="white", lw=1.6, zorder=10.6, solid_capstyle="round")
+    ax.text(-440, -10, "ordinary road on to\nthe old stone bridge", fontsize=7.5, zorder=21, ha="center",
+            bbox=dict(fc="white", ec="none", alpha=0.75, pad=0.2))
+    ax.add_patch(plt.Circle(ROUNDABOUT, 16, fc="#f2d27a", ec="#222", lw=1.6, zorder=10.7))
+    ax.add_patch(plt.Circle(ROUNDABOUT, 7, fc="#8DBF73", ec="#222", lw=0.8, zorder=10.8))
+    ax.text(ROUNDABOUT[0] - 70, ROUNDABOUT[1] + 30, "roundabout", fontsize=7.5, zorder=21, bbox=dict(fc="white", ec="none", alpha=0.75, pad=0.2))
+    for q in RAIL_CROSSINGS:
+        ax.add_patch(plt.Rectangle((q.x - 9, q.y - 9), 18, 18, fc="none", ec="#222", lw=1.6, zorder=10.9))
+        ax.text(q.x + 14, q.y + 12, "road over rail", fontsize=7, zorder=21, bbox=dict(fc="white", ec="none", alpha=0.75, pad=0.2))
     # bridges: a deck across the nearest water, square to it
     waters = [(CANAL, RIVER_W), (BROOK, 7.0), (BROOK2, 6.0)]
     style = {"stone": ("#b49a74", "#5a4630", 9.0), "modern": ("#d9d9d9", "#333", 10.0), "road": ("#c8c3b8", "#444", 9.0),

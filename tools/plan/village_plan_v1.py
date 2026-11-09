@@ -49,7 +49,7 @@ ROADS = {   # (points, carriageway m, kind)
     "Church Road": ([(-392, -60), (-480, -40), (-600, -60), (-750, -40)], 6.5, "c"),
     "North Road": ([(-575, 235), (-470, 175), (-352, 20)], 6.5, "c"),
     "Estate Road": ([(305, -100), (430, -120), (560, -60), (590, 60), (480, 200), (305, 120)], 6.5, "c"),
-    "Canal Road": ([(305, 200), (450, 300), (600, 360), (750, 380)], 6.5, "c"),
+    "Canal Road": ([(302, 238), (450, 305), (600, 360), (750, 380)], 6.5, "c"),     # starts clear of the canal bridge
     "Bypass": ([(750, -205), (720, 100), (650, 400), (600, 750)], 9, "a"),
     "Bridge Road": ([(-55, -445), (-75, -530), (-90, -750)], 6.5, "c"),            # over the railway by the station
     "Moor Lane": ([(300, -305), (330, -445), (365, -750)], 6.5, "c"),                # over the railway by the industrial estate
@@ -62,7 +62,7 @@ LANDMARKS = [   # (label, centre, size (w, h) or radius, colour, shape)
     ("village hall", (-360, -125), (22, 14), "#E8A33D", "rect"),
     ("GP + pharmacy", (-385, -205), (18, 12), "#E8A33D", "rect"),
     ("High St shops, pubs,\nfish & chips, takeaways", (-385, -150), None, None, "text"),
-    ("SUPERMARKET\n+ car park", (-195, -385), (95, 55), "#5C8FC9", "rect"),
+    ("SUPERMARKET\n+ car park", (-195, -392), (125, 78), "#5C8FC9", "rect"),
     ("petrol station", (560, -275), (40, 25), "#5C8FC9", "rect"),
     ("fire station", (150, -365), (35, 22), "#C0392B", "rect"),
     ("STATION", (-60, -470), (70, 12), "#444", "rect"),

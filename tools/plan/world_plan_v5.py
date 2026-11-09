@@ -78,11 +78,11 @@ assert PLOT.buffer(0.01).contains(MAXL), "max line must fit inside the plot"
 
 # ---------------------------------------------------------------- streets (centrelines)
 STREETS = {
-    "High Road": [(-265, -138), (-182, -135.5), (-120, -135), (-10, -135), (29, -135)],
-    "Car Park Lane": [(29, -135), (34, -142), (34, -184)],
+    "High Road": [(-265, -138), (-182, -135.5), (-120, -135), (-10, -135), (18, -135)],
+    "Car Park Lane": [(18, -135), (25, -135.6), (30.5, -138.2), (33.4, -143), (34, -150), (34, -184)],
     "Lower Road": [(34, -184), (153.5, -184), (265, -188)],
     "Gate Street": [(-10, -135), (-13, -190), (-19, -265)],
-    "Albert Street": [(-265, -187), (-120, -184), (-13, -183)],
+    "Albert Street": [(-265, -187), (-120, -184), (-13, -183), (34, -184)],
     "Victoria Street": [(-265, -236), (-120, -232), (-17.5, -232)],
     "Raglan Street": [(-17.5, -232), (34, -233), (150, -236), (265, -241)],
     "Mill Lane": [(-182, -135.5), (-205, -190), (-232, -265)],
@@ -99,7 +99,32 @@ STREETS = {
     "Keats Street": [(246, -188), (244, -57), (243, 149)],
     "Wharf Street": [(-265, 214), (0, 216), (265, 220)],
 }
-roads = {k: LineString(v) for k, v in STREETS.items()}
+def _run_on(streets, d=4.5):
+    lines = {k: LineString(v) for k, v in streets.items()}
+    out = {}
+    for k, pts in streets.items():
+        pts = list(pts)
+        for end in (0, -1):
+            p = Point(pts[end])
+            if any(o.distance(p) < 1.0 for kk, o in lines.items() if kk != k):
+                q = pts[1] if end == 0 else pts[-2]
+                dx, dy = pts[end][0] - q[0], pts[end][1] - q[1]
+                L = math.hypot(dx, dy) or 1
+                # only straight-on T-ends: a street that continues another one (same direction) is joined smoothly instead
+                ext = (pts[end][0] + dx / L * d, pts[end][1] + dy / L * d)
+                if end == 0:
+                    pts.insert(0, ext)
+                else:
+                    pts.append(ext)
+        out[k] = pts
+    return out
+
+
+SMOOTH_JOINS = {("High Road", "Car Park Lane")}
+_ext = _run_on({k: v for k, v in STREETS.items() if k not in ("Car Park Lane",)})
+_ext["Car Park Lane"] = STREETS["Car Park Lane"][:-1] + [(34, -184), (34, -188.5)]
+_ext["High Road"] = [p for p in _ext["High Road"] if p[0] <= 18.01]       # High Road flows into Car Park Lane: no run-on there
+roads = {k: LineString(_ext[k]) for k in STREETS}
 # natural: every street its own width (main roads wider, back streets narrower), pavements vary too
 MAIN = {"High Road", "Canal Street", "South Street", "North Street", "Lower Road", "Wharf Street"}
 _rw = random.Random(11)
@@ -186,7 +211,7 @@ for name, line in roads.items():
                     width, pub = 10.0, tag
                     break
             for depth in (FG + HD + yd_run + AL, FG + HD + 5.0 + AL, FG + HD + 3.0):
-                cand = frame_poly(o, t, n, 0.2, width - 0.2, 0.25, depth)
+                cand = frame_poly(o, t, n, 0.0, width, 0.25, depth)
                 if cand.intersects(blocked) or occ.hits(cand.buffer(-0.35)) or not VIEW.buffer(30).contains(cand):
                     continue
                 break
@@ -681,7 +706,7 @@ def draw(stage, G):
     draw_poly(ax, COACH_BAY, "#F4C7C5", ec=C["away"], lw=0.8, z=8)
     for dv in G["drives"]:
         draw_poly(ax, dv, C["hard"], ec="#8f8778", lw=0.6, z=10)
-    label(ax, 22, -162, "car park\nentrance", fs=6, w="normal")
+    label(ax, 58, -162, "car park entrance", fs=6, w="normal")
     # contours: the land falls gently towards the canal (the lock steps it down); the ground is levelled
     import numpy as np
     xs = np.linspace(VIEW.bounds[0], VIEW.bounds[2], 220)

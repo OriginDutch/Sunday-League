@@ -51,6 +51,8 @@ ROADS = {   # (points, carriageway m, kind)
     "Estate Road": ([(305, -100), (430, -120), (560, -60), (590, 60), (480, 200), (305, 120)], 6.5, "c"),
     "Canal Road": ([(305, 200), (450, 300), (600, 360), (750, 380)], 6.5, "c"),
     "Bypass": ([(750, -205), (720, 100), (650, 400), (600, 750)], 9, "a"),
+    "Bridge Road": ([(-55, -445), (-75, -530), (-90, -750)], 6.5, "c"),            # over the railway by the station
+    "Moor Lane": ([(300, -305), (330, -445), (365, -750)], 6.5, "c"),                # over the railway by the industrial estate
 }
 
 LANDMARKS = [   # (label, centre, size (w, h) or radius, colour, shape)

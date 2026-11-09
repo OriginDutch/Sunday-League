@@ -160,6 +160,10 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 - The ground grows **in place**, and it sits **in a residential area**.
 - There's always enough room to expand, but you can see houses around it, or a car driving past on the nearby road.
 
+### The world around the ground (Marcel, 2026-11-09) — mockup stage
+- **Marcel:** build a world around the stadium out to the fog (~400 m): **a real English neighbourhood**; water is Claude's pick; **static for now, but with movement in mind** (streets/towpath as future routes); **the neighbourhood is static** (doesn't grow with the club); **home ground only** for now.
+- **Mockup** (`tools/blender/build_town.py`, renders `design/world/mockup_*.png`), Claude's proposals in it: an **English canal along the East side** (towpath, lock, stone arch bridge, narrowboats); a **~70 m club-ground reserve** round the pitch (grass, palisade fence, car park on the West/High Road side) so the biggest stadium still fits; a **High Road** along West with a parade and the **pub** opposite the gate; Victorian **terraces** (brick variants, slate/tile roofs, chimneys, back gardens with fences and sheds) on a street grid; a **church** + **park** to the North, **allotments** to the South; street trees + lamp posts. ~300k faces + 1,300 trees (instanced) in Blender. Nothing in the game yet.
+
 ### Promotion requirements
 - Some tiers require certain stadium upgrades before you can be promoted, so you have something to work towards.
 - **Requirements are kept low**: a pretty crappy ground should still be able to play at the highest level.

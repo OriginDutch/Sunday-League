@@ -30,6 +30,7 @@ import village_plan_v1 as V
 NO_WATER = os.environ.get("NO_WATER") == "1"          # Marcel: "Ik bedoelde geheel zonder water :D" — just to look at the land
 NO_RIVER = os.environ.get("NO_RIVER") == "1" or NO_WATER          # Marcel (2026-11-09): "Kan je me een versie geven zonder rivier?"
 OUT = os.path.join(HERE, "../../design/world/" + ("village_land_v1_no_water.png" if NO_WATER else "village_land_v1_no_river.png" if NO_RIVER
+                                                     else "village_land_v1_holme_below_weir.png" if os.environ.get("HOLME_BELOW") == "1"
                                                      else "village_land_v1.png"))
 R = 1100
 
@@ -257,9 +258,12 @@ CANAL = LineString(CANAL_PTS)
 # the two locks in town + a flight climbing the hill's north flank at the west end (land rises ~1 -> 18 m there)
 # a river runs downhill (west -> east); it is made navigable up to the town: a lock beside a weir at x = 60 is the head of
 # navigation; another weir + lock at x = 520; upstream (west) just weirs where the river comes down off the high ground
-LOCK_X = (60, 520)
+# Marcel (option A): at the ground a WEIR ONLY, no lock — boats stop there (the last wharf is just below it);
+# upstream the quays are quay walls with the riverside walk. One lock + weir further downstream (x = 520).
+TOWN_WEIR = CANAL.interpolate(CANAL.project(Point(60, 200)))
+LOCK_X = (520,)
 LOCKS = [CANAL.interpolate(CANAL.project(Point(x, 200))) for x in LOCK_X]
-WEIRS = [CANAL.interpolate(CANAL.project(Point(x, 200))) for x in (-980, -820, -660)]
+WEIRS = [CANAL.interpolate(CANAL.project(Point(x, 200))) for x in (-980, -660)]          # was 3 weirs within ~450 m; one removed (review, Marcel)
 # water meadows: for each meander lobe outside the town, the land between the bend and the valley's line = inside of the bend
 def _meadows():
     base_y = lambda x: float(np.interp(x, [c[0] for c in CANAL_BASE], [c[1] for c in CANAL_BASE]))
@@ -288,7 +292,7 @@ MEADOWS = _meadows()
 # quays: mainly the centre, plus the mill reach and the industrial wharf (Marcel: "voornamelijk centrum, kleine stukjes daarbuiten")
 QUAY_X = [(-330, 330), (-560, -470), (700, 1060)]
 CONFLUENCE = tuple(_MW["mill"][-1])
-MILL = (CONFLUENCE[0] - 40, CONFLUENCE[1] - 22)            # Marcel: the mill at the confluence
+MILL = None                  # set below, once the river exists (Marcel: across the water from the ground)
 
 # railway: Marcel drew his own line (see below)
 def _chaikin(pts, n=3):
@@ -312,7 +316,7 @@ _xb = RAIL.intersection(LineString(CANAL_PTS))
 _xb = _xb if _xb.geom_type == "Point" else list(_xb.geoms)[0]
 _d0 = RAIL.project(_xb)
 from shapely.ops import substring as _sub
-STATION = _sub(RAIL, _d0 + 45, _d0 + 185).buffer(15, cap_style=2)
+STATION = None     # placed once the industry zone exists (below)
 RAIL_X_CANAL = RAIL.intersection(CANAL)
 # industry moves to where railway and canal cross: a wharf on the canal + sidings off the line (zone only; layout later)
 # a long strip along the south bank (quays + warehouses facing the water), from just past the lock to the map edge,
@@ -323,6 +327,10 @@ IND_ZONE = Polygon([(703, 263), (1051, 324), (1068, 256), (1021, 164), (1058, 39
 # basin: a short arm cut into the zone, warehouses round it (the heart of the wharf)
 BASIN = Polygon([(868, 318), (896, 322), (906, 205), (898, 186), (874, 184), (866, 200)])
 IND_ZONE = IND_ZONE.difference(BASIN.buffer(4))
+_ri = RAIL.intersection(IND_ZONE)
+_ri = max(getattr(_ri, "geoms", [_ri]), key=lambda g_: g_.length)
+_dm = RAIL.project(_ri.interpolate(0.5, normalized=True))
+STATION = _sub(RAIL, _dm - 70, _dm + 70).buffer(15, cap_style=2)      # Marcel: middle of the industry, on the straight
 FARMLAND_NOTCH = (1060, 160)      # Marcel: farmland round the bite out of the zone
 # the strip beyond the railway: a small "over the tracks" neighbourhood (Marcel), up to the town edge
 OVER_TRACKS_LABEL = (-150, 680)
@@ -388,7 +396,12 @@ SPRING = _MB[0]
 # small, tight bends high up in the wood (round bumps and roots), larger and calmer ones lower down; none at the mouth
 _MB = [tuple(c) for c in _MW["mill"]]          # Marcel's drawing, traced
 SPRING = _MB[0]
-BROOK = LineString(_chaikin(_MB, 2))
+_mbl = LineString(_MB)
+_flat = _mbl.length - 110.0
+_upper = _sub(_mbl, 0, _flat).simplify(45.0)               # the clough: nearly straight
+_lower = _sub(_mbl, _flat, _mbl.length)
+BROOK = LineString(_chaikin(list(_upper.coords) + list(_lower.coords)[1:], 2))
+FALLS = [BROOK.interpolate(f, normalized=True) for f in (0.12, 0.27, 0.41, 0.55)]      # small waterfalls in the ravine
 # Holme Beck: exactly Marcel's bends (incl. the S-bends on the slope) + a little dance at the top; his loop at full size
 _HB = [(-615, 991), (-369, 984), (-349, 916), (-342, 820), (-308, 738), (-233, 670), (-178, 547), (-123, 437),
        (-82, 350),
@@ -399,6 +412,22 @@ _HB = [tuple(c) for c in _MW["holme"]]         # Marcel's drawing, traced (his b
 _HBL = LineString(_HB)
 _HB = [(x, y + _away_from_ground(x) * max(0.0, 1.0 - (_HBL.length - _HBL.project(Point(x, y))) / 120.0)) for x, y in _HB]
 BROOK2 = LineString(_chaikin(_HB, 2))
+
+# the mill: across the water from the ground, at the town weir, on a mill race (goit) that leaves the river above the weir
+# and returns below it. The lane to it: "Miller's Lane" (Marcel)
+_RV = LineString(CANAL_PTS)
+_north = lambda x, off: (x, float(np.interp(x, [c[0] for c in CANAL_PTS], [c[1] for c in CANAL_PTS])) + off)
+GOIT = LineString(_chaikin([_north(-15, RIVER_W / 2), _north(10, 24), _north(60, 26), _north(110, 26), _north(140, 22),
+                            _north(160, RIVER_W / 2)], 3))
+MILL = (_north(95, 40)[0], _north(95, 40)[1])
+MILL_BOX = box(MILL[0] - 18, MILL[1] - 9, MILL[0] + 18, MILL[1] + 9)
+# Holme Beck variant (review point 6): its mouth carried past the weir so it joins below it (not into the lock)
+HOLME_BELOW = os.environ.get("HOLME_BELOW") == "1"
+if HOLME_BELOW:
+    _hb = list(BROOK2.coords)
+    _hx0 = _hb[-1][0]
+    _ext = [_north(x, 72 + 6 * math.sin(x / 40.0)) for x in np.linspace(_hx0 + 25, 185, 9)] + [_north(215, 40), _north(232, RIVER_W / 2)]
+    BROOK2 = LineString(_chaikin(_hb[:-3] + [_north(_hx0 + 5, 66)] + _ext, 2))
 _loop_pts = [c for c in _HB if c[1] < 330]
 LOOP_PARK = Polygon(_loop_pts).buffer(0).buffer(28).difference(BROOK2.buffer(4)).difference(
     LineString(CANAL_PTS).buffer(RIVER_W / 2 + 2))
@@ -440,6 +469,16 @@ def _carve(flat_x, flat_y, out, pts, bh_, width=45.0):
         hh = out[k:k + 20000]
         out[k:k + 20000] = np.where(hh > bed, bed + (hh - bed) * w, hh)
     return out
+
+
+# ---------------------------------------------------------------- bridges (Marcel's drawing, step 2 start; positions traced)
+_BR = _json.load(open(os.path.join(HERE, "marcel_bridges_2026-11-09.json")))
+_bkind = {(-502.7, 112.2): ("old stone bridge (the old crossing)", "stone"), (-236.1, 145.6): ("modern bridge (to the ground)", "modern"),
+          (206.1, 147.6): ("road bridge", "road"), (672.8, 259.8): ("station bridge", "road"),
+          (-107.5, 350.3): ("road bridge over Holme Beck", "road"), (-280.4, 531.9): ("rail bridge over Holme Beck", "rail")}
+BRIDGES = [(_bkind[tuple(c)][0], _bkind[tuple(c)][1], tuple(c)) for c in _BR["car"]]
+BRIDGES += [("footbridge", "foot", tuple(c)) for c in _BR["foot"]]
+BRIDGES.append(("footpath over the weir", "foot", (TOWN_WEIR.x - 14, TOWN_WEIR.y)))
 
 
 # ---------------------------------------------------------------- the way up (proposal): a lane with two hairpins + a footpath
@@ -535,9 +574,33 @@ def main():
                     if q_.geom_type == "LineString":
                         qx, qy = q_.xy
                         ax.plot(qx, qy, color="#4a4a4a", lw=2.2, zorder=6)
-    for W_ in ([] if NO_RIVER else WEIRS):
+    for W_ in ([] if NO_RIVER else WEIRS + [TOWN_WEIR]):
         ax.plot([W_.x - 8, W_.x + 8], [W_.y - 12, W_.y + 12], color="white", lw=2.5, zorder=6)
         ax.plot([W_.x - 8, W_.x + 8], [W_.y - 12, W_.y + 12], color="#3f7fa8", lw=1.0, zorder=6, ls=(0, (1, 1)))
+    # bridges: a deck across the nearest water, square to it
+    waters = [(CANAL, RIVER_W), (BROOK, 7.0), (BROOK2, 6.0)]
+    style = {"stone": ("#b49a74", "#5a4630", 9.0), "modern": ("#d9d9d9", "#333", 10.0), "road": ("#c8c3b8", "#444", 9.0),
+             "rail": ("#555", "#111", 8.0), "foot": ("#8a5a2b", "#3d2a14", 3.5)}
+    for name_, kind_, (bx0, by0) in BRIDGES:
+        ln_, ww_ = min(waters, key=lambda w_: w_[0].distance(Point(bx0, by0)))
+        dd_ = ln_.project(Point(bx0, by0))
+        c_ = ln_.interpolate(dd_)
+        a_ = ln_.interpolate(max(dd_ - 3, 0)); b_ = ln_.interpolate(min(dd_ + 3, ln_.length))
+        tx_, ty_ = b_.x - a_.x, b_.y - a_.y
+        T_ = math.hypot(tx_, ty_) or 1
+        tx_, ty_ = tx_ / T_, ty_ / T_
+        fc_, ec_, wd_ = style[kind_]
+        half_l, half_w = ww_ / 2 + 6, wd_ / 2
+        deck = Polygon([(c_.x - ty_ * half_l - tx_ * half_w, c_.y + tx_ * half_l - ty_ * half_w),
+                        (c_.x - ty_ * half_l + tx_ * half_w, c_.y + tx_ * half_l + ty_ * half_w),
+                        (c_.x + ty_ * half_l + tx_ * half_w, c_.y - tx_ * half_l + ty_ * half_w),
+                        (c_.x + ty_ * half_l - tx_ * half_w, c_.y - tx_ * half_l - ty_ * half_w)])
+        dx_, dy_ = deck.exterior.xy
+        ax.fill(dx_, dy_, fc=fc_, ec=ec_, lw=1.0, zorder=11)
+        if kind_ != "foot" or "weir" in name_:
+            oy_ = 18 if kind_ == "rail" else (-48 if "weir" in name_ else -22)
+            ax.text(c_.x + (-60 if "weir" in name_ else 18), c_.y + oy_, name_, fontsize=7.5, zorder=21,
+                    bbox=dict(fc="white", ec="none", alpha=0.75, pad=0.2))
     # water meadows: the insides of the meander bends outside the town (where a river leaves its silt)
     for mg in ([] if NO_RIVER else MEADOWS):
         mx_, my_ = mg.exterior.xy
@@ -566,7 +629,12 @@ def main():
       ax.text(-310, 860, "Holme Beck (name: proposal)", color="#245", fontsize=8, rotation=75, weight="bold", ha="center", va="center",
             zorder=20, bbox=dict(fc="white", ec="none", alpha=0.75, pad=0.3))
     if not NO_WATER:
-        ax.plot([MILL[0]], [MILL[1]], marker="s", ms=9, color="#7A6A5A", mec="#333", zorder=7)
+        fill(GOIT.buffer(3.0), "#9cc7dc", "#3f7fa8", 6, lw=0.5)
+        mx_, my_ = MILL_BOX.exterior.xy
+        ax.fill(mx_, my_, fc="#7A6A5A", ec="#222", lw=0.8, zorder=12)
+        for f_ in FALLS:
+            ax.plot([f_.x - 6, f_.x + 6], [f_.y, f_.y], color="white", lw=2.2, zorder=7)
+            ax.plot([f_.x - 6, f_.x + 6], [f_.y, f_.y], color="#3f7fa8", lw=0.8, zorder=7, ls=(0, (1, 1)))
     # railway
     rx, ry = RAIL.xy
     ax.plot(rx, ry, color="#444", lw=3.2, zorder=8)
@@ -583,7 +651,6 @@ def main():
     ax.text(880, 80, ("INDUSTRY\nsidings off the railway\n(zone; layout later)" if NO_RIVER else "INDUSTRY\nquays on the river +\nsidings off the railway\n(zone; layout later)"),
             ha="center", fontsize=8.5, weight="bold", zorder=20, bbox=dict(fc="white", ec="none", alpha=0.8, pad=0.3))
     ax.text(*OVER_TRACKS_LABEL, "\"over the tracks\"\nneighbourhood", ha="center", fontsize=9, style="italic", color="#7a3e22", zorder=20)
-    ax.text(560, -620, "old industrial site:\nfree again", ha="center", fontsize=8.5, style="italic", color="#555", zorder=20)
     if not NO_RIVER:
         bx_, by_ = BASIN.exterior.xy
         ax.fill(bx_, by_, fc="#BFD9E6", ec="#5f95b3", lw=0.8, zorder=6)
@@ -632,12 +699,12 @@ def main():
         ax.text(x, y, t, fontsize=fs, color=col, weight="bold", ha="center", va="center", rotation=rot, zorder=20,
                 bbox=dict(fc="white", ec="none", alpha=0.75, pad=0.3))
     if not NO_WATER:
-        lab(MILL[0] - 45, MILL[1] - 10, "mill", col="#4a3b22")
-        lab(-760, -200, "Mill Brook", col="#245", rot=80)
+        lab(MILL[0] + 150, MILL[1] + 30, "mill + mill race\n(Miller's Lane)", col="#4a3b22", fs=8)
+        lab(-760, -60, "Mill Brook: wooded clough\nwith small falls", col="#245", fs=7.5)
         lab(*SPRING, "spring", col="#245", fs=8)
     if not NO_RIVER:
         lab(520, 300, "river, 20 m · quays in the centre (dark lines)", col="#245", fs=8.5)
-        lab(60, 205, "lock + weir: head of navigation", col="#245", fs=8)
+        lab(60, 90, "weir: head of navigation (last wharf just below)", col="#245", fs=8)
         lab(-900, 60, "weirs: the river comes down\noff the high ground", col="#245", fs=8)
     if MEADOWS and not NO_RIVER:
         m0 = max(MEADOWS, key=lambda g_: g_.area).representative_point()

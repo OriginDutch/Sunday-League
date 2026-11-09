@@ -162,7 +162,21 @@ By the time you reach it, you're a big club with a real stadium and a real fanba
 
 ### The world around the ground (Marcel, 2026-11-09) — mockup stage
 - **Marcel:** build a world around the stadium out to the fog (~400 m): **a real English neighbourhood**; water is Claude's pick; **static for now, but with movement in mind** (streets/towpath as future routes); **the neighbourhood is static** (doesn't grow with the club); **home ground only** for now.
-- **Mockup** (`tools/blender/build_town.py`, renders `design/world/mockup_*.png`), Claude's proposals in it: an **English canal along the East side** (towpath, lock, stone arch bridge, narrowboats); a **~70 m club-ground reserve** round the pitch (grass, palisade fence, car park on the West/High Road side) so the biggest stadium still fits; a **High Road** along West with a parade and the **pub** opposite the gate; Victorian **terraces** (brick variants, slate/tile roofs, chimneys, back gardens with fences and sheds) on a street grid; a **church** + **park** to the North, **allotments** to the South; street trees + lamp posts. ~300k faces + 1,300 trees (instanced) in Blender. Nothing in the game yet.
+- **Mockup v1** (night of 2026-11-08/09): a street grid. **Rejected** — Marcel (2026-11-09): "Maak het niet te vierkant. Het moet geen raster van huizen worden."
+- **Decisions (Marcel, 2026-11-09):**
+  - **Water:** Claude's pick, an **English canal** (towpath, lock, humpback bridges, narrowboats later for movement — their route is fixed).
+  - **Static neighbourhood vs growing stadium → option A:** the neighbourhood really is static. The houses start at the edge of the max-stadium reserve plus a plaza ("with a second or third ring the facade needs breathing room"). So a small stadium sits in a roomy ground.
+  - **What fills the reserve early on:** car parks, lots of trees, a park, a training pitch.
+  - **Performance:** a few house variants, instanced, simple LOD from ~200 m — built in Blender like the stands.
+- **Mockup v2** (`tools/blender/build_town.py [--max] --render …`, fog via `tools/blender/fog_composite.py`, renders `design/world/v2_*.png`):
+  - **Reserve:** a superellipse (rounded oval), 150 × 128 m half sizes, palisade fence, gate on the West side. The max stadium (pitch + ~70 m stands) fits with a 23–25 m plaza at mid-side.
+  - **Ring road** round the reserve; its West side is the **High Road** with the **pub** opposite the gate.
+  - **Streets:** curved roads, crescents (West and South), a close with a turning circle. Houses are placed **along the streets** and follow the bends (collision grid keeps them off roads, water and each other). Victorian **terraces** in runs of 6–16 with ginnels between them, near the ground; **1930s semis** (bay windows, hipped roofs, driveways) further out; mixed streets in between. Parked cars on terrace streets, lamp posts, avenue trees on the main roads.
+  - **Canal** winds across the East side: towpath on the stadium side, a **lock** with a lock keeper's cottage (South-East), **two humpback bridges**, moored narrowboats.
+  - **The rec + church** (North-West), **allotments** (South-East), leftover land green with tree clumps, thick woods at the edge (~400–430 m).
+  - **Early variant:** car parks by the gate, a **park with a pond** at the North end, a **training pitch** at the South end, a tree belt inside the fence; a short main stand (tunnel) + a short Shed.
+  - **Max variant:** a paved plaza with a tree row along the fence and tree islands in the corners; the two-tier POC stand on all four sides (the reserve leaves room for a 3rd tier).
+  - Nothing in the game yet.
 
 ### Promotion requirements
 - Some tiers require certain stadium upgrades before you can be promoted, so you have something to work towards.

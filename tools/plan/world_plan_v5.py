@@ -178,7 +178,8 @@ def frame_poly(p, t, n, u0, u1, v0, v1):
     return Polygon(pts)
 
 
-HOUSES = []      # dicts: front, house, outrigger, yard, alley, pub
+HOUSES = []      # dicts: front, house, outrigger, yard, alley, pub, frame (for the 3D mockup)
+RUN_ID = [0]
 blocked = unary_union([PLOT.buffer(0.5), road_area.buffer(-0.05), water.buffer(3.6), tow]).intersection(box(-400, -400, 400, 400))
 occ = Grid()
 pubs_used = set()
@@ -233,6 +234,12 @@ for name, line in roads.items():
             if pub is not None:
                 pubs_used.add((jx, jy, name, side))
                 h["pubpos"] = h["house"].centroid
+            if run == 0:
+                RUN_ID[0] += 1
+            h["frame"] = {"o": o, "t": t, "n": n, "w": width, "fg": FG, "hd": HD, "yd": yd, "depth": depth,
+                          "run": RUN_ID[0], "street": name}
+            if "out" in h:
+                h["frame"]["out_u0"] = 0 if k % 2 == 0 else width - OUTW
             HOUSES.append(h)
             s += width
             k += 1
@@ -247,6 +254,14 @@ def terrain(x, y):
     t = np.clip((y + 262) / (175 + 262), 0, 1)
     base = 3.2 * (1 - t) ** 1.2 - 1.2 * t                # higher in the West, down towards the canal
     return base + 0.6 * np.sin(x / 70.0 + 0.8) * (1 - t) - 0.004 * np.clip(x, 0, None)
+
+
+# canal water levels: the lock steps the water down to the East; both stay well below the banks
+import numpy as _np
+_tw = [float(terrain(_np.array(x), _np.array(canal.interpolate(canal.project(Point(x, 175))).y - 8.0))) for x in range(-262, 50, 8)]
+_te = [float(terrain(_np.array(x), _np.array(canal.interpolate(canal.project(Point(x, 175))).y - 8.0))) for x in range(66, 262, 8)]
+WATER_W = round(min(_tw) - 0.6, 1)
+WATER_E = round(min(min(_te) - 0.6, WATER_W - 1.8), 1)
 
 
 # ---------------------------------------------------------------- canal crossings: two humpback bridges + a footbridge at the lock
@@ -719,8 +734,8 @@ def draw(stage, G):
     cs = ax.contour(X, Y, Z, levels=np.arange(-1.5, 4.01, 0.5), colors="#6b4a26", linewidths=1.0, alpha=0.85, zorder=8.5)
     ax.clabel(cs, fmt="%+.1f m", fontsize=5.5, inline=True)
     label(ax, 0, -22 if stage == "min" else -60, "ground levelled at ±0.0 m", fs=6, col="#7a5c3a", w="normal")
-    label(ax, LOCK_X - 40, lock_p.y, "+0.4 m water", fs=5.5, col="#245", w="normal")
-    label(ax, LOCK_X + 30, lock_p.y, "−1.4 m water", fs=5.5, col="#245", w="normal")
+    label(ax, LOCK_X - 40, lock_p.y, f"{WATER_W:+.1f} m water", fs=5.5, col="#245", w="normal")
+    label(ax, LOCK_X + 30, lock_p.y, f"{WATER_E:+.1f} m water", fs=5.5, col="#245", w="normal")
     label(ax, 157, 87, "away\ncoaches", fs=6.5, col=C["away"])
     # compass, key, scale
     title = "PLAN v5 — MIN (13th division)" if stage == "min" else "PLAN v5 — MAX (1st division)"

@@ -627,9 +627,13 @@ func seat_list() -> Array:
 				var info := stand_info(stage, int(state.sections[key]["rows"]), sec)
 				var mult: float = ClubState.STAGES[stage]["ticket"]
 				var fr := section_frame(sec)
+				var prof: Dictionary = info.get("profile", {})
 				for sv in info.get("seats", []):
 					var lp := Vector3(float(sv[0]), float(sv[1]) - 0.45, float(sv[2]) - STAND_FRONT_D)
-					out.append({"pos": fr["line"] + lp.rotated(Vector3.UP, yaw), "yaw": yaw, "sec": sec, "mult": mult})
+					# room between the row and the roof above it (flags only where they fit, Marcel 2026-11-09)
+					var floor_h := float(sv[1]) - 0.44
+					var head := _roof_at(prof, -float(sv[2])) - floor_h if not prof.is_empty() else 99.0
+					out.append({"pos": fr["line"] + lp.rotated(Vector3.UP, yaw), "yaw": yaw, "sec": sec, "mult": mult, "headroom": head})
 				continue
 			for r in int(state.sections[key]["rows"]):
 				for i in ClubState.BLEACHER_SEATS_PER_ROW:
@@ -665,7 +669,7 @@ func spawn_crowd(attendance: int, travelling: int = 0) -> void:
 	for k in seated:
 		var st: Dictionary = seats[k]
 		var hard := ours and state.is_hardcore(int(st.get("sec", -1)))
-		places.append({"pos": st["pos"], "yaw": st["yaw"], "hard": hard, "standing": false})
+		places.append({"pos": st["pos"], "yaw": st["yaw"], "hard": hard, "standing": false, "headroom": st.get("headroom", 99.0)})
 	var standing_spots := _standing_spots(away_mode)
 	standing_spots.shuffle()
 	for k in mini(attendance - seated, standing_spots.size()):

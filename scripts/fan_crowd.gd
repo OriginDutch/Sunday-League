@@ -15,6 +15,7 @@ const HC_STANDING := 0.6     # hard core: share that always stands
 const GLASSES := 0.12
 ## Flag routines (Marcel): figure 8s then a circle, alternating; both directions. Consecutive in fans.json.
 const FLAG_CLIPS := ["flag_8x4", "flag_8x4_cw", "flag_8x3", "flag_8x3_cw"]
+const FLAG_HEADROOM := 5.6  # metres of room above the row a flag needs (roofed stands, Marcel 2026-11-09)
 const FLAG_GAP := 2.6        # metres between flag wavers (no poles in each other's way, room to swing)
 
 const SKIN := [Color(0.98, 0.84, 0.72), Color(0.94, 0.76, 0.62), Color(0.85, 0.64, 0.48), Color(0.72, 0.52, 0.38),
@@ -237,7 +238,8 @@ func _roll(rng: RandomNumberGenerator, seat: Dictionary, temp: String, flag_chan
 		elif b < 0.47: mask |= 1 << Bit.GOATEE
 		elif b < 0.52: mask |= 1 << Bit.MOUSTACHE
 	var standing: bool = seat.get("standing", false) or (hard and rng.randf() < HC_STANDING)
-	var flag := hard and body != "child" and rng.randf() < flag_chance
+	# under a roof only where the flag fits: hands 1.1 m + 3 m pole + 1.3 m cloth ≈ 5.4 m above the feet
+	var flag := hard and body != "child" and rng.randf() < flag_chance and float(seat.get("headroom", 99.0)) >= FLAG_HEADROOM
 	if flag:
 		mask |= 1 << Bit.FLAG
 		mask |= rng.randi_range(0, 7) << Bit.PATTERN0

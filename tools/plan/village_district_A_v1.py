@@ -201,6 +201,158 @@ HOUSE_LINES = [LineString(h.exterior.coords) for h in HOUSES]
 FRONT_U = unary_union(FRONT)
 
 
+# ---------------------------------------------------------------- back yards (Marcel 2026-11-10: "doe de achtertuintjes maar")
+# The land behind the houses is shared out the way real blocks are: every house gets the part of the backland nearest to its
+# own back wall (so the yards fill the block — Marcel: no maximum, no dead land), its side walls run straight back, and where
+# the yards of two different rows meet, a 3 m ginnel (back alley) runs along the line between them. A row backing onto a
+# main road gets its ginnel along the road. Rear extensions (2.6 x 3.5 m, mirrored in pairs) as world plan v5 agreed.
+from shapely.validation import make_valid as _mv
+from shapely import voronoi_polygons
+from shapely.geometry import MultiPoint
+GINNEL, OUT_W, OUT_D = 3.0, 2.6, 3.5
+
+
+def _clean(g, min_area=0.5):
+    g = _mv(g)
+    ps = [q for q in getattr(g, "geoms", [g]) if q.geom_type == "Polygon" and q.area > min_area]
+    return max(ps, key=lambda q: q.area) if ps else None
+
+
+_hu = unary_union(HOUSES)
+BACKLAND = unary_union(BLOCKS).difference(_hu).difference(unary_union([
+    STREET_U.buffer(0.5), MAIN.buffer(6.0), PLOT.buffer(1.0), WATER.buffer(1), GREEN, CLUB_SQUARE, NE_GREEN, RIVER_STRIP,
+    CLUBHOUSE.buffer(1), CHURCH_HALL.buffer(1) if CHURCH_HALL else Point(0, 0), PUB.buffer(4) if PUB is not None else Point(0, 0)]))
+# rows: houses joined wall to wall (corner houses are their own row)
+_corner_ids = {id(c) for c in CORNERS}
+_row_of = {}
+_rid = 0
+for h in HOUSES:
+    if id(h) in _row_of:
+        continue
+    stack = [h]
+    _row_of[id(h)] = _rid
+    while stack and id(h) not in _corner_ids:
+        g = stack.pop()
+        for k in HOUSES:
+            if id(k) not in _row_of and id(k) not in _corner_ids and k.distance(g) < 0.3:
+                _row_of[id(k)] = _rid
+                stack.append(k)
+    _rid += 1
+
+
+def _back_edge(h):
+    cs = list(h.exterior.coords)[:-1]
+    if len(cs) == 4 and id(h) not in _corner_ids:
+        return LineString([cs[3], cs[2]])                       # b0 -> b1
+    return h.exterior.difference(STREET_U.buffer(1.0))           # corner house: every wall away from the streets
+
+
+# each house's territory: Voronoi cells of points along its back wall
+_pts, _own = [], []
+for i_, h in enumerate(HOUSES):
+    e = _back_edge(h)
+    for seg in getattr(e, "geoms", [e]):
+        if seg.geom_type != "LineString" or seg.length < 0.2:
+            continue
+        for d_ in np.arange(0.25, seg.length, 0.5):
+            q = seg.interpolate(d_)
+            _pts.append((q.x, q.y))
+            _own.append(i_)
+# shapely returns the cells in the order of the input points when ordered=True
+_vor = voronoi_polygons(MultiPoint(_pts), extend_to=box(*VIEW).buffer(50), ordered=True)
+TERR = {}
+for k_, cell in enumerate(_vor.geoms):
+    TERR.setdefault(_own[k_], []).append(cell)
+import shapely as _shp
+TERR = {i_: _shp.union_all([c.buffer(0.001) for c in v], grid_size=0.01).intersection(BACKLAND) for i_, v in TERR.items()}
+# only the piece of backland the house actually backs onto (not land across a street)
+def _own_piece(i_, t):
+    e = _back_edge(HOUSES[i_]).buffer(0.8)
+    return unary_union([q for q in getattr(t, "geoms", [t]) if q.geom_type == "Polygon" and q.intersects(e)])
+_bl_parts = [q for q in getattr(BACKLAND, "geoms", [BACKLAND]) if q.geom_type == "Polygon"]
+TERR = {i_: unary_union([t.intersection(q) for q in _bl_parts if q.intersects(_back_edge(HOUSES[i_]).buffer(0.8))]) for i_, t in TERR.items()}
+# ginnels: where territories of different rows meet, and along a main road behind a row
+_row_terr = {}
+for i_, t in TERR.items():
+    _row_terr.setdefault(_row_of[id(HOUSES[i_])], []).append(t)
+_row_terr = {r: _shp.union_all(v, grid_size=0.01) for r, v in _row_terr.items()}
+_row_terr = {r: unary_union([q for q in getattr(g, "geoms", [g]) if q.geom_type == "Polygon"]) for r, g in _row_terr.items()}
+_row_terr = {r: g for r, g in _row_terr.items() if not g.is_empty}
+# the borders between rows: each row's territory outline, minus the back walls and the edge of the backland
+_edges = unary_union([_hu.buffer(0.4), BACKLAND.boundary.buffer(0.4)])
+_lines = []
+for r_, g_ in _row_terr.items():
+    b_ = g_.boundary.difference(_edges)
+    if not b_.is_empty:
+        _lines.append(b_)
+GINNEL_U = unary_union([g.buffer(GINNEL / 2, cap_style=2, join_style=2) for g in _lines]) if _lines else Point(0, 0).buffer(0)
+GINNEL_U = unary_union([GINNEL_U, BACKLAND.intersection(MAIN.buffer(6.0 + GINNEL))]).intersection(BACKLAND)
+GINNEL_U = unary_union([q for q in getattr(GINNEL_U, "geoms", [GINNEL_U]) if q.geom_type == "Polygon" and q.area > 6])
+# yards: territory minus ginnel; houses with a regular back wall keep their side walls square (no yard wider than the house)
+YARDS, OUTRIGGERS, YARD_INFO = [], [], []
+for i_, h in enumerate(HOUSES):
+    t = TERR.get(i_)
+    if t is None or t.is_empty:
+        continue
+    y = t.difference(GINNEL_U)
+    cs = list(h.exterior.coords)[:-1]
+    if len(cs) == 4 and id(h) not in _corner_ids:
+        f0, f1, b1, b0 = cs
+        def ext(p, q, d):
+            sx, sy = p[0] - q[0], p[1] - q[1]
+            sl = math.hypot(sx, sy) or 1
+            return (p[0] + sx / sl * d, p[1] + sy / sl * d)
+        band = _clean(Polygon([b0, b1, ext(b1, f1, 45), ext(b0, f0, 45)]))
+        if band is not None:
+            y = y.intersection(band)
+    y = _clean(y, 4.0)
+    if y is None or y.buffer(-0.9).is_empty:
+        continue
+    YARDS.append(y)
+    yd = y.hausdorff_distance(_back_edge(h))
+    YARD_INFO.append((h, yd))
+    if len(cs) == 4 and id(h) not in _corner_ids:
+        f0, f1, b1, b0 = cs
+        w_ = math.dist(b0, b1)
+        t_ = ((b1[0] - b0[0]) / w_, (b1[1] - b0[1]) / w_)
+        nx, ny = b0[0] - f0[0], b0[1] - f0[1]
+        nl = math.hypot(nx, ny) or 1
+        nx, ny = nx / nl, ny / nl
+        u0 = 0.0 if i_ % 2 == 0 else w_ - OUT_W
+        p0 = (b0[0] + t_[0] * u0, b0[1] + t_[1] * u0)
+        p1 = (b0[0] + t_[0] * (u0 + OUT_W), b0[1] + t_[1] * (u0 + OUT_W))
+        o = Polygon([p0, p1, (p1[0] + nx * OUT_D, p1[1] + ny * OUT_D), (p0[0] + nx * OUT_D, p0[1] + ny * OUT_D)])
+        if y.buffer(0.05).contains(o) and not y.difference(o).buffer(-0.9).is_empty:
+            OUTRIGGERS.append(o)
+YARD_U = unary_union(YARDS)
+# a ginnel serves yards: stray bits that touch no yard (fragments on the fence strip etc.) go
+GINNEL_U = unary_union([q for q in getattr(GINNEL_U, "geoms", [GINNEL_U]) if q.geom_type == "Polygon" and q.distance(YARD_U) < 0.3 and q.area > 15])
+
+
+# tunnel backs (Marcel: A): where a ginnel runs dead against a house at the end of a block, a covered passage through that
+# house's ground floor (1.5 m wide, the rooms above stay) leads from the street into the ginnel; no house is lost.
+# A ginnel lane that already reaches a street or the main road needs none.
+TUNNELS = []                                       # (house, passage line from the street to the ginnel)
+_open_to = unary_union([STREET_U, MAIN.buffer(5.0)]).buffer(2.0)
+for gcomp in getattr(GINNEL_U, "geoms", [GINNEL_U]):
+    if gcomp.geom_type != "Polygon" or gcomp.area < 20:
+        continue
+    if gcomp.intersects(_open_to):
+        continue
+    best = None
+    for h in HOUSES:
+        dgh = h.distance(gcomp)
+        if dgh > 1.0:
+            continue
+        P_ = nearest_points(h, gcomp)[0]
+        S_ = nearest_points(STREET_U.boundary, P_)[0]
+        ln_ = LineString([(S_.x, S_.y), (P_.x, P_.y)])
+        if ln_.length < 14 and (best is None or ln_.length < best[1].length):
+            best = (h, ln_)
+    if best is not None:
+        TUNNELS.append(best)
+
+
 # ---------------------------------------------------------------- checks (pinch points for Marcel)
 def _depth(b):
     """How far the middle of a block is from its edge (half its 'thickness')."""
@@ -290,7 +442,14 @@ def main(path=OUT, for_overlay=False, sketch=False):
     fill(PLOT, "#dfeccf", "#2f5a2a", 1.2, 3.5)
     for b in BLOCKS:
         fill(b, "#efe8d6", "#c9bea6", 0.4, 4)
+    fill(GINNEL_U, "#b9b2a3", "#8a8274", 0.3, 4.6)            # back alleys (ginnels)
+    for y_ in YARDS:
+        fill(y_, "#e2d6bd", "#7e4a3a", 0.35, 4.7)             # walled yards
+    for o_ in OUTRIGGERS:
+        fill(o_, "#b08f68", "#5b4a36", 0.35, 4.8)             # rear extensions
     fill(FRONT_U, "#c4a27a", "#5b4a36", 0.5, 5)
+    for h_, ln_ in TUNNELS:
+        fill(ln_.buffer(0.75, cap_style=2).intersection(h_.buffer(0.3)), "#6b6458", "none", 0, 5.2)
     hl = unary_union(HOUSE_LINES).intersection(FRONT_U)
     for q in getattr(hl, "geoms", [hl]):
         if q.geom_type == "LineString":
@@ -347,8 +506,8 @@ def main(path=OUT, for_overlay=False, sketch=False):
         ax.text(225, 100, "district B →", fontsize=8, color="#7a6a50", zorder=10, ha="center")
         res = checks()
         txt = "\n".join(f"{k}: {len(v)}" + (f" — {'; '.join(v[:5])}" if v else "") for k, v in res)
-        ax.set_title("DISTRICT A v1 — Marcel's town sketch as the base, at real sizes. Bold = ring streets 10.5 m, others 8.5 m; "
-                     "brown = terraced houses (9 m deep), cream = yards", fontsize=10.5, loc="left")
+        ax.set_title("DISTRICT A v1 — Marcel's town sketch as the base, at real sizes. Bold = ring streets 10.5 m, others 10 m; "
+                     "brown = terraced houses (9 m deep) with rear extensions, walled yards, grey = back alleys (ginnels), dark = tunnel backs into them", fontsize=10.5, loc="left")
         ax.text(x0 + 4, y0 + 4, "CHECK\n" + txt, fontsize=7, zorder=30, va="bottom", ha="left",
                 bbox=dict(fc="white", ec="#999", boxstyle="round,pad=0.4"))
     fig.savefig(path, bbox_inches="tight", pad_inches=0.1)

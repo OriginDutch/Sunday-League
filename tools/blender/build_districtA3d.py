@@ -517,9 +517,38 @@ def houses():
                                        (wdt * 0.3, 4.1, 1.1, 1.2, "win"), (wdt * 0.7, 4.1, 1.1, 1.2, "win")):
                 px, py = P(u)
                 box(rr2.choice(DOORS) if k == "door" else "window", px, py, z0 + zc, ww, 0.08, wh, rot)
-        # front wall at the back of the pavement (1.5 m front garden / step)
+        # front wall at the back of the pavement (1.5 m front garden / step); a tunnel-back house leaves a gap for the passage
+        if any(h is t_[0] for t_ in A.TUNNELS):
+            continue
         px, py = P(wdt / 2, 1.35)
         box("wall_low", px, py, z0 + 0.1, wdt, 0.25, 0.7, rot)
+
+
+def backs():
+    """Walled yards (paved), rear extensions with a lean-to roof, cobbled back alleys (ginnels)."""
+    hu = unary_union(A.HOUSES).buffer(0.3)
+    for y in A.YARDS:
+        drape("yard", y, lambda x, y_: gz(x, y_), 0.08)
+        wall = y.exterior.difference(hu)
+        for seg in getattr(wall, "geoms", [wall]):
+            if seg.geom_type == "LineString" and seg.length > 0.5:
+                ribbon_wall("wall_yard", seg, lambda x, y_: gz(x, y_) - 0.1, lambda x, y_: gz(x, y_) + 1.8, 1.5)
+    for k, o in enumerate(A.OUTRIGGERS):
+        c = o.centroid
+        z0 = float(traw(np.array(c.x), np.array(c.y))) + 0.25
+        brick = BRICKS[(k // 6 + int(c.x // 40)) % len(BRICKS)]
+        _prism(brick, o, z0 - 0.3, 3.6)
+        _hip_roof("slate_b", o, z0 + 3.3, 0.8)
+    drape("gravel", A.GINNEL_U.intersection(VIEWB), lambda x, y_: gz(x, y_), 0.06)
+    # tunnel backs: a dark arched opening in the front wall and the back wall of the house it passes through
+    for h, ln in A.TUNNELS:
+        (sx_, sy_), (px_, py_) = ln.coords[0], ln.coords[-1]
+        a = math.atan2(py_ - sy_, px_ - sx_)
+        cut = ln.intersection(h.exterior)
+        pts = [cut] if cut.geom_type == "Point" else list(getattr(cut, "geoms", []))
+        for q in pts:
+            zq = float(traw(np.array(q.x), np.array(q.y))) + 0.25
+            box("door_black", q.x, q.y, zq + 1.3, 0.3, 1.6, 2.6, a)
 
 
 # ------------------------------------------------------------------ the river, the green spaces and the district's buildings
@@ -852,6 +881,7 @@ def finish():
 terrain_mesh()
 streets()
 houses()
+backs()
 river_and_green()
 club_ground()
 plan_trees()
@@ -892,6 +922,9 @@ SHOTS = {
     "turnstile_lane": {"lens": 24, "pos": ("eye", -205, 41), "target": (-139, 50, 3), "res": (1600, 900)},
     "main_gate": {"lens": 24, "pos": ("eye", -45, -138), "target": (-10, -122, 3), "res": (1600, 900)},
     "lower_road": {"lens": 26, "pos": ("eye", 125, -186), "target": (0, -186, 3), "res": (1600, 900)},
+    "ginnel": {"lens": 24, "pos": ("eye", 175, -212.5), "target": (110, -213, 2), "res": (1600, 900)},
+    "yards_low": {"lens": 30, "pos": (40, -260, 28), "target": (60, -205, 0), "res": (1600, 900)},
+    "tunnel": {"lens": 28, "pos": ("eye", 210, 8), "target": (200, 22, 1.8), "res": (1600, 900)},
     "away_walk": {"lens": 24, "pos": ("eye", 192, 128), "target": (139, 100, 3), "res": (1600, 900)},
     "pitch_home": {"lens": 22, "pos": (-10, 6, 1.7), "target": (-200, 0, 10), "res": (1600, 900)},
     "pitch_west": {"lens": 22, "pos": (0, 18, 1.7), "target": (0, -200, 12), "res": (1600, 900)},

@@ -514,11 +514,11 @@ def _draw_tram(ax, labels=True):
             ax.plot([bx_ - dx_ * 7 + s_ * dy_ * 4.5, bx_ + dx_ * 7 + s_ * dy_ * 4.5],
                     [by_ - dy_ * 7 - s_ * dx_ * 4.5, by_ + dy_ * 7 - s_ * dx_ * 4.5], color="#222", lw=1.2, zorder=8)
     if labels:
-        ax.text(*STONE_YARD.centroid.coords[0], "stone\nyard", fontsize=6.5, ha="center", va="center", zorder=21, color="#2a1a0c")
+        ax.text(*STONE_YARD.centroid.coords[0], "stone\nyard", fontsize=6.5, ha="center", va="center", zorder=21, color="#2a1a0c", clip_on=True)
         mx_, my_ = TRAMWAY.interpolate(0.62, normalized=True).coords[0]
         ang_ = np.degrees(np.arctan2(dy_, dx_))
         ax.text(mx_, my_ + 9, "quarry incline", fontsize=7, rotation=ang_, ha="center", va="bottom", zorder=21, color="#4a2f18",
-                style="italic", bbox=dict(fc="white", ec="none", alpha=0.7, pad=0.2))
+                style="italic", bbox=dict(fc="white", ec="none", alpha=0.7, pad=0.2), clip_on=True)
 
 
 # ---------------------------------------------------------------- quarry tramway (Claude, 2026-11-10; Marcel: "teken de tramlijn")
@@ -591,6 +591,8 @@ BRIDGES.append(("footpath over the weir", "foot", (TOWN_WEIR.x - 14, TOWN_WEIR.y
 # ---------------------------------------------------------------- step 2: main roads (Marcel's sketch, traced)
 _RD = _json.load(open(os.path.join(HERE, "marcel_roads_2026-11-09.json")))
 MAIN_ROADS = [LineString(_chaikin([tuple(c) for c in ln], 2)) for ln in _RD["lines"]]
+# the hand tremor of the tracing out (Marcel ok, 2026-11-10): same route and the same end points, max ~2-6 m sideways
+MAIN_ROADS = [LineString(_chaikin(list(r.simplify(4).coords), 3)) for r in MAIN_ROADS]
 ROUNDABOUT = tuple(_RD["roundabout"])
 # the old straight road via the station bridge is gone (Marcel): its bridge goes; the new road crosses rail and river
 # by two separate bridges from different periods (Marcel)

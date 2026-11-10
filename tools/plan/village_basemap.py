@@ -24,8 +24,13 @@ NAME = args[4] if len(args) >= 5 else "core"
 OUT = os.path.join(HERE, f"../../design/world/basemap_{NAME}.png")
 
 
-def main():
-    x0, y0, x1, y1 = VIEW
+def view_has(g, x0, y0, x1, y1):
+    from shapely.geometry import box as _b
+    return g.intersects(_b(x0, y0, x1, y1))
+
+
+def main(view=None, out=None, title=None):
+    x0, y0, x1, y1 = view or VIEW
     nx = int((x1 - x0) / 1.5)
     ny = int((y1 - y0) / 1.5)
     xs = np.linspace(x0, x1, nx)
@@ -60,6 +65,8 @@ def main():
     fill(L.BROOK.buffer(3.5), "#9cc7dc", "#3f7fa8", 0.5, 3)
     fill(L.BROOK2.buffer(3.0), "#9cc7dc", "#3f7fa8", 0.5, 3)
     fill(L.GOIT.buffer(3.0), "#9cc7dc", "#3f7fa8", 0.5, 3)
+    fill(L.QUARRY_POND, "#9cc7dc", "#3f7fa8", 0.5, 3)
+    L._draw_tram(ax)
     for f_ in L.FALLS:
         ax.plot([f_.x - 5, f_.x + 5], [f_.y, f_.y], color="white", lw=2, zorder=3.5)
     # the ground plot + loop park + quay walk (decided)
@@ -67,6 +74,20 @@ def main():
     fill(L.LOOP_PARK, "#a9d08e", "#4f7a3a", 0.6, 2.6)
     fill(L.QUAY_WALK, "#a9d08e", "#4f7a3a", 0.6, 2.6)
     fill(L.MILL_BOX, "#7A6A5A", "#222", 0.8, 6)
+    # the old core (decided): its streets, church, churchyard, market, inn + green
+    import village_core_v2 as C
+    for nm_, ln_, w_, k_ in C.STREETS:
+        fill(ln_.buffer(w_ / 2), "#e3dccb", "#6b5a45", 0.6, 4.5)
+        if view_has(ln_, x0, y0, x1, y1):
+            p_ = ln_.interpolate(0.5, normalized=True)
+            ax.text(p_.x, p_.y, nm_, fontsize=6.5, ha="center", va="center", zorder=8, color="#3a2a1e", clip_on=True)
+    for fp_ in C.FOOTPATHS:
+        xx, yy = fp_.xy
+        ax.plot(xx, yy, color="#8a7a5a", lw=1.2, ls=(0, (2, 1.5)), zorder=4.6)
+    fill(C.CHURCHYARD, "#a9d08e", "#4f7a3a", 0.6, 4.4)
+    fill(C.CHURCH, "#7d7466", "#222", 0.8, 6)
+    fill(C.MARKET, "#d9cfb8", "#8a7a5a", 0.6, 4.4)
+    fill(C.INN, "#a0522d", "#222", 0.8, 6)
     # main roads (decided) + roundabout + bridges
     for rd in L.MAIN_ROADS:
         xx, yy = rd.xy
@@ -81,6 +102,9 @@ def main():
                     "rail": "#555", "foot": "#8a5a2b"}[kind_], mec="#222", zorder=7)
             ax.text(bx + 8, by + 8, name_, fontsize=7, zorder=8, clip_on=True, bbox=dict(fc="white", ec="none", alpha=0.7, pad=0.15))
     ax.text(L.MILL[0], L.MILL[1] + 16, "mill", fontsize=7, ha="center", zorder=8, clip_on=True)
+    if title:
+        ax.set_title(title, fontsize=11, loc="left")
+        return fig, ax
     ax.set_title(f"BASE MAP ({NAME}) — only what is decided. Contours 1 m (bold 5 m), grid 50 m, coordinates in metres. "
                  "Draw in purple / orange, not black, red or blue.", fontsize=11, loc="left")
     cx, cy = x1 - 40, y0 + 60

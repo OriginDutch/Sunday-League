@@ -143,7 +143,11 @@ def _seg_param(px, py, ax_, ay_, bx_, by_):
     L2 = dx * dx + dy * dy
     t = np.clip(((px - ax_) * dx + (py - ay_) * dy) / L2, 0, 1)
     qx, qy = ax_ + t * dx, ay_ + t * dy
-    return t, np.hypot(px - qx, py - qy), (px - qx) * (-dy) + (py - qy) * dx      # t, distance, signed side
+    d = np.hypot(px - qx, py - qy)
+    # signed side as a cosine (-1..1): normalised by the stretch length too, else clip(+-1) turns it into a hard
+    # switch that draws a dead-straight crease out from every bend in the crest (found 2026-11-10 by the quarry)
+    c = ((px - qx) * (-dy) + (py - qy) * dx) / (np.maximum(d, 1e-6) * np.sqrt(L2))
+    return t, d, np.tanh(4.0 * c) / np.tanh(4.0) * d          # t, distance, signed side (side/d is soft, -1..1)
 
 
 def height_raw(x, y):
@@ -205,12 +209,12 @@ def height_raw(x, y):
     valley = tilt + core
     h = h + valley * f_ + 4.0 * (1 - f_)                     # round the ground: one level platform at ~4 m
     # noise at three scales, stronger on the hill than in the valley
-    h = _quarry(x0_, y0_, h)
     hill_ = np.clip(h / TOP_H, 0, 1)
     h = h + (0.25 + hill_) * 7 * _noise(x0_, y0_, 420, 11) + hill_ * (4 * _noise(x0_, y0_, 160, 12) + 1.5 * _noise(x0_, y0_, 55, 13)) \
         + 0.6 * _noise(x0_, y0_, 160, 12)                     # the valley stays calm: long swells, no pockmarks
     # a little swell on top so nothing is a table (Marcel: natural, gentle height differences)
     h = h + 1.6 * np.sin(x0_ / 260.0 + 0.7) * np.cos(y0_ / 310.0 - 0.3) * f_
+    h = _quarry(x0_, y0_, h)                                   # last, so the floor is level and the tip meets it
     return np.maximum(h, 0.0)
 
 
@@ -218,18 +222,56 @@ def height_raw(x, y):
 # an irregular bite into the slope (worked faces, a spoil tip spilling out at the front), not a shape
 QUARRY = Polygon([P(-690, -150), P(-668, -168), P(-640, -160), P(-612, -178), P(-590, -150), P(-575, -118), P(-588, -92),
                   P(-570, -60), P(-602, -48), P(-630, -70), P(-655, -52), P(-684, -78), P(-702, -112)])
-QUARRY_FLOOR = 45.0
+QUARRY_RAW = QUARRY
+# rounded: a worked face never has a sharp outward corner, and inward corners become buttresses, not spikes
+QUARRY = QUARRY_RAW.buffer(-8).buffer(16).buffer(-8)
+QUARRY_FLOOR = 91.0          # open to the downhill side (land at the mouth ~90-91 m), faces up to ~23 m
+# Claude's call (Marcel: "dit is jouw stukje"): an abandoned millstone-grit quarry, as they look in the Pennines:
+# near-vertical faces worked in bays, a scree talus at their foot, a hummocky floor with a seepage pond under the
+# back face, and the spoil tipped out level from the mouth as a flat-topped tongue (the tramway leaves from its end)
+QUARRY_POND = Polygon([(-936, -320), (-928, -316), (-918, -318), (-912, -325), (-916, -332), (-926, -334), (-934, -329)]).buffer(2.5)
+SPOIL_TIP = Polygon([(-946, -276), (-904, -276), (-907, -246), (-918, -236), (-934, -234), (-943, -244)])
+SPOIL_TOP = QUARRY_FLOOR                # carted out level from the floor, tipped over the end
+TIP_HEAD = (-926, -234)                 # the end of the tip: where the tramway starts down
 
 
 def _quarry(x, y, h):
     from shapely import contains_xy, distance
+    sh = x.shape
+    x, y, h = x.ravel(), y.ravel(), np.asarray(h, dtype=float).ravel().copy()
+    F = QUARRY_FLOOR
     inside = contains_xy(QUARRY, x, y)
-    if not inside.any():
-        return h
-    edge = np.zeros(x.shape)
-    edge[inside] = distance(QUARRY.exterior, [Point(a, b) for a, b in zip(x[inside], y[inside])])
-    floor = QUARRY_FLOOR + np.clip(8.0 - edge, 0, 8) * 2.2          # the face rises steeply in the last 8 m
-    return np.where(inside & (h > floor), floor, h)
+    if inside.any():
+        xi, yi, hi = x[inside], y[inside], h[inside]
+        e = distance(QUARRY.exterior, [Point(a, b) for a, b in zip(xi, yi)])
+        # bays: the rim wanders 0-11 m in from the outline, so the face is a row of scoops and buttresses
+        floor = F + 0.7 * _noise(xi, yi, 22, 33) + 0.35 * _noise(xi, yi, 8, 34)      # hummocky spoil, not a table
+        # bays only where there is a real face (at the open mouth the rim stays put, so no lip is left standing)
+        bay = np.clip((hi - F) / 8.0, 0, 1)
+        e = e - bay * (5.5 + 5.5 * _noise(xi, yi, 26, 31)) + bay * 1.5 * _noise(xi, yi, 9, 32)
+        pd = distance(QUARRY_POND.exterior, [Point(a, b) for a, b in zip(xi, yi)])
+        pin = contains_xy(QUARRY_POND, xi, yi)
+        floor = np.where(pin, F - 0.6 - np.clip(pd / 4.0, 0, 1) * 0.8, floor)           # pond bed, ~1.4 m deep
+        H = np.maximum(hi - floor, 0.0)
+        tz = np.minimum(0.35 * H, 6.0)                       # scree piled up the foot of the face
+        cw = 1.5 + 0.12 * H                                  # the rock face itself: ~80 degrees
+        u = np.clip(e / cw, 0, 1)
+        u = u * u * (3 - 2 * u)
+        cliff = hi + (floor + tz - hi) * u
+        v = np.clip((e - cw) / np.maximum(tz / 0.7, 1e-6), 0, 1)                      # talus at ~35 degrees
+        talus = floor + tz * (1 - v) ** 1.4
+        z = np.where(e < cw, cliff, talus)
+        z = np.where(e <= 0, hi, z)
+        hi = np.where(hi > floor, z, hi)
+        h[inside] = hi
+    # the spoil tip: level top, ~35 degree tipped sides, laid over whatever is there
+    near = contains_xy(SPOIL_TIP.buffer(14), x, y)
+    if near.any():
+        xn, yn = x[near], y[near]
+        dt = distance(SPOIL_TIP, [Point(a, b) for a, b in zip(xn, yn)])
+        tip = SPOIL_TOP + 0.7 * _noise(xn, yn, 22, 33) + 0.35 * _noise(xn, yn, 8, 34) - 0.7 * dt   # same hummocks as the floor: no seam at the mouth
+        h[near] = np.maximum(h[near], tip)
+    return h.reshape(sh)
 
 
 # ---------------------------------------------------------------- viewpoint
@@ -452,7 +494,73 @@ def height(x, y):
     out = h.ravel().copy()
     for k_, (pts, bh_) in enumerate([] if NO_WATER else BROOKS):
         out = _carve(flat_x, flat_y, out, pts, bh_, ((45.0 if NO_RIVER else 90.0), 45.0, 55.0)[k_])
+    out = _tram_earthworks(flat_x, flat_y, out)
     return out.reshape(h.shape)
+
+
+def _draw_tram(ax, labels=True):
+    xs_, ys_ = TRAMWAY.xy
+    ax.plot(xs_, ys_, color="#6b3f1d", lw=2.2, zorder=7, solid_capstyle="butt")
+    L_ = TRAMWAY.length
+    dx_, dy_ = (xs_[1] - xs_[0]) / L_, (ys_[1] - ys_[0]) / L_
+    for c_ in np.arange(4, L_, 8):                  # sleepers
+        px_, py_ = xs_[0] + dx_ * c_, ys_[0] + dy_ * c_
+        ax.plot([px_ - dy_ * 3, px_ + dy_ * 3], [py_ + dx_ * 3, py_ - dx_ * 3], color="#6b3f1d", lw=0.8, zorder=7)
+    for g_, fc_ in ((STONE_YARD, "#c9b48f"), (DRUM_HOUSE, "#8a6a4a")):
+        ax.fill(*g_.exterior.xy, fc=fc_, ec="#4a2f18", lw=0.8, zorder=7.5)
+    if TRAM_BRIDGE:
+        bx_, by_ = TRAM_BRIDGE
+        for s_ in (-1, 1):
+            ax.plot([bx_ - dx_ * 7 + s_ * dy_ * 4.5, bx_ + dx_ * 7 + s_ * dy_ * 4.5],
+                    [by_ - dy_ * 7 - s_ * dx_ * 4.5, by_ + dy_ * 7 - s_ * dx_ * 4.5], color="#222", lw=1.2, zorder=8)
+    if labels:
+        ax.text(*STONE_YARD.centroid.coords[0], "stone\nyard", fontsize=6.5, ha="center", va="center", zorder=21, color="#2a1a0c")
+        mx_, my_ = TRAMWAY.interpolate(0.62, normalized=True).coords[0]
+        ang_ = np.degrees(np.arctan2(dy_, dx_))
+        ax.text(mx_, my_ + 9, "quarry incline", fontsize=7, rotation=ang_, ha="center", va="bottom", zorder=21, color="#4a2f18",
+                style="italic", bbox=dict(fc="white", ec="none", alpha=0.7, pad=0.2))
+
+
+# ---------------------------------------------------------------- quarry tramway (Claude, 2026-11-10; Marcel: "teken de tramlijn")
+# a self-acting incline: dead straight in plan (a rope incline can't bend), full wagons going down pull the empties up.
+# From the drum house on the spoil-tip head down to the stone yard at the end of Beacon Lane. Two grades with a knuckle
+# at the Mill Brook bridge: ~1:10 over the tip and the upper flank, ~1:6 below (a constant grade would run under the brook)
+STONE_YARD_C = (-430.0, -280.0)
+TRAMWAY = LineString([TIP_HEAD, STONE_YARD_C])
+TRAM_FORM_W = 5.0                                  # formation width (two tracks at the passing loop, one elsewhere)
+_tx = TRAMWAY.intersection(BROOK) if not NO_WATER else None
+TRAM_BRIDGE = (_tx.x, _tx.y) if (_tx is not None and not _tx.is_empty) else None
+_ch_b = TRAMWAY.project(Point(TRAM_BRIDGE)) if TRAM_BRIDGE else 180.0
+TRAM_PROFILE = ([0.0, _ch_b, TRAMWAY.length], [SPOIL_TOP, 73.0, 19.6])   # chainage (m) -> rail level (m)
+STONE_YARD = box(STONE_YARD_C[0] - 4, STONE_YARD_C[1] - 14, STONE_YARD_C[0] + 26, STONE_YARD_C[1] + 14)
+DRUM_HOUSE = Point(TIP_HEAD).buffer(4.0, cap_style=3)
+
+
+def tram_level(ch):
+    return np.interp(ch, *TRAM_PROFILE)
+
+
+def _tram_earthworks(x, y, h):
+    """Cuttings and embankments for the incline: a level formation, side slopes ~1:1.5; open at the brook bridge."""
+    from shapely import distance as _dist, line_locate_point
+    near = (x > -960) & (x < -400) & (y > -330) & (y < -190)
+    if not near.any():
+        return h
+    idx = np.nonzero(near)[0]
+    pts = [Point(a, b) for a, b in zip(x[idx], y[idx])]
+    d = _dist(TRAMWAY, pts)
+    ch = line_locate_point(TRAMWAY, pts)
+    z = tram_level(ch)
+    off = np.maximum(d - TRAM_FORM_W / 2, 0.0)
+    hh = h[idx]
+    hn = np.maximum(hh, z - off / 1.5)                 # embankment
+    hn = np.minimum(hn, z + off / 1.5)                 # cutting
+    if TRAM_BRIDGE is not None:
+        span = np.abs(ch - _ch_b) < 7.0               # the bridge: the brook runs free underneath
+        hn = np.where(span, hh, hn)
+    h = h.copy()
+    h[idx] = hn
+    return h
 
 
 def _carve(flat_x, flat_y, out, pts, bh_, width=45.0):
@@ -655,6 +763,9 @@ def main():
                 bbox=dict(fc="white", ec="none", alpha=0.75, pad=0.2))
     qx_, qy_ = QUARRY.exterior.xy
     ax.fill(qx_, qy_, fc="#d9d2c3", ec="#6b5a45", lw=1.0, hatch="..", zorder=3)
+    ax.fill(*QUARRY_POND.exterior.xy, fc="#9cc7dc", ec="#3f7fa8", lw=0.5, zorder=3.2)
+    ax.fill(*SPOIL_TIP.exterior.xy, fc="#cfc6b2", ec="#6b5a45", lw=0.6, zorder=3.1)
+    _draw_tram(ax)
     ax.text(QUARRY.centroid.x, QUARRY.centroid.y, "old quarry", fontsize=8, style="italic", ha="center", zorder=20, color="#3a2a1e")
     if not NO_WATER:
       ax.text(-310, 860, "Holme Beck (name: proposal)", color="#245", fontsize=8, rotation=75, weight="bold", ha="center", va="center",

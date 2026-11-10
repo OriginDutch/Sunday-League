@@ -29,7 +29,7 @@ import world_plan_v5 as W
 OUT = os.path.join(HERE, "../../design/world/village_district_A_v1.png")
 VIEW = (-260, -275, 245, 165)
 ch = L._chaikin
-RING, TERR = 10.5, 8.5
+RING, TERR = 10.5, 10.0         # terrace streets: 7 m carriageway (parking both sides + a 3.5 m lane; Marcel: A) + 2 x 1.5 m pavements
 MAIN = unary_union(L.MAIN_ROADS)
 PLOT = W.PLOT
 
@@ -67,7 +67,7 @@ STREETS = [
     # terrace streets
     ("Green Road", S([_A1_w, (-180, 109), (-146.5, 113)], 1), TERR, "street"),
     ("Turnstile Lane", S([(-146.5, 51), (-180, 45), _A2_w], 1), TERR, "street"),
-    ("Car Park Lane", S([(29, -136), (33, -139), (34, -148), (34, -185)], 2), TERR, "street"),
+    ("Car Park Lane", S([(29, -136), (32.5, -139), (33.3, -148), (33.3, -180), (34, -185)], 2), TERR, "street"),
     ("Albert Street", S([(-109, -172), (-96, -178), (-80, -182), (-40, -184), (34, -185)], 2), TERR, "street"),
     ("Fenton Road", S([(86, -185), (82, -205), (78, -228), _A4_s], 2), TERR, "street"),
     ("Lock Lane", S([(150.5, -84), (205, -85)], 1), TERR, "street"),
@@ -185,6 +185,18 @@ def _fit(region, w_, h_):
                 return r_
     return best
 CHURCH_HALL = _fit(NE_GREEN, 20, 11)
+# the club square furnished (Marcel: fewer trees, only along the edges; a statue, benches, a kiosk)
+_sq_open = CLUB_SQUARE.difference(CLUBHOUSE.buffer(6))
+_sq_c = _sq_open.centroid if _sq_open.buffer(-6).contains(_sq_open.centroid) else _sq_open.buffer(-6).representative_point()
+SQUARE_STATUE = (_sq_c.x, _sq_c.y)
+SQUARE_KIOSK = _fit(CLUB_SQUARE.difference(CLUBHOUSE.buffer(4)).difference(Point(*SQUARE_STATUE).buffer(10)), 4, 3)
+SQUARE_TREES = []
+_edge = CLUB_SQUARE.buffer(-3.5).exterior
+for _d in np.arange(4, _edge.length, 12.0):
+    _p = _edge.interpolate(_d)
+    if not _p.buffer(3).intersects(unary_union([CLUBHOUSE, SQUARE_KIOSK or Point(0, 0)])):
+        SQUARE_TREES.append((_p.x, _p.y))
+SQUARE_BENCHES = [(x_ + 2.5, y_) for x_, y_ in SQUARE_TREES[::2]]
 HOUSE_LINES = [LineString(h.exterior.coords) for h in HOUSES]
 FRONT_U = unary_union(FRONT)
 
@@ -288,7 +300,11 @@ def main(path=OUT, for_overlay=False, sketch=False):
     fill(NE_GREEN, "#8DBF73", "#4f7a3a", 0.8, 4.2)
     fill(CLUB_SQUARE, "#d8cfbf", "#8a7a5a", 0.8, 4.2)
     g_ = np.random.default_rng(4)
-    for zone, n_ in ((CLUB_SQUARE.buffer(-4).difference(CLUBHOUSE.buffer(4)), 14), (NE_GREEN.buffer(-3).difference(CHURCH_HALL.buffer(3) if CHURCH_HALL else Point(0, 0)), 10)):
+    ax.scatter([t[0] for t in SQUARE_TREES], [t[1] for t in SQUARE_TREES], s=60, c="#5f8f4a", edgecolors="#2f5a2a", linewidths=0.6, zorder=8)
+    ax.plot([SQUARE_STATUE[0]], [SQUARE_STATUE[1]], marker="*", ms=12, mfc="#555", mec="#111", zorder=9)
+    if SQUARE_KIOSK is not None:
+        fill(SQUARE_KIOSK, "#1D4F91", "#222", 0.8, 8)
+    for zone, n_ in ((NE_GREEN.buffer(-3).difference(CHURCH_HALL.buffer(3) if CHURCH_HALL else Point(0, 0)), 10),):
         pts_ = []
         while len(pts_) < n_:
             p_ = Point(g_.uniform(*zone.bounds[0::2]), g_.uniform(*zone.bounds[1::2]))

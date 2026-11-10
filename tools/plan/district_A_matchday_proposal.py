@@ -28,7 +28,10 @@ GATES = [((-10, -129), "1  MAIN GATE\nticket office, home turnstiles\n(main stan
 PUBS = [(corner_at(25, -150), "Main Gate pub\n(opposite the main gate)"),
         (corner_at(196, 81), "away pub\n(by the road bridge)")]
 SHOPS = [(corner_at(-162, 39), "corner shop\n(home end)"), (corner_at(93, -198), "corner shop"), (corner_at(162, -92), "corner shop")]
-COACH_BAY = box(139.8, 0, 143.4, 60)                          # 3.6 m on the ground side of South Street: 4 coaches
+COACH_BAY = box(139.8, 0, 143.4, 60)                          # 3.6 m on the ground side of South Street: 4 coaches now
+# the bay grows with the club (Marcel: B): the whole strip between fence and kerb is kept free for it, ~14 coaches at the top
+COACH_BAY_RESERVE = box(139.8, -163, 143.4, 62).difference(COACH_BAY)
+COACH_SLOTS_NOW = [(141.6, 7.5 + 15 * k) for k in range(4)]     # 12 m coaches, 15 m apart
 AWAY_ROUTE = LineString([(206, 145), (196, 129), (174, 125), (168, 112), (164, 103), (150, 100), (139, 100)])   # road bridge -> along the quay walk -> green -> gate
 
 
@@ -58,7 +61,12 @@ if __name__ == "__main__":
                         arrowprops=dict(arrowstyle="-", color="#7a5a10", lw=0.8), bbox=dict(fc="white", ec="none", alpha=0.85, pad=0.2))
         xs, ys = COACH_BAY.exterior.xy
         ax.fill(xs, ys, fc="#c0392b", ec="#222", lw=0.8, alpha=0.8, zorder=39)
-        ax.text(132, 30, "away coach bay\n(4 coaches)", fontsize=7, color="#c0392b", ha="right", zorder=41, weight="bold",
+        for q_ in getattr(COACH_BAY_RESERVE, "geoms", [COACH_BAY_RESERVE]):
+            xs, ys = q_.exterior.xy
+            ax.fill(xs, ys, fc="none", ec="#c0392b", lw=0.8, hatch="////", alpha=0.7, zorder=39)
+        ax.text(132, -80, "kept free: the coach bay\ngrows with the club\n(up to ~14 coaches)", fontsize=7, color="#c0392b", ha="right",
+                zorder=41, bbox=dict(fc="white", ec="none", alpha=0.85, pad=0.2))
+        ax.text(132, 30, "away coach bay\n(4 coaches now)", fontsize=7, color="#c0392b", ha="right", zorder=41, weight="bold",
                 bbox=dict(fc="white", ec="none", alpha=0.85, pad=0.2))
         xs, ys = AWAY_ROUTE.xy
         ax.plot(xs, ys, color="#c0392b", lw=2.5, ls=(0, (3, 2)), zorder=38)

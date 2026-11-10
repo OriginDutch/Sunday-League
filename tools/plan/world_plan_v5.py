@@ -72,7 +72,7 @@ def _kink(poly, keep, seed=5):
     return Polygon(out)
 
 
-GATES_KEEP = [(-10, -129, 30), (137, 100, 20), (-139, 20, 26), (-150, -125, 30), (40, -162, 12)]
+GATES_KEEP = [(-10, -129, 30), (137, 100, 20), (-139, 50, 26), (-150, -125, 30), (40, -162, 12)]
 PLOT = _kink(PLOT, GATES_KEEP)
 assert PLOT.buffer(0.01).contains(MAXL), "max line must fit inside the plot"
 
@@ -420,7 +420,7 @@ def ground(stage):
         path("home NW", [(-140, -118), (-112, -100), (-82, -30)], w=5)
         path("clubhouse", [(-158, -110), (-158, -100)], w=3)
         # home approach from Chapel Row
-        path("home N", [(-139, 20), (-82, 20)], w=5)
+        path("home N", [(-139, 50), (-112, 50), (-82, 22)], w=5)     # town plan step 4: the home end turnstiles face Turnstile Lane (y 50)
         # inside the paying fence: home end kiosks
         bld("chip van", box(-76, 30, -70, 42), label="chip van", fs=6.5)
         bld("tea hut", box(-76, -20, -70, -12), label="tea", fs=6.5)
